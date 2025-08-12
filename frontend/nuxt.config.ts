@@ -4,30 +4,16 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
 
   modules: [
-    '@nuxtjs/tailwindcss',
     '@nuxt/content',
     '@nuxt/eslint',
     '@nuxt/image',
     '@nuxt/scripts',
     '@nuxt/test-utils',
-    '@nuxt/ui',
+    '@nuxt/ui',        // This includes Tailwind v4 support
     '@nuxt/icon'
   ],
 
   css: ['~/assets/css/main.css'],
-
-  // Fix PostCSS configuration
-  postcss: {
-    plugins: {
-      '@tailwindcss/postcss': {},
-      autoprefixer: {}
-    }
-  },
-
-  tailwindcss: {
-    cssPath: '~/assets/css/main.css',
-    configPath: 'tailwind.config.js'
-  },
 
   runtimeConfig: {
     public: {

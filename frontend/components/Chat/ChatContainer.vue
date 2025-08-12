@@ -17,7 +17,7 @@
                 Digi Setu AI
               </h1>
               <p class="text-sm text-gray-600 flex items-center">
-                <div class="w-2 h-2 bg-green-400 rounded-full mr-2"></div>
+                <span class="w-2 h-2 bg-green-400 rounded-full mr-2 inline-block"></span>
                 {{ getProviderName(currentProvider) }} • {{ connectionStatus }}
               </p>
             </div>
@@ -154,28 +154,77 @@ const handleSubmit = async () => {
   await simulateThinking()
 
   try {
-    const response = await $fetch(`${config.public.apiBase}/chat`, {
-      method: 'POST',
-      body: {
-        messages: messages.value.map(m => ({ 
-          role: m.role, 
-          content: m.content
-        })),
-        provider: selectedProvider.value
-      }
-    })
-
+    // Create assistant message for streaming
     const assistantMessage = {
       id: generateId(),
       role: 'assistant',
-      content: response.response || 'No response received',
+      content: '',
       timestamp: new Date(),
       thinking: 'I analyzed your request and selected the best approach to provide a comprehensive answer.',
       components: []
     }
-
     messages.value.push(assistantMessage)
-    currentProvider.value = response.provider || selectedProvider.value
+    
+    // Use fetch with streaming
+    const response = await fetch(`${config.public.apiBase}/chat`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        messages: messages.value.slice(0, -1).map(m => ({ 
+          role: m.role, 
+          content: m.content
+        })),
+        provider: selectedProvider.value
+      })
+    })
+
+    if (!response.body) {
+      throw new Error('No response body')
+    }
+
+    const reader = response.body.getReader()
+    const decoder = new TextDecoder()
+
+    // Handle streaming data
+    while (true) {
+      const { done, value } = await reader.read()
+      
+      if (done) break
+      
+      const chunk = decoder.decode(value, { stream: true })
+      const lines = chunk.split('\n')
+      
+      for (const line of lines) {
+        if (line.startsWith('data: ')) {
+          const data = line.slice(6) // Remove 'data: ' prefix
+          
+          if (data.trim() === '[DONE]') {
+            return
+          }
+          
+          try {
+            const parsed = JSON.parse(data)
+            if (parsed.content) {
+              // Append content to the assistant message
+              const lastMessage = messages.value[messages.value.length - 1]
+              lastMessage.content += parsed.content
+              currentProvider.value = parsed.provider || selectedProvider.value
+              await scrollToBottom()
+            } else if (parsed.error) {
+              console.error('Stream error:', parsed.error)
+              const lastMessage = messages.value[messages.value.length - 1]
+              lastMessage.content = `Error: ${parsed.error}`
+              return
+            }
+          } catch (parseError) {
+            // Skip invalid JSON chunks
+            continue
+          }
+        }
+      }
+    }
     
   } catch (error) {
     console.error('Chat error:', error)

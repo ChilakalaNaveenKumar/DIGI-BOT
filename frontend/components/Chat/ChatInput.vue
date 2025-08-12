@@ -17,7 +17,7 @@
           </div>
         </div>
         <button
-          @click="$emit('file-remove')"
+          @click="emit('file-remove')"
           class="p-2 text-red-500 hover:text-red-700 hover:bg-red-50 rounded-lg transition-all duration-200"
         >
           ❌
@@ -26,7 +26,7 @@
     </div>
 
     <!-- Enhanced Input Form -->
-    <form @submit.prevent="$emit('submit')" class="flex items-end space-x-4">
+    <form @submit.prevent="emit('submit')" class="flex items-end space-x-4">
       <!-- Enhanced File Upload -->
       <label class="cursor-pointer group">
         <input
@@ -44,12 +44,12 @@
       <div class="flex-1 relative">
         <textarea
           :value="modelValue"
-          @input="updateValue"
+          @input="handleInput"
           placeholder="Describe what you'd like to create, ask a question, or upload a file..."
           :disabled="loading"
           rows="1"
           class="w-full min-h-[48px] max-h-32 px-6 py-4 bg-white border-2 border-gray-200 rounded-2xl resize-none focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent shadow-sm hover:shadow-md transition-all duration-200 placeholder-gray-500 text-gray-800"
-          @keydown.enter.exact.prevent="$emit('submit')"
+          @keydown.enter.exact.prevent="emit('submit')"
         />
         
         <!-- Character count -->
@@ -74,7 +74,7 @@
       <button
         v-for="quickAction in quickActions"
         :key="quickAction.text"
-        @click="$emit('update:modelValue', quickAction.text)"
+        @click="emit('update:modelValue', quickAction.text)"
         type="button"
         class="inline-flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-600 hover:text-blue-600 hover:border-blue-300 hover:bg-gradient-to-r hover:from-blue-50 hover:to-purple-50 transition-all duration-200 shadow-sm hover:shadow-md hover:scale-105"
       >
@@ -92,7 +92,7 @@ defineProps({
   uploadedFile: Object
 })
 
-defineEmits(['submit', 'file-upload', 'file-remove', 'update:modelValue'])
+const emit = defineEmits(['submit', 'file-upload', 'file-remove', 'update:modelValue'])
 
 const quickActions = [
   { label: 'Explain concept', text: 'Explain this concept in simple terms with examples', emoji: '💡' },
@@ -102,12 +102,15 @@ const quickActions = [
   { label: 'Design flowchart', text: 'Create a flowchart to visualize this process', emoji: '📊' }
 ]
 
-const updateValue = (event) => {
-  $emit('update:modelValue', event.target.value)
+const handleInput = (event) => {
+  emit('update:modelValue', event.target.value)
+  // Auto-resize textarea
+  event.target.style.height = 'auto'
+  event.target.style.height = Math.min(event.target.scrollHeight, 128) + 'px'
 }
 
 const handleFileUpload = (event) => {
-  $emit('file-upload', event)
+  emit('file-upload', event)
 }
 
 const getFileType = (file) => {
