@@ -16,8 +16,16 @@ export default defineNuxtConfig({
   css: ['~/assets/css/main.css'],
 
   runtimeConfig: {
+    // Private keys (only available on server-side)
+    openaiApiKey: process.env.OPENAI_API_KEY,
+    anthropicApiKey: process.env.ANTHROPIC_API_KEY,
+    grokApiKey: process.env.GROK_API_KEY,
+    
+    // Public keys (exposed to client-side)
     public: {
-      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8000/api'
+      apiBase: process.env.NUXT_PUBLIC_API_BASE || 'http://localhost:8000/api',
+      appName: 'Digi Setu AI',
+      appDescription: 'Transform static content into interactive learning experiences with AI'
     }
   }
 })

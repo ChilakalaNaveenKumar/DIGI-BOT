@@ -165,6 +165,7 @@ npm run lint         # Run ESLint
 ### Backend Development
 ```bash
 cd backend
+source venv/bin/activate
 uvicorn main:app --reload --port 8000    # Development server
 python -m pytest                         # Run tests (when added)
 ```

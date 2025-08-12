@@ -64,6 +64,10 @@
   animation: fadeIn 0.5s ease-in-out;
 }
 
+.animate-pulse-slow {
+  animation: pulse-slow 3s ease-in-out infinite;
+}
+
 @keyframes fadeIn {
   from { 
     opacity: 0; 
@@ -73,4 +77,70 @@
     opacity: 1; 
     transform: translateY(0); 
   }
+}
+
+@keyframes pulse-slow {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.7;
+  }
+}
+
+/* EMERGENCY FIX for text visibility - HIGH CONTRAST */
+.chat-message,
+.message-content,
+.ai-response,
+.ai-code-content {
+  color: #ffffff !important;
+}
+
+.chat-message p,
+.chat-message li,
+.chat-message span,
+.chat-message div,
+.ai-code-content p,
+.ai-code-content li,
+.ai-code-content span,
+.ai-code-content div {
+  color: #ffffff !important;
+}
+
+/* Fix numbered lists specifically */
+.chat-message ol,
+.chat-message ul,
+.ai-code-content ol,
+.ai-code-content ul {
+  color: #ffffff !important;
+}
+
+.chat-message ol li,
+.chat-message ul li,
+.ai-code-content ol li,
+.ai-code-content ul li {
+  color: #ffffff !important;
+  margin-bottom: 12px;
+}
+
+/* Make sure bold text is visible */
+.chat-message strong,
+.chat-message b,
+.ai-code-content strong,
+.ai-code-content b {
+  color: #ffffff !important;
+  font-weight: 600;
+}
+
+/* Force visibility for all text elements */
+.dark .ai-code-content,
+.dark .message-content,
+.dark .chat-message {
+  color: #ffffff !important;
+}
+
+.dark .ai-code-content *,
+.dark .message-content *,
+.dark .chat-message * {
+  color: #ffffff !important;
 }

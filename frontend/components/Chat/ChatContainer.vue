@@ -1,7 +1,7 @@
 <template>
-  <div class="min-h-screen bg-gradient-to-br from-gray-50 via-white to-blue-50">
+  <div class="min-h-screen bg-white dark:bg-gray-900">
     <!-- Enhanced Header -->
-    <header class="sticky top-0 z-50 backdrop-blur-xl bg-white/80 border-b border-gray-200/50 shadow-sm">
+    <header class="sticky top-0 z-50 backdrop-blur-xl bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-700 shadow-sm">
       <div class="max-w-5xl mx-auto px-6 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-4">
@@ -13,20 +13,31 @@
               <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
             </div>
             <div>
-              <h1 class="text-xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent">
+              <h1 class="text-xl font-bold text-gray-900 dark:text-white">
                 Digi Setu AI
               </h1>
-              <p class="text-sm text-gray-600 flex items-center">
+              <p class="text-sm text-gray-600 dark:text-gray-300 flex items-center">
                 <span class="w-2 h-2 bg-green-400 rounded-full mr-2 inline-block"></span>
                 {{ getProviderName(currentProvider) }} • {{ connectionStatus }}
               </p>
             </div>
           </div>
           
-          <ProviderSelector 
-            v-model="selectedProvider" 
-            @change="handleProviderChange"
-          />
+          <div class="flex items-center gap-3">
+            <button
+              @click="toggleTheme"
+              class="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
+              :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+            >
+              <Sun v-if="theme === 'dark'" class="w-5 h-5" />
+              <Moon v-else class="w-5 h-5" />
+            </button>
+            
+            <ProviderSelector 
+              v-model="selectedProvider" 
+              @change="handleProviderChange"
+            />
+          </div>
         </div>
       </div>
     </header>
@@ -39,29 +50,16 @@
         <div v-if="messages.length === 0" class="text-center py-16">
           <div class="relative mb-8">
             <div class="w-24 h-24 bg-gradient-to-r from-blue-500 to-purple-600 rounded-3xl mx-auto flex items-center justify-center shadow-2xl hover:scale-105 transition-transform duration-300">
-              <span class="text-white text-3xl">🎯</span>
+              <Icon name="lucide:sparkles" size="32" class="text-white" />
             </div>
             <div class="absolute -top-2 -right-2 w-6 h-6 bg-green-400 rounded-full animate-bounce"></div>
           </div>
-          <h2 class="text-3xl font-bold bg-gradient-to-r from-gray-900 to-gray-700 bg-clip-text text-transparent mb-4">
+          <h2 class="text-3xl font-bold text-gray-900 dark:text-white mb-4">
             Ready to transform your content?
           </h2>
-          <p class="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed mb-8">
+          <p class="text-gray-600 dark:text-gray-300 max-w-2xl mx-auto text-lg leading-relaxed">
             Upload documents, paste text, or describe what you'd like to create. I'll help you build interactive learning experiences with AI.
           </p>
-          
-          <!-- Sample Actions -->
-          <div class="flex flex-wrap gap-3 justify-center max-w-2xl mx-auto">
-            <button
-              v-for="sample in samplePrompts"
-              :key="sample.text"
-              @click="input = sample.text"
-              class="inline-flex items-center space-x-2 px-4 py-2 bg-white border border-gray-200 rounded-xl text-sm text-gray-700 hover:text-blue-600 hover:border-blue-300 hover:bg-blue-50 transition-all duration-200 shadow-sm hover:shadow-md"
-            >
-              <span>{{ sample.emoji }}</span>
-              <span>{{ sample.label }}</span>
-            </button>
-          </div>
         </div>
 
         <!-- Enhanced Chat Messages -->
@@ -88,12 +86,13 @@
     </main>
 
     <!-- Enhanced Input Area (Fixed Bottom) -->
-    <footer class="sticky bottom-0 bg-white/95 backdrop-blur-xl border-t border-gray-200/50 shadow-lg">
+    <footer class="sticky bottom-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-700 shadow-lg">
       <div class="max-w-5xl mx-auto px-6 py-6">
         <ChatInput
           v-model="input"
           :loading="isLoading"
           :uploaded-file="uploadedFile"
+          :selected-provider="getProviderName(selectedProvider)"
           @submit="handleSubmit"
           @file-upload="handleFileUpload"
           @file-remove="removeFile"
@@ -105,17 +104,24 @@
 
 <script setup>
 import { ref, nextTick, onMounted } from 'vue'
+import { Sun, Moon } from 'lucide-vue-next'
 import MessageBubble from './MessageBubble.vue'
 import ThinkingIndicator from './ThinkingIndicator.vue'
 import ChatInput from './ChatInput.vue'
 import ProviderSelector from '../UI/ProviderSelector.vue'
+import { useTheme } from '~/composables/useTheme.js'
+import { useAiChat } from '~/composables/useAiChat.ts'
 
 const config = useRuntimeConfig()
 
-// State management
-const messages = ref([])
+// Theme management
+const { theme, toggleTheme } = useTheme()
+
+// AI SDK Chat management
+const { messages, isLoading, sendMessage, reload, selectedProvider: aiSelectedProvider } = useAiChat()
+
+// Local state
 const input = ref('')
-const isLoading = ref(false)
 const isThinking = ref(false)
 const thinkingStage = ref('')
 const selectedProvider = ref('openai')
@@ -124,123 +130,26 @@ const connectionStatus = ref('Ready')
 const uploadedFile = ref(null)
 const messagesContainer = ref(null)
 
-// Enhanced sample prompts
-const samplePrompts = ref([
-  { label: 'Explain a concept', text: 'Explain photosynthesis in an engaging way', emoji: '💡' },
-  { label: 'Create a quiz', text: 'Create an interactive quiz about the solar system', emoji: '❓' },
-  { label: 'Make a timeline', text: 'Create a timeline of World War II events', emoji: '📅' },
-  { label: 'Build a diagram', text: 'Create a flowchart showing how rain forms', emoji: '🌧️' }
-])
 
-// Enhanced submission with thinking process
+
+// AI SDK-style submission
 const handleSubmit = async () => {
   if (!input.value.trim() || isLoading.value) return
 
-  const userMessage = {
-    id: generateId(),
-    role: 'user',
-    content: input.value.trim(),
-    timestamp: new Date(),
-    file: uploadedFile.value
-  }
-
-  messages.value.push(userMessage)
-  const currentInput = input.value
-  input.value = ''
-  isLoading.value = true
-  
   // Enhanced thinking process
   isThinking.value = true
   await simulateThinking()
 
   try {
-    // Create assistant message for streaming
-    const assistantMessage = {
-      id: generateId(),
-      role: 'assistant',
-      content: '',
-      timestamp: new Date(),
-      thinking: 'I analyzed your request and selected the best approach to provide a comprehensive answer.',
-      components: []
-    }
-    messages.value.push(assistantMessage)
-    
-    // Use fetch with streaming
-    const response = await fetch(`${config.public.apiBase}/chat`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        messages: messages.value.slice(0, -1).map(m => ({ 
-          role: m.role, 
-          content: m.content
-        })),
-        provider: selectedProvider.value
-      })
-    })
-
-    if (!response.body) {
-      throw new Error('No response body')
-    }
-
-    const reader = response.body.getReader()
-    const decoder = new TextDecoder()
-
-    // Handle streaming data
-    while (true) {
-      const { done, value } = await reader.read()
-      
-      if (done) break
-      
-      const chunk = decoder.decode(value, { stream: true })
-      const lines = chunk.split('\n')
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6) // Remove 'data: ' prefix
-          
-          if (data.trim() === '[DONE]') {
-            return
-          }
-          
-          try {
-            const parsed = JSON.parse(data)
-            if (parsed.content) {
-              // Append content to the assistant message
-              const lastMessage = messages.value[messages.value.length - 1]
-              lastMessage.content += parsed.content
-              currentProvider.value = parsed.provider || selectedProvider.value
-              await scrollToBottom()
-            } else if (parsed.error) {
-              console.error('Stream error:', parsed.error)
-              const lastMessage = messages.value[messages.value.length - 1]
-              lastMessage.content = `Error: ${parsed.error}`
-              return
-            }
-          } catch (parseError) {
-            // Skip invalid JSON chunks
-            continue
-          }
-        }
-      }
-    }
-    
-  } catch (error) {
-    console.error('Chat error:', error)
-    const errorMessage = {
-      id: generateId(),
-      role: 'assistant',
-      content: 'Sorry, I encountered an error. Please try again.',
-      timestamp: new Date()
-    }
-    messages.value.push(errorMessage)
-    connectionStatus.value = 'Error'
-  } finally {
-    isLoading.value = false
-    isThinking.value = false
+    await sendMessage(input.value.trim())
+    input.value = ''
     uploadedFile.value = null
     await scrollToBottom()
+  } catch (error) {
+    console.error('Chat error:', error)
+    connectionStatus.value = 'Error'
+  } finally {
+    isThinking.value = false
   }
 }
 
@@ -264,6 +173,7 @@ const simulateThinking = async () => {
 const handleProviderChange = (newProvider) => {
   selectedProvider.value = newProvider
   currentProvider.value = newProvider
+  aiSelectedProvider.value = newProvider // Sync with AI SDK
   connectionStatus.value = 'Connecting...'
   
   setTimeout(() => {

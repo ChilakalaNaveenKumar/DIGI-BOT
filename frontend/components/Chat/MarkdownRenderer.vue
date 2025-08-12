@@ -41,12 +41,20 @@ const renderedContent = computed(() => {
   line-height: 1.625;
 }
 
+:root.dark .markdown-content {
+  color: #e5e7eb;
+}
+
 .markdown-content :deep(h1) {
   font-size: 1.5rem;
   font-weight: 700;
   color: #111827;
   margin-bottom: 1rem;
   margin-top: 1.5rem;
+}
+
+:root.dark .markdown-content :deep(h1) {
+  color: #ffffff;
 }
 
 .markdown-content :deep(h2) {
@@ -57,12 +65,20 @@ const renderedContent = computed(() => {
   margin-top: 1.25rem;
 }
 
+:root.dark .markdown-content :deep(h2) {
+  color: #ffffff;
+}
+
 .markdown-content :deep(h3) {
   font-size: 1.125rem;
   font-weight: 600;
   color: #111827;
   margin-bottom: 0.5rem;
   margin-top: 1rem;
+}
+
+:root.dark .markdown-content :deep(h3) {
+  color: #ffffff;
 }
 
 .markdown-content :deep(p) {
@@ -83,8 +99,12 @@ const renderedContent = computed(() => {
 }
 
 .markdown-content :deep(li) {
-  color: #374151;
+  color: #4b5563;
   margin-bottom: 0.25rem;
+}
+
+:root.dark .markdown-content :deep(li) {
+  color: #d1d5db;
 }
 
 .markdown-content :deep(blockquote) {
@@ -95,13 +115,22 @@ const renderedContent = computed(() => {
   margin: 1rem 0;
 }
 
+:root.dark .markdown-content :deep(blockquote) {
+  color: #9ca3af;
+}
+
 .markdown-content :deep(code) {
   background-color: #f3f4f6;
+  color: #1f2937;
   padding: 0.125rem 0.5rem;
   border-radius: 0.25rem;
   font-size: 0.875rem;
   font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
-  color: #1f2937;
+}
+
+:root.dark .markdown-content :deep(code) {
+  background-color: #374151;
+  color: #e5e7eb;
 }
 
 .markdown-content :deep(pre) {
@@ -111,6 +140,12 @@ const renderedContent = computed(() => {
   border-radius: 0.5rem;
   overflow-x: auto;
   margin: 1rem 0;
+  border: 1px solid #374151;
+}
+
+:root.dark .markdown-content :deep(pre) {
+  background-color: #1f2937;
+  border-color: #4b5563;
 }
 
 .markdown-content :deep(pre code) {
@@ -150,6 +185,10 @@ const renderedContent = computed(() => {
 .markdown-content :deep(strong) {
   font-weight: 600;
   color: #111827;
+}
+
+:root.dark .markdown-content :deep(strong) {
+  color: #ffffff;
 }
 
 .markdown-content :deep(em) {

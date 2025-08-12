@@ -2,7 +2,7 @@
   <div class="group relative animate-fade-in">
     <!-- AI Message -->
     <div v-if="message.role === 'assistant'" class="flex items-start space-x-4">
-      <!-- Enhanced Avatar -->
+      <!-- Real Provider Icon Avatar -->
       <div class="relative flex-shrink-0">
         <div class="w-10 h-10 bg-white dark:bg-gray-800 border-2 border-gray-200 dark:border-gray-600 rounded-2xl flex items-center justify-center shadow-lg hover:scale-110 transition-transform duration-200">
           <ProviderIcon :provider="provider" :size="24" />
@@ -12,41 +12,27 @@
       
       <!-- Message Content -->
       <div class="flex-1 max-w-4xl space-y-4">
-        <!-- Thinking Process -->
-        <div v-if="message.thinking" class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 border border-blue-200 dark:border-gray-600 rounded-2xl p-4 shadow-sm">
+        <!-- Thinking Process (AI SDK Style) -->
+        <div v-if="isLoading && message.content === ''" class="bg-gradient-to-r from-blue-50 to-purple-50 dark:from-gray-800 dark:to-gray-700 border border-blue-200 dark:border-gray-600 rounded-2xl p-4 shadow-sm">
           <div class="flex items-center space-x-2 mb-3">
-            <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
+            <div class="flex space-x-1">
+              <div class="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce"></div>
+              <div class="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce" style="animation-delay: 0.15s"></div>
+              <div class="w-1.5 h-1.5 bg-blue-500 dark:bg-blue-400 rounded-full animate-bounce" style="animation-delay: 0.3s"></div>
+            </div>
             <span class="text-sm font-medium text-blue-700 dark:text-blue-300 flex items-center gap-2">
               <Icon name="lucide:brain" size="16" class="text-blue-600 dark:text-blue-400" />
-              Thinking process
+              AI is thinking...
             </span>
           </div>
-          <p class="text-sm text-blue-600 dark:text-blue-400 italic leading-relaxed">{{ message.thinking }}</p>
+          <p class="text-sm text-blue-600 dark:text-blue-400 italic leading-relaxed">Processing your request...</p>
         </div>
         
-        <!-- Main Response -->
-        <div class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+        <!-- Main Response with AI SDK Rendering -->
+        <div v-if="message.content" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
           <!-- Content with Enhanced Rendering -->
           <div class="p-6">
-            <MarkdownRenderer :content="message.content" />
-          </div>
-          
-          <!-- Interactive Components -->
-          <div v-if="message.components && message.components.length > 0" class="border-t border-gray-100 dark:border-gray-600 p-4 bg-gray-50 dark:bg-gray-700">
-            <div class="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 flex items-center gap-2">
-              <Icon name="lucide:gamepad-2" size="16" class="text-gray-600 dark:text-gray-400" />
-              Interactive Elements:
-            </div>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-3">
-              <button
-                v-for="component in message.components"
-                :key="component.type"
-                class="flex items-center space-x-2 p-3 bg-white dark:bg-gray-800 rounded-xl border dark:border-gray-600 hover:border-blue-300 hover:bg-blue-50 dark:hover:bg-gray-600 transition-all"
-              >
-                <span>{{ component.emoji }}</span>
-                <span class="text-sm text-gray-700 dark:text-gray-300">{{ component.label }}</span>
-              </button>
-            </div>
+            <AiCodeBlock :content="message.content" />
           </div>
           
           <!-- Enhanced Action Bar -->
@@ -65,28 +51,19 @@
                 <Heart class="w-4 h-4" />
               </button>
             </div>
-            <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatTime(message.timestamp) }}</span>
+            <span class="text-xs text-gray-500 dark:text-gray-400">{{ formatTime(message.createdAt) }}</span>
           </div>
         </div>
       </div>
     </div>
 
-    <!-- Enhanced User Message -->
+    <!-- User Message -->
     <div v-else class="flex items-start space-x-4 justify-end">
       <div class="max-w-2xl">
         <div class="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl px-6 py-4 shadow-lg hover:shadow-xl transition-shadow">
           <p class="text-sm whitespace-pre-wrap leading-relaxed">{{ message.content }}</p>
-          
-          <!-- File Attachment Preview -->
-          <div v-if="message.file" class="mt-4 p-3 bg-blue-400/20 rounded-xl border border-blue-300/30">
-            <div class="flex items-center space-x-2 text-sm">
-              <Icon name="lucide:paperclip" size="16" class="text-blue-600" />
-              <span class="font-medium">{{ message.file.name }}</span>
-              <span class="opacity-75">({{ formatFileSize(message.file.size) }})</span>
-            </div>
-          </div>
         </div>
-        <div class="text-xs text-gray-500 mt-2 text-right">{{ formatTime(message.timestamp) }}</div>
+        <div class="text-xs text-gray-500 dark:text-gray-400 mt-2 text-right">{{ formatTime(message.createdAt) }}</div>
       </div>
       
       <div class="w-10 h-10 bg-gradient-to-r from-gray-500 to-gray-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0">
@@ -98,11 +75,12 @@
 
 <script setup>
 import { Copy, RotateCcw, Download, Heart } from 'lucide-vue-next'
-import MarkdownRenderer from './MarkdownRenderer.vue'
 import ProviderIcon from '../UI/ProviderIcon.vue'
+import AiCodeBlock from './AiCodeBlock.vue'
 
 const props = defineProps({
   message: Object,
+  isLoading: Boolean,
   provider: String
 })
 
@@ -117,18 +95,15 @@ const formatTime = (timestamp) => {
   }).format(new Date(timestamp))
 }
 
-const formatFileSize = (bytes) => {
-  if (bytes === 0) return '0 Bytes'
-  const k = 1024
-  const sizes = ['Bytes', 'KB', 'MB', 'GB']
-  const i = Math.floor(Math.log(bytes) / Math.log(k))
-  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i]
-}
-
-// Enhanced action handlers
-const copyMessage = () => {
-  navigator.clipboard.writeText(props.message.content)
-  emit('copy', props.message)
+// Action handlers
+const copyMessage = async () => {
+  try {
+    await navigator.clipboard.writeText(props.message.content)
+    console.log('Message copied to clipboard')
+    emit('copy', props.message)
+  } catch (err) {
+    console.error('Failed to copy message:', err)
+  }
 }
 
 const regenerateMessage = () => {
