@@ -28,31 +28,49 @@ def get_service(provider: AIProvider):
 
 @router.post("/chat")
 async def chat_endpoint(request: ChatRequest):
-    """Main chat endpoint supporting multiple AI providers"""
+    """Main chat endpoint with streaming support for all AI providers"""
     try:
-        # Get the appropriate service (lazy initialization)
         service = get_service(request.provider)
         
-        # For now, return a simple non-streaming response
-        if request.provider == "openai":
-            response_text = await get_openai_response(service, request.messages, request.model)
-        elif request.provider == "grok":
-            response_text = await get_grok_response(service, request.messages, request.model)
-        elif request.provider == "anthropic":
-            response_text = await get_anthropic_response(service, request.messages, request.model)
-        else:
-            response_text = "Provider not implemented yet"
+        # Return streaming response for all providers
+        async def generate_stream():
+            try:
+                if request.provider == "openai":
+                    async for chunk in get_openai_stream(service, request.messages, request.model):
+                        yield chunk
+                elif request.provider == "grok":
+                    async for chunk in get_grok_stream(service, request.messages, request.model):
+                        yield chunk
+                elif request.provider == "anthropic":
+                    async for chunk in get_anthropic_stream(service, request.messages, request.model):
+                        yield chunk
+                else:
+                    yield f"data: {json.dumps({'error': 'Provider not implemented'})}\n\n"
+                    
+                yield "data: [DONE]\n\n"
+                
+            except Exception as e:
+                yield f"data: {json.dumps({'error': f'Stream error: {str(e)}'})}\n\n"
+                yield "data: [DONE]\n\n"
         
-        return {"response": response_text, "provider": request.provider}
+        return StreamingResponse(
+            generate_stream(),
+            media_type="text/plain",
+            headers={
+                "Cache-Control": "no-cache",
+                "Connection": "keep-alive",
+                "Content-Type": "text/plain; charset=utf-8"
+            }
+        )
         
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Chat error: {str(e)}")
 
-async def get_openai_response(service, messages, model):
-    """Get response from OpenAI"""
+async def get_openai_stream(service, messages, model):
+    """Stream response from OpenAI"""
     try:
         openai_messages = [{"role": msg.role, "content": msg.content} for msg in messages]
-        
+
         # Add system message if not present
         if not any(msg["role"] == "system" for msg in openai_messages):
             system_msg = {
@@ -60,26 +78,106 @@ async def get_openai_response(service, messages, model):
                 "content": "You are Digi Setu AI, an educational content transformation assistant. You help transform static content into interactive learning experiences. Be helpful, educational, and engaging."
             }
             openai_messages.insert(0, system_msg)
-        
+
         response = service.client.chat.completions.create(
             model=model or service.default_model,
             messages=openai_messages,
             temperature=0.7,
-            max_tokens=500
+            max_tokens=500,
+            stream=True
         )
-        
-        return response.choices[0].message.content
+
+        for chunk in response:
+            if chunk.choices[0].delta.content is not None:
+                content = chunk.choices[0].delta.content
+                yield f"data: {json.dumps({'content': content, 'provider': 'openai'})}\n\n"
         
     except Exception as e:
-        return f"OpenAI Error: {str(e)}"
+        yield f"data: {json.dumps({'error': f'OpenAI Error: {str(e)}'})}\n\n"
 
-async def get_grok_response(service, messages, model):
-    """Get response from Grok"""
-    return "Grok integration coming soon! For now, try OpenAI or Claude."
+async def get_grok_stream(service, messages, model):
+    """Stream response from Grok"""
+    try:
+        import httpx
+        
+        # Convert messages to Grok format
+        grok_messages = [
+            {"role": msg.role, "content": msg.content} 
+            for msg in messages
+        ]
+        
+        # Add system message if not present
+        if not any(msg["role"] == "system" for msg in grok_messages):
+            system_msg = {
+                "role": "system",
+                "content": "You are Digi Setu AI powered by Grok. Be helpful, educational, and engaging."
+            }
+            grok_messages.insert(0, system_msg)
+        
+        async with httpx.AsyncClient(timeout=30.0) as client:
+            async with client.stream(
+                "POST",
+                "https://api.x.ai/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {service.api_key}",
+                    "Content-Type": "application/json"
+                },
+                json={
+                    "model": model or service.default_model,
+                    "messages": grok_messages,
+                    "temperature": 0.7,
+                    "max_tokens": 500,
+                    "stream": True
+                }
+            ) as response:
+                async for line in response.aiter_lines():
+                    if line.startswith("data: "):
+                        data = line[6:]  # Remove "data: " prefix
+                        if data.strip() == "[DONE]":
+                            break
+                        try:
+                            chunk_data = json.loads(data)
+                            if chunk_data.get("choices") and len(chunk_data["choices"]) > 0:
+                                delta = chunk_data["choices"][0].get("delta", {})
+                                if "content" in delta and delta["content"]:
+                                    content = delta["content"]
+                                    yield f"data: {json.dumps({'content': content, 'provider': 'grok'})}\n\n"
+                        except json.JSONDecodeError:
+                            continue
+        
+    except Exception as e:
+        yield f"data: {json.dumps({'error': f'Grok Error: {str(e)}'})}\n\n"
 
-async def get_anthropic_response(service, messages, model):
-    """Get response from Anthropic"""
-    return "Claude integration coming soon! For now, try OpenAI."
+async def get_anthropic_stream(service, messages, model):
+    """Stream response from Anthropic"""
+    try:
+        # Use the Anthropic client directly with streaming
+        system_message = "You are Digi Setu AI powered by Claude. Be helpful, educational, and engaging."
+        
+        anthropic_messages = []
+        for msg in messages:
+            if msg.role != "system":
+                anthropic_messages.append({
+                    "role": msg.role, 
+                    "content": msg.content
+                })
+            else:
+                system_message = msg.content
+        
+        # Use streaming API
+        with service.client.messages.stream(
+            model=model or service.default_model,
+            max_tokens=500,
+            temperature=0.7,
+            system=system_message,
+            messages=anthropic_messages
+        ) as stream:
+            for text in stream.text_stream:
+                if text:
+                    yield f"data: {json.dumps({'content': text, 'provider': 'anthropic'})}\n\n"
+        
+    except Exception as e:
+        yield f"data: {json.dumps({'error': f'Claude Error: {str(e)}'})}\n\n"
 
 @router.get("/providers", response_model=ProvidersResponse)
 def get_providers():
