@@ -15,9 +15,16 @@ fi
 echo "📝 Setting up environment variables..."
 
 # Set environment variables for backend
-export OPENAI_API_KEY="REDACTED_SEE_ENV_FILE"
-export GROK_API_KEY="REDACTED_SEE_ENV_FILE"
-export ANTHROPIC_API_KEY="REDACTED_SEE_ENV_FILE"
+# Load API keys from environment or .env file
+# You need to set these in your environment:
+# export OPENAI_API_KEY="your_openai_api_key_here"
+# export GROK_API_KEY="your_grok_api_key_here" 
+# export ANTHROPIC_API_KEY="your_anthropic_api_key_here"
+
+if [ -f "backend/.env" ]; then
+    echo "Loading environment variables from backend/.env"
+    export $(cat backend/.env | xargs)
+fi
 export ENVIRONMENT="development"
 export DEBUG="true"
 echo "✅ Environment variables set"

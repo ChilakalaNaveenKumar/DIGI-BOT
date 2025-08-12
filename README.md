@@ -80,10 +80,13 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 # Install dependencies
 pip install -r requirements.txt
 
-# Set environment variables
-export OPENAI_API_KEY="your_openai_api_key"
-export GROK_API_KEY="your_grok_api_key"
-export ANTHROPIC_API_KEY="your_anthropic_api_key"
+# Create environment file from example
+cp .env.example .env
+
+# Edit .env file and add your API keys:
+# OPENAI_API_KEY=your_actual_openai_api_key_here
+# GROK_API_KEY=your_actual_grok_api_key_here
+# ANTHROPIC_API_KEY=your_actual_anthropic_api_key_here
 
 # Start the backend server
 uvicorn main:app --reload --port 8000
