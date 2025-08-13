@@ -15,6 +15,14 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // SSR configuration for AI SDK compatibility
+  ssr: true,
+  
+  // Ensure proper client-side hydration
+  experimental: {
+    payloadExtraction: false
+  },
+
   runtimeConfig: {
     // Private keys (only available on server-side)
     openaiApiKey: process.env.OPENAI_API_KEY,

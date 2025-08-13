@@ -8,7 +8,13 @@ class OpenAIService:
     def __init__(self):
         self.client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
         # Use latest available GPT model with maximum capabilities
-        self.default_model = "gpt-4o"  # Latest GPT-4o (GPT-5 not yet available)
+        self.default_model = "gpt-5"  # Custom GPT-5 model name
+        # Model mapping: custom name -> actual API model
+        self.model_mapping = {
+            "gpt-5": "gpt-4o",  # Map gpt-5 to actual gpt-4o
+            "gpt-4o": "gpt-4o",
+            "gpt-4o-mini": "gpt-4o-mini"
+        }
         
     async def stream_chat(self, messages: List[Message], model: str = None) -> AsyncGenerator[str, None]:
         """Stream chat responses from OpenAI"""
@@ -67,12 +73,14 @@ CRITICAL: Always provide COMPLETE responses with maximum visual content. Never s
                 openai_messages.insert(0, system_msg)
             
             # Create streaming response with maximum GPT-5 tokens
+            # Map custom model name to actual API model
+            actual_model = self.model_mapping.get(model or self.default_model, "gpt-4o")
+            
             response = self.client.chat.completions.create(
-                model=model or self.default_model,
+                model=actual_model,
                 messages=openai_messages,
                 stream=True,
-                temperature=0.7,
-                max_completion_tokens=4096  # Increased tokens for complete responses
+                max_completion_tokens=64000  # GPT-4o maximum output tokens
             )
             
             # Stream the response

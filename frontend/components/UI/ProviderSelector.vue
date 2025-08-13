@@ -45,18 +45,18 @@ const emit = defineEmits(['update:modelValue', 'change'])
 const isOpen = ref(false)
 
 const providers = [
-  { value: 'openai', label: 'GPT-5' },
-  { value: 'grok', label: 'Grok 4' },
-  { value: 'anthropic', label: 'Claude 4' }
+  { value: 'openai', label: 'GPT-5 (128k context, 64k output)' },
+  { value: 'grok', label: 'Grok-4 (256k context, 256k output)' },
+  { value: 'anthropic', label: 'Claude-4-Opus (1M context, 200k output)' }
 ]
 
 const getProviderName = (provider) => {
   const names = {
-    'openai': 'GPT-5',
-    'grok': 'Grok 4',
-    'anthropic': 'Claude 4'
+    'openai': 'GPT-5 (128k/64k)',
+    'grok': 'Grok-4 (256k/256k)',
+    'anthropic': 'Claude-4-Opus (1M/200k)'
   }
-  return names[provider] || 'GPT-5'
+  return names[provider] || 'GPT-5 (128k/64k)'
 }
 
 const selectProvider = (value) => {

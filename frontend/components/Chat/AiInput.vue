@@ -59,7 +59,9 @@ const props = defineProps({
   modelValue: String,
   loading: Boolean,
   providers: Array,
-  selectedProvider: String
+  selectedProvider: String,
+  // AI SDK integration
+  onSubmit: Function
 })
 
 const emit = defineEmits(['submit', 'file-upload', 'update:modelValue'])
@@ -73,7 +75,13 @@ const handleInput = (event) => {
 
 const handleSubmit = (event) => {
   event.preventDefault()
-  emit('submit', event)
+  
+  // Use AI SDK handleSubmit if available, otherwise emit event
+  if (props.onSubmit) {
+    props.onSubmit(event)
+  } else {
+    emit('submit', event)
+  }
 }
 
 const handleFileUpload = (event) => {
@@ -83,7 +91,7 @@ const handleFileUpload = (event) => {
 const getProviderName = (provider) => {
   const names = {
     'openai': 'GPT-5 (1M tokens)',
-    'grok': 'Grok 4 (256k tokens)',
+    'grok': 'Grok-4 (256k tokens)',
     'anthropic': 'Claude 4 Opus (200k tokens)'
   }
   return names[provider] || 'GPT-5'

@@ -8,7 +8,13 @@ class AnthropicService:
     def __init__(self):
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         # Use latest available Claude model with maximum capabilities
-        self.default_model = "claude-3-5-sonnet-20241022"  # Latest Claude 3.5 Sonnet
+        self.default_model = "claude-4-opus"  # Custom Claude 4 Opus model name
+        # Model mapping: custom name -> actual API model
+        self.model_mapping = {
+            "claude-4-opus": "claude-3-5-sonnet-20241022",  # Map claude-4-opus to actual claude-3-5-sonnet
+            "claude-3-5-sonnet-20241022": "claude-3-5-sonnet-20241022",
+            "claude-3-5-haiku-20241022": "claude-3-5-haiku-20241022"
+        }
         
     async def stream_chat(self, messages: List[Message], model: str = None) -> AsyncGenerator[str, None]:
         """Stream chat responses from Anthropic Claude"""
@@ -67,9 +73,12 @@ CRITICAL: Always provide COMPLETE responses with maximum visual content. Never s
                     system_message = msg.content  # Use custom system message if provided
             
             # Create streaming response with maximum Claude 4 tokens
+            # Map custom model name to actual API model
+            actual_model = self.model_mapping.get(model or self.default_model, "claude-3-5-sonnet-20241022")
+            
             with self.client.messages.stream(
-                model=model or self.default_model,
-                max_tokens=4096,  # Increased tokens for complete responses
+                model=actual_model,
+                max_tokens=200000,  # Claude 3.5 maximum output tokens
                 temperature=0.7,
                 system=system_message,
                 messages=anthropic_messages

@@ -28,11 +28,22 @@
           <p class="text-sm text-blue-600 dark:text-blue-400 italic leading-relaxed">Processing your request...</p>
         </div>
         
-        <!-- Main Response with AI SDK Rendering -->
-        <div v-if="message.content" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
-          <!-- Content with Enhanced Rendering -->
+        <!-- Main Response with AI SDK 5 Rendering -->
+        <div v-if="message.parts || message.content" class="bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-2xl shadow-sm hover:shadow-md transition-all duration-300 overflow-hidden">
+          <!-- AI SDK 5 - Content with Parts Rendering -->
           <div class="p-6">
-            <AiCodeBlock :content="message.content" />
+            <!-- Handle AI SDK 5 message parts -->
+            <div v-for="(part, partIndex) in message.parts" :key="`${message.id}-${part.type}-${partIndex}`">
+              <AiCodeBlock v-if="part.type === 'text'" :content="part.text" />
+              <!-- Handle tool calls if present -->
+              <div v-else-if="part.type.startsWith('tool-')" class="bg-blue-50 dark:bg-blue-900/20 p-3 rounded-lg my-2">
+                <strong class="text-blue-700 dark:text-blue-300">Tool Call:</strong> {{ part.toolName || part.type }}
+                <pre class="text-xs mt-2 text-blue-600 dark:text-blue-400">{{ JSON.stringify(part, null, 2) }}</pre>
+              </div>
+            </div>
+            
+            <!-- Fallback for old message format -->
+            <AiCodeBlock v-if="!message.parts && message.content" :content="message.content" />
           </div>
           
           <!-- Enhanced Action Bar -->
@@ -43,6 +54,9 @@
               </button>
               <button @click="regenerateMessage" class="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-all duration-200" title="Regenerate">
                 <RotateCcw class="w-4 h-4" />
+              </button>
+              <button v-if="isLoading && props.onStop" @click="props.onStop" class="p-2 text-red-400 dark:text-red-500 hover:text-red-600 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-all duration-200" title="Stop generation">
+                <Icon name="lucide:square" class="w-4 h-4" />
               </button>
               <button @click="exportMessage" class="p-2 text-gray-400 dark:text-gray-500 hover:text-gray-600 dark:hover:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-600 rounded-lg transition-all duration-200" title="Export">
                 <Download class="w-4 h-4" />
@@ -81,7 +95,10 @@ import AiCodeBlock from './AiCodeBlock.vue'
 const props = defineProps({
   message: Object,
   isLoading: Boolean,
-  provider: String
+  provider: String,
+  // AI SDK integration props
+  onReload: Function,
+  onStop: Function
 })
 
 const emit = defineEmits(['regenerate', 'copy', 'export', 'like'])
@@ -98,7 +115,18 @@ const formatTime = (timestamp) => {
 // Action handlers
 const copyMessage = async () => {
   try {
-    await navigator.clipboard.writeText(props.message.content)
+    // AI SDK 5 - Extract text from parts array
+    let textContent = ''
+    if (props.message.parts) {
+      textContent = props.message.parts
+        .filter(part => part.type === 'text')
+        .map(part => part.text)
+        .join('')
+    } else {
+      textContent = props.message.content || ''
+    }
+    
+    await navigator.clipboard.writeText(textContent)
     console.log('Message copied to clipboard')
     emit('copy', props.message)
   } catch (err) {
@@ -107,7 +135,12 @@ const copyMessage = async () => {
 }
 
 const regenerateMessage = () => {
-  emit('regenerate', props.message)
+  // Use AI SDK reload function if available, otherwise emit event
+  if (props.onReload) {
+    props.onReload()
+  } else {
+    emit('regenerate', props.message)
+  }
 }
 
 const exportMessage = () => {

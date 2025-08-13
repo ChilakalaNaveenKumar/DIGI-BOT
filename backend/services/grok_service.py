@@ -8,8 +8,8 @@ class GrokService:
     def __init__(self):
         self.api_key = os.getenv("GROK_API_KEY")
         self.base_url = "https://api.x.ai/v1"
-        # Use latest available Grok model with maximum capabilities
-        self.default_model = "grok-2-1212"  # Latest available Grok-2
+        # Use latest Grok-4 model with maximum capabilities
+        self.default_model = "grok-4"  # Latest Grok-4
         
     async def stream_chat(self, messages: List[Message], model: str = None) -> AsyncGenerator[str, None]:
         """Stream chat responses from Grok"""
@@ -24,7 +24,7 @@ class GrokService:
             if not any(msg["role"] == "system" for msg in grok_messages):
                 system_msg = {
                     "role": "system",
-                    "content": """You are Digi Setu AI powered by Grok-2, the latest available AI model with enhanced reasoning, real-time data access, and live highlighting capabilities.
+                    "content": """You are Digi Setu AI powered by Grok-4, the most advanced AI model with enhanced reasoning, real-time data access, and live highlighting capabilities.
 
 You can and SHOULD:
 - Generate extremely detailed explanations with comprehensive tables, diagrams, and visual representations
@@ -57,7 +57,7 @@ IMPORTANT: With 256K token context window, provide MASSIVE, COMPREHENSIVE respon
                 "model": model or self.default_model,
                 "stream": True,
                 "temperature": 0.7,
-                "max_tokens": 4096  # Increased tokens for complete responses
+                "max_tokens": 256000  # Grok-4 maximum output tokens (256k)
             }
             
             async with httpx.AsyncClient() as client:
@@ -89,9 +89,9 @@ IMPORTANT: With 256K token context window, provide MASSIVE, COMPREHENSIVE respon
     def get_available_models(self) -> List[str]:
         """Get list of latest Grok models with maximum capabilities"""
         return [
-            "grok-2-1212",          # Latest Grok-2 (December 2024)
+            "grok-4",               # Latest Grok-4 (most advanced)
+            "grok-4-vision",        # Grok-4 with vision capabilities
+            "grok-2-1212",          # Previous Grok-2 (December 2024)
             "grok-2-vision-1212",   # Grok-2 with vision
-            "grok-2-public-beta",   # Public beta version
-            "grok-beta",            # Beta version
-            "grok-1"                # Previous generation
+            "grok-2-public-beta"    # Public beta version
         ]

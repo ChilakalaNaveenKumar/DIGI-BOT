@@ -21,8 +21,8 @@ class ChatRequest(BaseModel):
     messages: List[Message]
     provider: AIProvider = AIProvider.OPENAI
     model: Optional[str] = None
-    temperature: Optional[float] = 0.7
-    max_tokens: Optional[int] = 500
+    temperature: Optional[float] = 1.0
+    max_tokens: Optional[int] = 256000
     stream: bool = True
 
 class ChatResponse(BaseModel):

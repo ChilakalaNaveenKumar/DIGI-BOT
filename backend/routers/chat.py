@@ -82,8 +82,7 @@ async def get_openai_stream(service, messages, model):
         response = service.client.chat.completions.create(
             model=model or service.default_model,
             messages=openai_messages,
-            temperature=0.7,
-            max_tokens=500,
+            max_completion_tokens=64000,  # GPT-4o max output tokens
             stream=True
         )
 
@@ -126,7 +125,7 @@ async def get_grok_stream(service, messages, model):
                     "model": model or service.default_model,
                     "messages": grok_messages,
                     "temperature": 0.7,
-                    "max_tokens": 500,
+                    "max_tokens": 256000,  # Grok-4 max output tokens (256k)
                     "stream": True
                 }
             ) as response:
@@ -167,7 +166,7 @@ async def get_anthropic_stream(service, messages, model):
         # Use streaming API
         with service.client.messages.stream(
             model=model or service.default_model,
-            max_tokens=500,
+            max_tokens=200000,  # Claude 3.5 max output tokens
             temperature=0.7,
             system=system_message,
             messages=anthropic_messages
@@ -186,20 +185,20 @@ def get_providers():
         providers = [
             ProviderInfo(
                 id="openai",
-                name="GPT-4o (16k tokens)",
-                models=["gpt-4o", "gpt-4o-2024-11-20", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"],
+                name="GPT-5 (128k context, 64k output)",
+                models=["gpt-5", "gpt-4o", "gpt-4o-mini"],
                 status="active"
             ),
             ProviderInfo(
                 id="anthropic",
-                name="Claude 3.5 (8k tokens)",
-                models=["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620", "claude-3-5-haiku-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+                name="Claude 4 Opus (1M context, 200k output)",
+                models=["claude-4-opus", "claude-3-5-sonnet-20241022", "claude-3-5-haiku-20241022"],
                 status="active"
             ),
             ProviderInfo(
                 id="grok", 
-                name="Grok-2 (32k tokens)",
-                models=["grok-2-1212", "grok-2-vision-1212", "grok-2-public-beta", "grok-beta", "grok-1"],
+                name="Grok-4 (256k context, 256k output)",
+                models=["grok-4", "grok-4-vision", "grok-2-1212"],
                 status="active"
             )
         ]
