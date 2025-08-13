@@ -118,9 +118,9 @@ const selectedProvider = ref('openai')
 const messagesContainer = ref(null)
 
 const providers = [
-  { id: 'openai', name: 'GPT-4', icon: 'openai' },
-  { id: 'anthropic', name: 'Claude', icon: 'claude' },
-  { id: 'grok', name: 'Grok', icon: 'xai' }
+  { id: 'openai', name: 'GPT-4o', icon: 'openai' },
+  { id: 'anthropic', name: 'Claude 3.5', icon: 'claude' },
+  { id: 'grok', name: 'Grok-2', icon: 'xai' }
 ]
 
 // Enhanced submission with provider data
@@ -150,9 +150,11 @@ const handleSubmit = async (e) => {
     }
     messages.value.push(assistantMessage)
 
-    // Use our backend API
-    const config = useRuntimeConfig()
-    const response = await fetch(`${config.public.apiBase}/chat`, {
+    // Use backend API (port 8000) with timeout
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minute timeout
+    
+    const response = await fetch('http://localhost:8000/api/chat', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -163,47 +165,59 @@ const handleSubmit = async (e) => {
           content: m.content
         })),
         provider: selectedProvider.value
-      })
+      }),
+      signal: controller.signal
     })
+    
+    clearTimeout(timeoutId)
 
-    if (!response.body) {
-      throw new Error('No response body')
+    // Handle streaming response
+    if (!response.ok) {
+      throw new Error(`HTTP ${response.status}: ${response.statusText}`)
     }
 
     const reader = response.body.getReader()
     const decoder = new TextDecoder()
+    const lastMessage = messages.value[messages.value.length - 1]
 
-    // Handle streaming data
-    while (true) {
-      const { done, value } = await reader.read()
-      
-      if (done) break
-      
-      const chunk = decoder.decode(value, { stream: true })
-      const lines = chunk.split('\n')
-      
-      for (const line of lines) {
-        if (line.startsWith('data: ')) {
-          const data = line.slice(6)
-          
-          if (data.trim() === '[DONE]') {
-            break
-          }
-          
-          try {
-            const parsed = JSON.parse(data)
-            if (parsed.content) {
-              const lastMessage = messages.value[messages.value.length - 1]
-              lastMessage.content += parsed.content
-              await scrollToBottom()
-            } else if (parsed.error) {
-              throw new Error(parsed.error)
+    try {
+      while (true) {
+        const { done, value } = await reader.read()
+        
+        if (done) break
+        
+        const chunk = decoder.decode(value, { stream: true })
+        const lines = chunk.split('\n')
+        
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = line.slice(6).trim()
+            
+            if (data === '[DONE]') {
+              console.log('Stream completed successfully')
+              break
             }
-          } catch (parseError) {
-            continue
+            
+            try {
+              const parsed = JSON.parse(data)
+              if (parsed.content) {
+                lastMessage.content += parsed.content
+                await scrollToBottom()
+              } else if (parsed.error) {
+                console.error('Stream error:', parsed.error)
+                lastMessage.content += `\n\n❌ **Error:** ${parsed.error}`
+                break
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse chunk:', data)
+              // Skip invalid JSON lines but continue streaming
+              continue
+            }
           }
         }
       }
+    } finally {
+      reader.releaseLock()
     }
     
   } catch (error) {
@@ -236,11 +250,11 @@ const handleFileUpload = (event) => {
 // Utility functions
 const getProviderName = (provider) => {
   const names = {
-    'openai': 'GPT-4',
-    'grok': 'Grok',
-    'anthropic': 'Claude'
+    'openai': 'GPT-4o (16k tokens)',
+    'grok': 'Grok-2 (32k tokens)', 
+    'anthropic': 'Claude 3.5 (8k tokens)'
   }
-  return names[provider] || 'GPT-4'
+  return names[provider] || 'GPT-4o'
 }
 
 // Utility functions

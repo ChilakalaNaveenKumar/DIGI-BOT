@@ -16,7 +16,7 @@ export default defineEventHandler(async (event) => {
         if (!config.openaiApiKey) {
           throw new Error('OpenAI API key not configured')
         }
-        model = openai('gpt-4', {
+        model = openai('gpt-5', {
           apiKey: config.openaiApiKey
         })
         break
@@ -24,7 +24,7 @@ export default defineEventHandler(async (event) => {
         if (!config.anthropicApiKey) {
           throw new Error('Anthropic API key not configured')
         }
-        model = anthropic('claude-3-sonnet-20240229', {
+        model = anthropic('claude-4-opus', {
           apiKey: config.anthropicApiKey
         })
         break
@@ -33,12 +33,12 @@ export default defineEventHandler(async (event) => {
         if (!config.openaiApiKey) {
           throw new Error('OpenAI API key not configured (fallback for Grok)')
         }
-        model = openai('gpt-4', {
+        model = openai('gpt-5', {
           apiKey: config.openaiApiKey
         })
         break
       default:
-        model = openai('gpt-4', {
+        model = openai('gpt-5', {
           apiKey: config.openaiApiKey
         })
     }
@@ -62,7 +62,7 @@ Format your responses using proper markdown with:
 - Proper headings and structure
 - Lists and emphasis where appropriate`,
       temperature: 0.7,
-      maxTokens: 2000,
+      maxTokens: 1000000,  // Maximum tokens for latest models
     })
 
     // Return the AI SDK stream response

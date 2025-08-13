@@ -41,9 +41,9 @@ let progressInterval = null
 
 const getProviderName = (provider) => {
   const names = {
-    'openai': 'GPT-4',
-    'anthropic': 'Claude',
-    'grok': 'Grok'
+    'openai': 'GPT-5',
+    'anthropic': 'Claude 4',
+    'grok': 'Grok 4'
   }
   return names[provider] || 'AI'
 }

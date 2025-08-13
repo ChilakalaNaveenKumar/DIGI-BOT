@@ -50,3 +50,4 @@ const props = defineProps({
 
 const iconSize = computed(() => Math.max(16, props.size - 4))
 </script>
+

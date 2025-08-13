@@ -86,8 +86,9 @@ const renderedContent = computed(() => {
   padding-bottom: 0.25rem;
 }
 
-:root.dark .ai-code-content :deep(h2) {
-  color: #ffffff;
+:root.dark .ai-code-content :deep(h2),
+.dark .ai-code-content :deep(h2) {
+  color: #ffffff !important;
   border-bottom-color: #374151;
 }
 
@@ -99,8 +100,9 @@ const renderedContent = computed(() => {
   margin-top: 1rem;
 }
 
-:root.dark .ai-code-content :deep(h3) {
-  color: #ffffff;
+:root.dark .ai-code-content :deep(h3),
+.dark .ai-code-content :deep(h3) {
+  color: #ffffff !important;
 }
 
 .ai-code-content :deep(p) {

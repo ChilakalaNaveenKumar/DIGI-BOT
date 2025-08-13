@@ -215,11 +215,11 @@ const generateId = () => Date.now() + '-' + Math.random().toString(36).substr(2,
 
 const getProviderName = (provider) => {
   const names = {
-    'openai': 'GPT-4',
-    'grok': 'Grok',
-    'anthropic': 'Claude'
+    'openai': 'GPT-5',
+    'grok': 'Grok 4',
+    'anthropic': 'Claude 4'
   }
-  return names[provider] || 'GPT-4'
+  return names[provider] || 'GPT-5'
 }
 
 // Enhanced scroll behavior

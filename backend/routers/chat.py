@@ -186,20 +186,20 @@ def get_providers():
         providers = [
             ProviderInfo(
                 id="openai",
-                name="GPT-4",
-                models=["gpt-4", "gpt-4-turbo", "gpt-3.5-turbo"],
-                status="active"
-            ),
-            ProviderInfo(
-                id="grok", 
-                name="Grok",
-                models=["grok-beta", "grok-1"],
+                name="GPT-4o (16k tokens)",
+                models=["gpt-4o", "gpt-4o-2024-11-20", "gpt-4o-mini", "gpt-4-turbo", "gpt-4"],
                 status="active"
             ),
             ProviderInfo(
                 id="anthropic",
-                name="Claude",
-                models=["claude-3-sonnet-20240229", "claude-3-haiku-20240307", "claude-3-opus-20240229"],
+                name="Claude 3.5 (8k tokens)",
+                models=["claude-3-5-sonnet-20241022", "claude-3-5-sonnet-20240620", "claude-3-5-haiku-20241022", "claude-3-opus-20240229", "claude-3-sonnet-20240229", "claude-3-haiku-20240307"],
+                status="active"
+            ),
+            ProviderInfo(
+                id="grok", 
+                name="Grok-2 (32k tokens)",
+                models=["grok-2-1212", "grok-2-vision-1212", "grok-2-public-beta", "grok-beta", "grok-1"],
                 status="active"
             )
         ]

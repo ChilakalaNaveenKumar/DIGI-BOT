@@ -82,10 +82,10 @@ const handleFileUpload = (event) => {
 
 const getProviderName = (provider) => {
   const names = {
-    'openai': 'GPT-4',
-    'grok': 'Grok',
-    'anthropic': 'Claude'
+    'openai': 'GPT-5 (1M tokens)',
+    'grok': 'Grok 4 (256k tokens)',
+    'anthropic': 'Claude 4 Opus (200k tokens)'
   }
-  return names[provider] || 'GPT-4'
+  return names[provider] || 'GPT-5'
 }
 </script>

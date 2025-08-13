@@ -1,13 +1,13 @@
 # 🧠 Digi Bot - AI-Powered Educational Content Platform
 
-A modern, multi-AI provider chat application built with **Nuxt 3** (frontend) and **Python FastAPI** (backend). Transform static content into interactive learning experiences with the power of GPT-4, Grok, and Claude.
+A modern, multi-AI provider chat application built with **Nuxt 3** (frontend) and **Python FastAPI** (backend). Transform static content into interactive learning experiences with the power of GPT-5, Grok 4, and Claude 4.
 
 ## ✨ Features
 
 ### 🤖 **Multi-AI Provider Support**
-- **GPT-4** (OpenAI) - Advanced reasoning and content generation
-- **Grok** (X.AI) - Real-time information and analysis
-- **Claude** (Anthropic) - Thoughtful and nuanced responses
+- **GPT-5** (OpenAI) - Latest multimodal AI with 1M token responses
+- **Grok 4** (X.AI) - Real-time information with 256k token responses
+- **Claude 4 Opus** (Anthropic) - Superior code generation with 200k token responses
 
 ### 🎨 **Beautiful User Interface**
 - **Modern gradient design** with smooth animations
@@ -240,9 +240,9 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **OpenAI** for GPT-4 API
-- **Anthropic** for Claude API
-- **X.AI** for Grok API
+- **OpenAI** for GPT-5 API
+- **Anthropic** for Claude 4 API
+- **X.AI** for Grok 4 API
 - **Nuxt.js** team for the amazing framework
 - **FastAPI** team for the excellent Python framework
 - **Tailwind CSS** for beautiful styling

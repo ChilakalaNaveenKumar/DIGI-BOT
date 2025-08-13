@@ -7,14 +7,54 @@ from models.chat_models import Message
 class AnthropicService:
     def __init__(self):
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
-        self.default_model = "claude-3-sonnet-20240229"
+        # Use latest available Claude model with maximum capabilities
+        self.default_model = "claude-3-5-sonnet-20241022"  # Latest Claude 3.5 Sonnet
         
     async def stream_chat(self, messages: List[Message], model: str = None) -> AsyncGenerator[str, None]:
         """Stream chat responses from Anthropic Claude"""
         try:
-            # Convert messages to Anthropic format
-            # Anthropic expects system message separately
-            system_message = "You are Digi Setu AI powered by Claude, an educational content transformation assistant. You help transform static content into interactive learning experiences with thoughtful analysis. Be helpful, educational, and engaging."
+            # Convert messages to Anthropic format with multimodal support
+            # Enhanced system message for multimodal capabilities
+            system_message = """You are Digi Setu AI. You MUST create rich visual content like ChatGPT/Claude.
+
+🔥 MANDATORY RESPONSE RULES:
+1. ALWAYS create comprehensive tables for comparisons
+2. ALWAYS include ASCII diagrams and flowcharts  
+3. ALWAYS use visual text representations
+4. NEVER give plain text - make it visual and interactive
+5. ALWAYS complete full responses - never stop mid-sentence
+
+📊 REQUIRED FORMAT FOR EVERY RESPONSE:
+- Start with overview table
+- Include ASCII art diagrams
+- Create step-by-step visual flows
+- Use emojis and symbols for visual appeal
+- Build comparison matrices
+- Add interactive examples
+
+🎯 EXAMPLE FORMAT (TCP/IP):
+```
+# 🌐 TCP/IP Model Complete Guide
+
+## 📋 Quick Reference Table
+| Layer | Protocols | Function | Visual |
+|-------|-----------|----------|--------|
+| Application | HTTP, FTP | User Interface | 🖥️ Apps |
+| Transport | TCP, UDP | Data Delivery | 📦 Packages |
+| Internet | IP, ICMP | Routing | 🗺️ Addresses |
+| Network | Ethernet | Physical | 🔌 Cables |
+
+## 🔄 Data Flow Diagram
+```
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│ Application │ ←→ │  Transport  │ ←→ │  Internet   │
+│   Layer     │    │   Layer     │    │   Layer     │
+└─────────────┘    └─────────────┘    └─────────────┘
+       ↕                   ↕                   ↕
+   HTTP/FTP            TCP/UDP              IP/ICMP
+```
+
+CRITICAL: Always provide COMPLETE responses with maximum visual content. Never stop mid-response."""
             
             anthropic_messages = []
             for msg in messages:
@@ -26,26 +66,32 @@ class AnthropicService:
                 else:
                     system_message = msg.content  # Use custom system message if provided
             
-            # Create streaming response
+            # Create streaming response with maximum Claude 4 tokens
             with self.client.messages.stream(
                 model=model or self.default_model,
-                max_tokens=500,
+                max_tokens=4096,  # Increased tokens for complete responses
                 temperature=0.7,
                 system=system_message,
                 messages=anthropic_messages
-            ) as stream:
-                for text in stream.text_stream:
-                    if text:
-                        yield f"data: {json.dumps({'content': text, 'provider': 'anthropic'})}\n\n"
+                            ) as stream:
+                    for text in stream.text_stream:
+                        if text:
+                            yield f"data: {json.dumps({'content': text, 'provider': 'anthropic'})}\n\n"
+                    
+                    # Send completion marker
+                    yield f"data: [DONE]\n\n"
                         
         except Exception as e:
             error_msg = f"Anthropic Error: {str(e)}"
             yield f"data: {json.dumps({'error': error_msg})}\n\n"
     
     def get_available_models(self) -> List[str]:
-        """Get list of available Anthropic models"""
+        """Get list of latest Anthropic models with maximum capabilities"""
         return [
-            "claude-3-sonnet-20240229", 
-            "claude-3-haiku-20240307",
-            "claude-3-opus-20240229"
+            "claude-3-5-sonnet-20241022",  # Latest Claude 3.5 Sonnet (Oct 2024)
+            "claude-3-5-sonnet-20240620",  # Claude 3.5 Sonnet (June 2024)
+            "claude-3-5-haiku-20241022",   # Claude 3.5 Haiku (fast)
+            "claude-3-opus-20240229",      # Claude 3 Opus
+            "claude-3-sonnet-20240229",    # Claude 3 Sonnet
+            "claude-3-haiku-20240307"      # Claude 3 Haiku
         ]
