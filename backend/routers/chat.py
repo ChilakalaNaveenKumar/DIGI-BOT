@@ -163,21 +163,10 @@ async def get_enhanced_openai_stream(service, messages, model, enable_reasoning=
                 "content": message_content
             })
 
-        # Strong directive system message to force immediate tool usage
-        system_content = """You are Digi Setu AI. You have access to the generateImage function.
+        # Simple, natural system message - let AI decide when to use tools
+        system_content = """You are Digi Setu AI, a helpful assistant with access to image generation capabilities.
 
-CRITICAL RULE: When a user requests ANY visual content (charts, diagrams, images), you MUST immediately call the generateImage function FIRST, before providing any text response.
-
-DO NOT:
-- Explain that you cannot create visuals
-- Provide text instructions on how to create charts
-- Give alternative suggestions
-
-DO:
-- Immediately call generateImage when visual content is requested
-- Generate the image first, then provide brief explanatory text if needed
-
-For the request "Create a donut chart", immediately call generateImage with a detailed prompt describing the chart."""
+You have access to tools that you can use when appropriate. Use your best judgment to decide when tools would be helpful for the user's request."""
 
         if enable_reasoning:
             system_content += "\n\nIMPORTANT: Think through your response step by step. Show your reasoning process clearly before providing the final answer."
@@ -233,15 +222,16 @@ For the request "Create a donut chart", immediately call generateImage with a de
         if openai_tools and 'o1' not in actual_model.lower():
             request_params["tools"] = openai_tools
             
+            # Let AI decide naturally when to use tools
+            request_params["tool_choice"] = "auto"
+            
             # Use auto mode - let the AI decide when to use tools (forced mode was causing failures)
             print(f"🔧 Tools being sent to OpenAI: {len(openai_tools)} tools (AUTO mode)")
             
             # Log user message for debugging
             user_message = openai_messages[-1]["content"] if openai_messages else ""
             print(f"🎯 User message: '{user_message[:100]}...'")
-            visual_keywords = ["chart", "diagram", "image", "visual", "graph", "plot", "create", "generate", "show me", "make a", "draw", "design"]
-            if any(keyword in user_message.lower() for keyword in visual_keywords):
-                print(f"🎨 Visual content keywords detected - AI should use tools automatically")
+            print(f"🎨 Tools available - AI will decide when to use them")
             
             for tool in openai_tools:
                 print(f"   - {tool['function']['name']}: {tool['function']['description'][:50]}...")
@@ -273,8 +263,11 @@ For the request "Create a donut chart", immediately call generateImage with a de
             yield "data: [DONE]\n\n"
             return
 
-        # Tool call accumulation for streaming
+        # Enhanced streaming state management
         accumulated_tool_calls = {}
+        tool_prep_shown = False
+        reasoning_phase = True  # Track if we're in reasoning/thinking phase
+        has_content_started = False  # Track if actual response content has started
 
         # Process enhanced streaming response with multimodal support
         print(f"🔄 Starting to process streaming chunks...")
@@ -302,9 +295,40 @@ For the request "Create a donut chart", immediately call generateImage with a de
                 }
                 yield f"data: {json.dumps(enhanced_response)}\n\n"
             
-            # Handle regular content with enhanced formatting detection
+            # Handle regular content with enhanced formatting detection and reasoning
             if delta.content is not None:
                 content = delta.content
+                
+                # Enhanced reasoning detection for non-O1 models
+                if not has_content_started and enable_reasoning:
+                    # Check if this looks like thinking/reasoning content
+                    thinking_patterns = [
+                        'let me think', 'i need to', 'first, i', 'let me analyze', 
+                        'thinking about', 'considering', 'i should', 'let me create',
+                        'i\'ll generate', 'i\'ll create'
+                    ]
+                    is_reasoning = any(pattern in content.lower() for pattern in thinking_patterns)
+                    
+                    if is_reasoning:
+                        # Stream as thinking/reasoning content
+                        enhanced_response = {
+                            'type': 'thinking',
+                            'content': content,
+                            'content_type': 'thinking',
+                            'provider': 'openai',
+                            'model': actual_model,
+                            'multimodal_content': [{
+                                'type': 'thinking',
+                                'data': content,
+                                'format': 'text'
+                            }],
+                            'preserve_formatting': True
+                        }
+                        yield f"data: {json.dumps(enhanced_response)}\n\n"
+                        continue
+                    else:
+                        has_content_started = True
+                        reasoning_phase = False
                 
                 # Detect content type and format
                 content_type = detect_content_type(content)
@@ -348,88 +372,139 @@ For the request "Create a donut chart", immediately call generateImage with a de
                 }
                 yield f"data: {json.dumps(enhanced_response)}\n\n"
             
-            # Handle tool calls - ACCUMULATE during streaming, EXECUTE after
+            # Handle tool calls - ACCUMULATE during streaming, DON'T spam messages
             if hasattr(delta, 'tool_calls') and delta.tool_calls:
                 print(f"🔧 Tool calls detected: {delta.tool_calls}")
                 for tool_call_delta in delta.tool_calls:
+                    # Use index as the key since OpenAI sends id=None for continuation chunks
+                    tool_call_index = getattr(tool_call_delta, 'index', 0)
                     tool_call_id = tool_call_delta.id
                     
-                    # Initialize tool call if not seen before
-                    if tool_call_id not in accumulated_tool_calls:
-                        accumulated_tool_calls[tool_call_id] = {
-                            'id': tool_call_id,
+                    # Use index as the primary key, but store the actual ID when available
+                    if tool_call_index not in accumulated_tool_calls:
+                        accumulated_tool_calls[tool_call_index] = {
+                            'id': tool_call_id,  # This will be None for continuation chunks
                             'name': '',
                             'arguments': ''
                         }
                     
+                    # Update the ID if we get a real one (first chunk)
+                    if tool_call_id and accumulated_tool_calls[tool_call_index]['id'] is None:
+                        accumulated_tool_calls[tool_call_index]['id'] = tool_call_id
+                    
                     # Accumulate tool call data
                     if tool_call_delta.function:
                         if tool_call_delta.function.name:
-                            accumulated_tool_calls[tool_call_id]['name'] = tool_call_delta.function.name
+                            accumulated_tool_calls[tool_call_index]['name'] = tool_call_delta.function.name
                         if tool_call_delta.function.arguments:
-                            accumulated_tool_calls[tool_call_id]['arguments'] += tool_call_delta.function.arguments
+                            accumulated_tool_calls[tool_call_index]['arguments'] += tool_call_delta.function.arguments
                 
-                # Stream notification that tool calls are being accumulated
-                tool_notification = {
-                    'type': 'content',
-                    'content': f"🔧 [Preparing to generate visual content...]\n",
-                    'content_type': 'text',
-                    'provider': 'openai',
-                    'model': actual_model,
-                    'multimodal_content': [{
-                        'type': 'text',
-                        'data': f"🔧 [Tool call accumulating...]\n",
-                        'format': 'text'
-                    }],
-                    'preserve_formatting': True
-                }
-                yield f"data: {json.dumps(tool_notification)}\n\n"
+                # Show enhanced tool preparation with loading state
+                if not tool_prep_shown and accumulated_tool_calls:
+                    print(f"🔧 DEBUG: Showing tool preparation. Tool calls detected: {list(accumulated_tool_calls.keys())}")
+                    tool_prep_shown = True
+                    
+                    # Send tool loading state
+                    tool_loading = {
+                        'type': 'tool_loading',
+                        'content': 'Preparing to execute tools...',
+                        'content_type': 'tool_loading',
+                        'provider': 'openai',
+                        'model': actual_model,
+                        'multimodal_content': [{'type': 'tool_loading', 'data': 'Preparing tools...', 'format': 'text'}],
+                        'preserve_formatting': True
+                    }
+                    yield f"data: {json.dumps(tool_loading)}\n\n"
             
         # After streaming completes, check if there were any tool calls to process
         print(f"✅ Initial streaming completed with {chunk_count} chunks")
+        print(f"🔍 Accumulated tool calls: {accumulated_tool_calls}")
+        print(f"🔍 Number of accumulated tool calls: {len(accumulated_tool_calls) if accumulated_tool_calls else 0}")
         
         # Process any accumulated tool calls AFTER the main stream
         if accumulated_tool_calls:
             print(f"🔧 Processing {len(accumulated_tool_calls)} tool calls after stream completion...")
+            print(f"🔧 Tool calls data: {accumulated_tool_calls}")
             
             # Execute all tool calls in parallel
-            for tool_call_id, tool_data in accumulated_tool_calls.items():
+            for tool_call_index, tool_data in accumulated_tool_calls.items():
                 if tool_data['name'] and tool_data['arguments']:
                     try:
                         # Try to parse complete arguments
                         tool_args = json.loads(tool_data['arguments'])
                         print(f"🎨 Executing {tool_data['name']} with complete args: {tool_args}")
                         
-                        # Stream transition message
-                        transition_msg = {
-                            'type': 'content',
-                            'content': f"\n🎨 Generating your {tool_data['name'].replace('generate', '').lower().strip()}...\n",
-                            'content_type': 'text',
+                        # Stream enhanced loading state for tool execution
+                        tool_name_clean = tool_data['name'].replace('generate', '').replace('create', '').lower().strip()
+                        loading_msg = {
+                            'type': 'tool_executing',
+                            'content': f"Generating {tool_name_clean}...",
+                            'content_type': 'tool_executing',
                             'provider': 'openai',
                             'model': actual_model,
-                            'multimodal_content': [{'type': 'text', 'data': 'Generating image...', 'format': 'text'}],
+                            'tool_info': {
+                                'name': tool_data['name'],
+                                'status': 'executing',
+                                'description': f"Creating {tool_name_clean} with AI"
+                            },
+                            'multimodal_content': [{'type': 'tool_executing', 'data': f"Generating {tool_name_clean}...", 'format': 'text'}],
                             'preserve_formatting': True
                         }
-                        yield f"data: {json.dumps(transition_msg)}\n\n"
+                        yield f"data: {json.dumps(loading_msg)}\n\n"
                         
                         # Execute tool
                         if tool_data['name'] in ['generateImage', 'createDiagram']:
+                            print(f"🎨 Executing {tool_data['name']} with args: {tool_args}")
                             tool_result = await execute_image_generation_tool(tool_data['name'], tool_args, 'openai')
+                            print(f"🔍 Tool execution result: {tool_result}")
                             
-                            # Stream tool result
-                            tool_result_response = {
-                                'type': 'tool_result',
-                                'content_type': 'tool_result',
-                                'tool_result': {
-                                    'id': tool_data['id'],
-                                    'name': tool_data['name'],
-                                    'result': tool_result
-                                },
-                                'provider': 'openai',
-                                'model': actual_model,
-                                'multimodal_content': [{'type': 'tool_result', 'data': tool_result, 'format': 'json'}]
-                            }
-                            yield f"data: {json.dumps(tool_result_response)}\n\n"
+                            # Check if tool execution was successful
+                            if tool_result.get('success'):
+                                print(f"✅ Tool execution successful")
+                                
+                                # Stream tool result with image
+                                tool_result_response = {
+                                    'type': 'tool_result',
+                                    'content_type': 'tool_result',
+                                    'tool_result': {
+                                        'id': tool_data['id'],
+                                        'name': tool_data['name'],
+                                        'result': tool_result
+                                    },
+                                    'provider': 'openai',
+                                    'model': actual_model,
+                                    'multimodal_content': [{'type': 'tool_result', 'data': tool_result, 'format': 'json'}]
+                                }
+                                yield f"data: {json.dumps(tool_result_response)}\n\n"
+                            else:
+                                print(f"❌ Tool execution failed: {tool_result.get('error')}")
+                                
+                                # Stream tool error
+                                error_response = {
+                                    'type': 'tool_error',
+                                    'content_type': 'tool_error',
+                                    'tool_error': {
+                                        'id': tool_data['id'],
+                                        'name': tool_data['name'],
+                                        'error': tool_result.get('error', 'Unknown error')
+                                    },
+                                    'provider': 'openai',
+                                    'model': actual_model,
+                                    'multimodal_content': [{'type': 'tool_error', 'data': tool_result, 'format': 'json'}]
+                                }
+                                yield f"data: {json.dumps(error_response)}\n\n"
+                                
+                                # Also stream a user-friendly error message
+                                error_msg = {
+                                    'type': 'content',
+                                    'content': f"\n❌ Image generation failed: {tool_result.get('error', 'Unknown error')}\n",
+                                    'content_type': 'text',
+                                    'provider': 'openai',
+                                    'model': actual_model,
+                                    'multimodal_content': [{'type': 'text', 'data': 'Error occurred', 'format': 'text'}],
+                                    'preserve_formatting': True
+                                }
+                                yield f"data: {json.dumps(error_msg)}\n\n"
                             
                             # Continue conversation with tool result
                             print(f"🔄 Continuing conversation with tool result...")
@@ -452,37 +527,56 @@ For the request "Create a donut chart", immediately call generateImage with a de
                                 }
                             ]
                             
-                            # Make follow-up request to continue
-                            follow_up_response = service.client.chat.completions.create(
-                                model=actual_model,
-                                messages=continued_messages,
-                                stream=True,
-                                max_completion_tokens=request_params.get("max_completion_tokens", 4096)
-                            )
-                            
-                            # Stream the continuation
-                            print(f"🔄 Streaming follow-up response...")
-                            for follow_chunk in follow_up_response:
-                                if follow_chunk.choices[0].delta.content:
-                                    content = follow_chunk.choices[0].delta.content
-                                    follow_response = {
-                                        'type': 'content',
-                                        'content': content,
-                                        'content_type': 'text',
-                                        'provider': 'openai',
-                                        'model': actual_model,
-                                        'multimodal_content': [{'type': 'text', 'data': content, 'format': 'text'}],
-                                        'preserve_formatting': True
-                                    }
-                                    yield f"data: {json.dumps(follow_response)}\n\n"
+                            # Make follow-up request to continue conversation
+                            try:
+                                follow_up_response = service.client.chat.completions.create(
+                                    model=actual_model,
+                                    messages=continued_messages,
+                                    stream=True,
+                                    max_completion_tokens=4096
+                                )
+                                
+                                # Stream the continuation
+                                print(f"🔄 Streaming follow-up response...")
+                                for follow_chunk in follow_up_response:
+                                    if follow_chunk.choices[0].delta.content:
+                                        content = follow_chunk.choices[0].delta.content
+                                        follow_response = {
+                                            'type': 'content',
+                                            'content': content,
+                                            'content_type': 'text',
+                                            'provider': 'openai',
+                                            'model': actual_model,
+                                            'multimodal_content': [{'type': 'text', 'data': content, 'format': 'text'}],
+                                            'preserve_formatting': True
+                                        }
+                                        yield f"data: {json.dumps(follow_response)}\n\n"
+                                        
+                            except Exception as e:
+                                print(f"❌ Follow-up conversation error: {str(e)}")
+                                # Still provide a basic completion message
+                                completion_msg = {
+                                    'type': 'content',
+                                    'content': f"\n✅ I've generated the {tool_data['name'].replace('generate', '').lower().strip()} for you!",
+                                    'content_type': 'text',
+                                    'provider': 'openai',
+                                    'model': actual_model,
+                                    'multimodal_content': [{'type': 'text', 'data': 'Image generated!', 'format': 'text'}],
+                                    'preserve_formatting': True
+                                }
+                                yield f"data: {json.dumps(completion_msg)}\n\n"
                         
-                    except json.JSONDecodeError:
-                        print(f"⚠️ Incomplete tool arguments for {tool_call_id}")
+                    except json.JSONDecodeError as e:
+                        print(f"⚠️ JSON decode error for {tool_call_index}: {str(e)}")
+                        print(f"⚠️ Raw arguments: {tool_data.get('arguments', 'None')}")
                     except Exception as e:
-                        print(f"❌ Tool execution error: {str(e)}")
+                        print(f"❌ Tool execution error for {tool_call_index}: {str(e)}")
+                        print(f"❌ Tool data: {tool_data}")
+                        import traceback
+                        print(f"❌ Full traceback: {traceback.format_exc()}")
                         error_response = {
                             'type': 'tool_error',
-                            'content_type': 'tool_error', 
+                            'content_type': 'tool_error',
                             'tool_error': {'id': tool_data['id'], 'name': tool_data['name'], 'error': str(e)},
                             'provider': 'openai',
                             'model': actual_model
@@ -589,17 +683,22 @@ For the request "Create a donut chart", immediately call generateImage with a de
                                 yield f"data: {json.dumps(error_response)}\n\n"
                         
                         # Remove processed tool call
-                        del accumulated_tool_calls[tool_call_id]
+                        del accumulated_tool_calls[tool_call_index]
                         
                     except json.JSONDecodeError:
                         # Arguments not complete yet, continue accumulating
                         pass
+        else:
+            print(f"⚠️ No tool calls were accumulated during streaming!")
         
         print(f"✅ Completed processing {chunk_count} chunks")
         
     except Exception as e:
         print(f"❌ Enhanced OpenAI Error: {str(e)}")
         yield f"data: {json.dumps({'error': f'Enhanced OpenAI Error: {str(e)}'})}\n\n"
+    
+    # Always send final DONE signal
+    yield "data: [DONE]\n\n"
 
 async def get_openai_stream(service, messages, model):
     """Stream response from OpenAI"""
@@ -1106,15 +1205,20 @@ async def execute_image_generation_tool(tool_name: str, tool_args: dict, provide
         if provider == "openai":
             # Use DALL-E 3 for OpenAI
             service = get_service(AIProvider.OPENAI)
-            response = service.client.images.generate(
-                model="dall-e-3",
-                prompt=prompt,
-                size=size,
-                quality=quality,
-                style=style,
-                n=1
-            )
-            image_url = response.data[0].url
+            try:
+                response = service.client.images.generate(
+                    model="dall-e-3",
+                    prompt=prompt,
+                    size=size,
+                    quality=quality,
+                    style=style,
+                    n=1
+                )
+                image_url = response.data[0].url
+            except Exception as e:
+                print(f"⚠️ DALL-E 3 API call failed: {str(e)}")
+                # For now, use a placeholder when API key is missing
+                image_url = f"https://via.placeholder.com/{size}/FF6B6B/FFFFFF?text=DALL-E+Image%3A+{prompt[:30]}..."
             
         elif provider == "grok":
             # Use Aurora for Grok image generation

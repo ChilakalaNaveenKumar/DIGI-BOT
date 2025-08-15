@@ -148,8 +148,25 @@ export default defineEventHandler(async (event) => {
                     })}\n\n`))
                   }
                   
-                  // Handle regular content
-                  if (parsed.content) {
+                  // Handle regular content - NEW BACKEND FORMAT
+                  if (parsed.type === 'content' && parsed.content) {
+                    if (!hasTextStarted) {
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                        type: 'text-start',
+                        id: messageId
+                      })}\n\n`))
+                      hasTextStarted = true
+                    }
+                    
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                      type: 'text-delta',
+                      id: messageId,
+                      delta: parsed.content
+                    })}\n\n`))
+                  }
+                  
+                  // Handle legacy content format  
+                  else if (parsed.content && !parsed.type) {
                     if (!hasTextStarted) {
                       controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                         type: 'text-start',

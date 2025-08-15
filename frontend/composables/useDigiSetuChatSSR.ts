@@ -423,6 +423,21 @@ export const useDigiSetuChatSSR = () => {
                   isThinking.value = true
                   currentThought.value = parsed.content || ''
                   console.log('🤔 Enhanced reasoning:', parsed.content)
+                } else if (parsed.type === 'thinking') {
+                  // AI thinking/planning phase
+                  isThinking.value = true
+                  currentThought.value = parsed.content || ''
+                  console.log('💭 AI thinking:', parsed.content)
+                } else if (parsed.type === 'tool_loading') {
+                  // Tool preparation phase
+                  isThinking.value = true
+                  currentThought.value = parsed.content || 'Preparing tools...'
+                  console.log('🔧 Tool loading:', parsed.content)
+                } else if (parsed.type === 'tool_executing') {
+                  // Tool execution with loading animation
+                  isThinking.value = true
+                  currentThought.value = parsed.content || 'Executing tool...'
+                  console.log('⚡ Tool executing:', parsed.content)
                   
                   // Add multimodal reasoning part
                   if (lastMessage && lastMessage.role === 'assistant') {
