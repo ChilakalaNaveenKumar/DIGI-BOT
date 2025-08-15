@@ -1,11 +1,12 @@
 <template>
-  <div class="markdown-content" v-html="renderedContent"></div>
+  <div class="markdown-renderer">
+    <div v-html="renderedContent" class="prose prose-gray dark:prose-invert max-w-none"></div>
+  </div>
 </template>
 
 <script setup>
 import { computed } from 'vue'
 import { marked } from 'marked'
-import hljs from 'highlight.js'
 
 const props = defineProps({
   content: {
@@ -14,184 +15,112 @@ const props = defineProps({
   }
 })
 
-// Configure marked with syntax highlighting
+// Configure marked for better rendering
 marked.setOptions({
-  highlight: function(code, lang) {
-    if (lang && hljs.getLanguage(lang)) {
-      try {
-        return hljs.highlight(code, { language: lang }).value
-      } catch (err) {
-        console.error('Highlight.js error:', err)
-      }
-    }
-    return hljs.highlightAuto(code).value
-  },
   breaks: true,
-  gfm: true
+  gfm: true,
+  headerIds: false,
+  mangle: false
 })
 
 const renderedContent = computed(() => {
-  return marked(props.content)
+  if (!props.content) return ''
+  
+  try {
+    return marked(props.content)
+  } catch (error) {
+    console.error('Markdown rendering error:', error)
+    return `<pre>${props.content}</pre>`
+  }
 })
 </script>
 
 <style scoped>
-.markdown-content {
-  color: #1f2937;
-  line-height: 1.625;
-}
-
-:root.dark .markdown-content {
-  color: #e5e7eb;
-}
-
-.markdown-content :deep(h1) {
-  font-size: 1.5rem;
-  font-weight: 700;
+.markdown-renderer {
   color: #111827;
-  margin-bottom: 1rem;
-  margin-top: 1.5rem;
 }
 
-:root.dark .markdown-content :deep(h1) {
-  color: #ffffff;
+.dark .markdown-renderer {
+  color: #f3f4f6;
 }
 
-.markdown-content :deep(h2) {
-  font-size: 1.25rem;
-  font-weight: 700;
-  color: #111827;
-  margin-bottom: 0.75rem;
-  margin-top: 1.25rem;
+.prose {
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  max-width: none;
 }
 
-:root.dark .markdown-content :deep(h2) {
-  color: #ffffff;
+@media (min-width: 1024px) {
+  .prose {
+    font-size: 1rem;
+    line-height: 1.5rem;
+  }
 }
 
-.markdown-content :deep(h3) {
-  font-size: 1.125rem;
-  font-weight: 600;
-  color: #111827;
-  margin-bottom: 0.5rem;
-  margin-top: 1rem;
-}
-
-:root.dark .markdown-content :deep(h3) {
-  color: #ffffff;
-}
-
-.markdown-content :deep(p) {
-  margin-bottom: 1rem;
-  line-height: 1.625;
-}
-
-.markdown-content :deep(ul) {
-  list-style-type: disc;
-  list-style-position: inside;
-  margin-bottom: 1rem;
-}
-
-.markdown-content :deep(ol) {
-  list-style-type: decimal;
-  list-style-position: inside;
-  margin-bottom: 1rem;
-}
-
-.markdown-content :deep(li) {
-  color: #4b5563;
-  margin-bottom: 0.25rem;
-}
-
-:root.dark .markdown-content :deep(li) {
-  color: #d1d5db;
-}
-
-.markdown-content :deep(blockquote) {
-  border-left: 4px solid #60a5fa;
-  padding-left: 1rem;
-  font-style: italic;
-  color: #4b5563;
-  margin: 1rem 0;
-}
-
-:root.dark .markdown-content :deep(blockquote) {
-  color: #9ca3af;
-}
-
-.markdown-content :deep(code) {
+.prose :deep(pre) {
   background-color: #f3f4f6;
-  color: #1f2937;
-  padding: 0.125rem 0.5rem;
+  border-radius: 0.5rem;
+  padding: 1rem;
+  overflow-x: auto;
+}
+
+.dark .prose :deep(pre) {
+  background-color: #1f2937;
+}
+
+.prose :deep(code) {
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.375rem;
   border-radius: 0.25rem;
   font-size: 0.875rem;
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Consolas, "Liberation Mono", Menlo, monospace;
 }
 
-:root.dark .markdown-content :deep(code) {
-  background-color: #374151;
-  color: #e5e7eb;
-}
-
-.markdown-content :deep(pre) {
-  background-color: #111827;
-  color: #f9fafb;
-  padding: 1rem;
-  border-radius: 0.5rem;
-  overflow-x: auto;
-  margin: 1rem 0;
-  border: 1px solid #374151;
-}
-
-:root.dark .markdown-content :deep(pre) {
+.dark .prose :deep(code) {
   background-color: #1f2937;
-  border-color: #4b5563;
 }
 
-.markdown-content :deep(pre code) {
-  background-color: transparent;
-  padding: 0;
-  color: #f9fafb;
+.prose :deep(blockquote) {
+  border-left: 4px solid #3b82f6;
+  background-color: #eff6ff;
+  padding-left: 1rem;
+  padding-top: 0.5rem;
+  padding-bottom: 0.5rem;
+  margin: 1rem 0;
 }
 
-.markdown-content :deep(a) {
-  color: #2563eb;
-  text-decoration: underline;
+.dark .prose :deep(blockquote) {
+  background-color: rgba(30, 58, 138, 0.2);
 }
 
-.markdown-content :deep(a:hover) {
-  color: #1d4ed8;
-}
-
-.markdown-content :deep(table) {
+.prose :deep(table) {
   width: 100%;
   border-collapse: collapse;
-  border: 1px solid #d1d5db;
-  margin: 1rem 0;
+  border: 1px solid #e5e7eb;
 }
 
-.markdown-content :deep(th) {
-  border: 1px solid #d1d5db;
-  padding: 0.5rem 1rem;
-  background-color: #f3f4f6;
+.dark .prose :deep(table) {
+  border-color: #374151;
+}
+
+.prose :deep(th) {
+  background-color: #f9fafb;
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem;
+  text-align: left;
   font-weight: 600;
 }
 
-.markdown-content :deep(td) {
-  border: 1px solid #d1d5db;
-  padding: 0.5rem 1rem;
+.dark .prose :deep(th) {
+  background-color: #1f2937;
+  border-color: #374151;
 }
 
-.markdown-content :deep(strong) {
-  font-weight: 600;
-  color: #111827;
+.prose :deep(td) {
+  border: 1px solid #e5e7eb;
+  padding: 0.75rem;
 }
 
-:root.dark .markdown-content :deep(strong) {
-  color: #ffffff;
-}
-
-.markdown-content :deep(em) {
-  font-style: italic;
+.dark .prose :deep(td) {
+  border-color: #374151;
 }
 </style>

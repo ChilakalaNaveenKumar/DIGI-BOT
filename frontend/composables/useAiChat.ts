@@ -81,8 +81,10 @@ export const useAiChat = () => {
               const parsed = JSON.parse(data)
               if (parsed.content) {
                 // Append content to the assistant message
-                const lastMessage = messages.value[messages.value.length - 1]
-                lastMessage.content += parsed.content
+                const lastMessage = messages.value?.[messages.value.length - 1]
+                if (lastMessage) {
+                  lastMessage.content += parsed.content
+                }
               } else if (parsed.error) {
                 throw new Error(parsed.error)
               }

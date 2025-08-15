@@ -1,5 +1,5 @@
-from pydantic import BaseModel
-from typing import List, Optional, Literal
+from pydantic import BaseModel, Field
+from typing import List, Optional, Literal, Dict, Any, Union
 from enum import Enum
 
 class MessageRole(str, Enum):
@@ -7,10 +7,29 @@ class MessageRole(str, Enum):
     ASSISTANT = "assistant"
     SYSTEM = "system"
 
+class FileInfo(BaseModel):
+    filename: Optional[str] = Field(default=None)
+    mediaType: Optional[str] = Field(default=None)
+    url: Optional[str] = Field(default=None)
+    size: Optional[int] = Field(default=None)
+
+class ToolInfo(BaseModel):
+    name: str
+    description: Optional[str] = Field(default=None)
+    parameters: Optional[Dict[str, Any]] = Field(default=None)
+
+class EnhancedMessage(BaseModel):
+    role: MessageRole
+    content: str
+    reasoning: Optional[str] = Field(default=None)
+    files: List[FileInfo] = Field(default_factory=list)
+    metadata: Optional[Dict[str, Any]] = Field(default=None)
+    timestamp: Optional[str] = Field(default=None)
+
 class Message(BaseModel):
     role: MessageRole
     content: str
-    timestamp: Optional[str] = None
+    timestamp: Optional[str] = Field(default=None)
 
 class AIProvider(str, Enum):
     OPENAI = "openai"
@@ -18,24 +37,55 @@ class AIProvider(str, Enum):
     ANTHROPIC = "anthropic"
 
 class ChatRequest(BaseModel):
-    messages: List[Message]
+    messages: List[Union[Message, EnhancedMessage]]
     provider: AIProvider = AIProvider.OPENAI
-    model: Optional[str] = None
-    temperature: Optional[float] = 1.0
-    max_tokens: Optional[int] = 256000
-    stream: bool = True
+    model: Optional[str] = Field(default=None)
+    # temperature: Optional[float] = Field(default=0.7)  # Removed - not supported by some models
+    max_tokens: Optional[int] = Field(default=256000)
+    stream: bool = Field(default=True)
+    # Enhanced AI SDK 5 features
+    enableReasoning: Optional[bool] = Field(default=False)
+    enableToolCalling: Optional[bool] = Field(default=False)
+    tools: List[ToolInfo] = Field(default_factory=list)
+    files: List[FileInfo] = Field(default_factory=list)
+    streamMode: Optional[str] = Field(default="standard")
 
 class ChatResponse(BaseModel):
     message: str
     provider: str
     model: str
-    usage: Optional[dict] = None
+    usage: Optional[dict] = Field(default=None)
 
 class ProviderInfo(BaseModel):
     id: str
     name: str
     models: List[str]
-    status: str = "active"
+    status: str = Field(default="active")
+    description: Optional[str] = Field(default=None)
+    reasoning: Optional[bool] = Field(default=False)
+    toolCalling: Optional[bool] = Field(default=False)
+    multiModal: Optional[bool] = Field(default=False)
 
 class ProvidersResponse(BaseModel):
     providers: List[ProviderInfo]
+
+class ToolCall(BaseModel):
+    id: str
+    name: str
+    arguments: Dict[str, Any]
+    result: Optional[Any] = Field(default=None)
+
+class ToolResult(BaseModel):
+    id: str
+    output: Any
+    success: bool = Field(default=True)
+    error: Optional[str] = Field(default=None)
+
+class EnhancedChatResponse(BaseModel):
+    content: Optional[str] = Field(default=None)
+    reasoning: Optional[str] = Field(default=None)
+    tool_call: Optional[ToolCall] = Field(default=None)
+    tool_result: Optional[ToolResult] = Field(default=None)
+    provider: str
+    model: Optional[str] = Field(default=None)
+    error: Optional[str] = Field(default=None)

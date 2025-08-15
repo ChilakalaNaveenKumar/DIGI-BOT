@@ -79,7 +79,6 @@ CRITICAL: Always provide COMPLETE responses with maximum visual content. Never s
             with self.client.messages.stream(
                 model=actual_model,
                 max_tokens=200000,  # Claude 3.5 maximum output tokens
-                temperature=0.7,
                 system=system_message,
                 messages=anthropic_messages
                             ) as stream:

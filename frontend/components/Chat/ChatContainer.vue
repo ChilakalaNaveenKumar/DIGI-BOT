@@ -1,7 +1,7 @@
 <template>
   <div class="min-h-screen bg-white dark:bg-gray-900">
     <!-- Enhanced Header -->
-    <header class="sticky top-0 z-50 backdrop-blur-xl bg-white/95 dark:bg-gray-900/95 border-b border-gray-200 dark:border-gray-700 shadow-sm">
+    <header class="sticky top-0 z-50 backdrop-blur-xl bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 shadow-sm opacity-95">
       <div class="max-w-5xl mx-auto px-6 py-4">
         <div class="flex items-center justify-between">
           <div class="flex items-center space-x-4">
@@ -86,7 +86,7 @@
     </main>
 
     <!-- Enhanced Input Area (Fixed Bottom) -->
-    <footer class="sticky bottom-0 bg-white/95 dark:bg-gray-900/95 backdrop-blur-xl border-t border-gray-200 dark:border-gray-700 shadow-lg">
+    <footer class="sticky bottom-0 bg-white dark:bg-gray-900 backdrop-blur-xl border-t border-gray-200 dark:border-gray-700 shadow-lg opacity-95">
       <div class="max-w-5xl mx-auto px-6 py-6">
         <ChatInput
           v-model="input"

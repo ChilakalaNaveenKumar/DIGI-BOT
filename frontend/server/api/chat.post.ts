@@ -1,25 +1,62 @@
 // server/api/chat.post.ts
-// AI SDK 5 compatible route - proxy to Python FastAPI backend
+// Enhanced AI SDK 5 route with reasoning, tool calling, and file support
 
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
-    console.log('🔄 AI SDK 5 request to Python backend:', body)
+    console.log('🚀 AI SDK 5 Enhanced Request:', {
+      messagesCount: body.messages?.length || 0,
+      provider: body.data?.provider || body.provider,
+      hasFiles: body.files?.length > 0,
+      hasTools: body.tools?.length > 0
+    })
     
-    // AI SDK 5 sends messages in different format
+    // Extract AI SDK 5 data
     const messages = body.messages || []
     const provider = body.data?.provider || body.provider || 'openai'
-    
-    console.log('📨 Messages count:', messages.length)
-    console.log('🔧 Provider:', provider)
+    const model = body.model
+    const files = body.files || []
+    const tools = body.tools || []
     
     // Convert AI SDK 5 messages to Python backend format
-    const convertedMessages = messages.map(msg => ({
-      role: msg.role,
-      content: msg.parts ? 
-        msg.parts.filter(part => part.type === 'text').map(part => part.text).join('') :
-        msg.content || ''
-    }))
+    const convertedMessages = messages.map(msg => {
+      if (msg.parts) {
+        // Handle AI SDK 5 message parts
+        const textParts = msg.parts?.filter(part => part.type === 'text') || []
+        const reasoningParts = msg.parts?.filter(part => part.type === 'reasoning') || []
+        const fileParts = msg.parts?.filter(part => part.type === 'file') || []
+        
+        return {
+          role: msg.role,
+          content: textParts.map(part => part.text).join(''),
+          reasoning: reasoningParts.map(part => part.text).join(''),
+          files: fileParts.map(part => ({
+            url: part.url,
+            mediaType: part.mediaType,
+            filename: part.filename
+          }))
+        }
+      } else {
+        return {
+          role: msg.role,
+          content: msg.content || '',
+          reasoning: '',
+          files: []
+        }
+      }
+    })
+    
+    // Enhanced request to Python backend
+    const pythonRequest = {
+      messages: convertedMessages,
+      provider: provider,
+      model: model,
+      files: files,
+      tools: tools,
+      enableReasoning: true,  // Enable reasoning/thinking process
+      enableToolCalling: tools.length > 0,
+      streamMode: 'enhanced'  // Request enhanced streaming
+    }
     
     // Forward to Python backend
     const response = await fetch('http://localhost:8000/api/chat', {
@@ -27,24 +64,20 @@ export default defineEventHandler(async (event) => {
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        messages: convertedMessages,
-        provider: provider,
-        model: body.model
-      })
+      body: JSON.stringify(pythonRequest)
     })
 
     if (!response.ok) {
       throw new Error(`Python backend error: ${response.status} ${response.statusText}`)
     }
 
-    // Set proper headers for AI SDK 5 streaming
+    // Set AI SDK 5 streaming headers
     setHeader(event, 'Content-Type', 'text/plain; charset=utf-8')
     setHeader(event, 'Cache-Control', 'no-cache')
     setHeader(event, 'Connection', 'keep-alive')
     setHeader(event, 'Access-Control-Allow-Origin', '*')
     
-    // Convert Python backend streaming to AI SDK 5 format
+    // Enhanced Python to AI SDK 5 stream conversion
     const reader = response.body?.getReader()
     const decoder = new TextDecoder()
     
@@ -52,28 +85,37 @@ export default defineEventHandler(async (event) => {
       throw new Error('No response body from Python backend')
     }
     
-    // Create a readable stream that converts Python format to AI SDK 5 format
+    // AI SDK 5 Enhanced Stream with reasoning and tool support
     const stream = new ReadableStream({
       async start(controller) {
         try {
           let messageId = `msg-${Date.now()}`
-          let hasStarted = false
+          let hasTextStarted = false
+          let hasReasoningStarted = false
+          let currentToolCall = null
           
           while (true) {
             const { done, value } = await reader.read()
             
             if (done) {
-              // Send finish chunk
-              if (hasStarted) {
+              // Send proper finish chunks
+              if (hasTextStarted) {
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                   type: 'text-end',
                   id: messageId
                 })}\n\n`))
-                
+              }
+              
+              if (hasReasoningStarted) {
                 controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                  type: 'finish'
+                  type: 'reasoning-end',
+                  id: messageId
                 })}\n\n`))
               }
+              
+              controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                type: 'finish'
+              })}\n\n`))
               break
             }
             
@@ -84,37 +126,75 @@ export default defineEventHandler(async (event) => {
               if (line.startsWith('data: ')) {
                 const data = line.slice(6).trim()
                 
-                if (data === '[DONE]') {
-                  continue
-                }
+                if (data === '[DONE]') continue
                 
                 try {
                   const parsed = JSON.parse(data)
                   
+                  // Handle reasoning/thinking content
+                  if (parsed.reasoning) {
+                    if (!hasReasoningStarted) {
+                      controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                        type: 'reasoning-start',
+                        id: messageId
+                      })}\n\n`))
+                      hasReasoningStarted = true
+                    }
+                    
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                      type: 'reasoning-delta',
+                      id: messageId,
+                      delta: parsed.reasoning
+                    })}\n\n`))
+                  }
+                  
+                  // Handle regular content
                   if (parsed.content) {
-                    // Send start chunk if this is the first content
-                    if (!hasStarted) {
+                    if (!hasTextStarted) {
                       controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                         type: 'text-start',
                         id: messageId
                       })}\n\n`))
-                      hasStarted = true
+                      hasTextStarted = true
                     }
                     
-                    // Send text delta chunk
                     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                       type: 'text-delta',
                       id: messageId,
                       delta: parsed.content
                     })}\n\n`))
-                  } else if (parsed.error) {
-                    // Send error chunk
+                  }
+                  
+                  // Handle tool calls
+                  if (parsed.tool_call) {
+                    const toolCall = parsed.tool_call
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                      type: 'tool-call',
+                      toolCallId: toolCall.id,
+                      toolName: toolCall.function?.name || toolCall.name,
+                      args: toolCall.function?.arguments || toolCall.arguments
+                    })}\n\n`))
+                  }
+                  
+                  // Handle tool results
+                  if (parsed.tool_result) {
+                    const toolResult = parsed.tool_result
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
+                      type: 'tool-result',
+                      toolCallId: toolResult.id,
+                      result: toolResult.output || toolResult.result
+                    })}\n\n`))
+                  }
+                  
+                  // Handle errors
+                  if (parsed.error) {
                     controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
                       type: 'error',
                       errorText: parsed.error
                     })}\n\n`))
                     break
                   }
+                  
                 } catch (parseError) {
                   console.warn('Failed to parse chunk:', data)
                   continue
@@ -123,7 +203,7 @@ export default defineEventHandler(async (event) => {
             }
           }
         } catch (error) {
-          console.error('Stream conversion error:', error)
+          console.error('Enhanced stream conversion error:', error)
           controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
             type: 'error',
             errorText: error.message
@@ -143,9 +223,8 @@ export default defineEventHandler(async (event) => {
     })
     
   } catch (error) {
-    console.error('❌ AI SDK 5 Proxy error:', error)
+    console.error('❌ AI SDK 5 Enhanced Proxy error:', error)
     
-    // Return error in AI SDK 5 compatible format
     return new Response(
       `data: ${JSON.stringify({ type: 'error', errorText: error.message })}\n\n`,
       {

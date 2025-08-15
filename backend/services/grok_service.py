@@ -56,7 +56,6 @@ IMPORTANT: With 256K token context window, provide MASSIVE, COMPREHENSIVE respon
                 "messages": grok_messages,
                 "model": model or self.default_model,
                 "stream": True,
-                "temperature": 0.7,
                 "max_tokens": 256000  # Grok-4 maximum output tokens (256k)
             }
             
