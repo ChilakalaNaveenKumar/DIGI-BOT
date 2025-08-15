@@ -207,6 +207,52 @@
                   Image generation in progress...
                 </div>
               </div>
+
+              <!-- Audio Generation Result -->
+              <div v-else-if="isAudioGenerationTool(toolPart)" class="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-700">
+                <div class="flex items-center space-x-2 mb-3">
+                  <div class="p-1.5 bg-blue-100 dark:bg-blue-800 rounded-lg">
+                    <Volume2 class="w-4 h-4 text-blue-600 dark:text-blue-400" />
+                  </div>
+                  <span class="text-sm font-medium text-blue-700 dark:text-blue-300">
+                    Generated Audio
+                  </span>
+                </div>
+
+                <div v-if="toolPart.output?.audio_url || toolPart.output?.url" class="space-y-3">
+                  <!-- Audio Player -->
+                  <div class="audio-container">
+                    <audio 
+                      :src="toolPart.output.audio_url || toolPart.output.url" 
+                      controls
+                      class="w-full max-w-md rounded-lg shadow-sm"
+                      preload="metadata"
+                    >
+                      Your browser does not support the audio element.
+                    </audio>
+                  </div>
+                  <!-- Audio Details -->
+                  <div class="text-xs text-gray-600 dark:text-gray-400 space-y-1">
+                    <div v-if="toolPart.output.text || toolPart.input?.text">
+                      <strong>Text:</strong> {{ (toolPart.output.text || toolPart.input.text).substring(0, 100) }}{{ (toolPart.output.text || toolPart.input.text).length > 100 ? '...' : '' }}
+                    </div>
+                    <div class="flex items-center space-x-4">
+                      <span v-if="toolPart.output.voice">
+                        <strong>Voice:</strong> {{ toolPart.output.voice }}
+                      </span>
+                      <span v-if="toolPart.output.model">
+                        <strong>Model:</strong> {{ toolPart.output.model }}
+                      </span>
+                      <span v-if="toolPart.output.size_bytes">
+                        <strong>Size:</strong> {{ Math.round(toolPart.output.size_bytes / 1024) }}KB
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div v-else class="text-sm text-blue-600 dark:text-blue-400">
+                  Audio generation in progress...
+                </div>
+              </div>
               
               <!-- Generic Tool Result -->
               <div v-else class="p-4 bg-green-50 dark:bg-green-900/20 rounded-lg border border-green-200 dark:border-green-700">
@@ -323,7 +369,7 @@ import { computed } from 'vue'
 import { 
   Loader2, Wrench, ChevronRight, AlertCircle, Clock, 
   User, Paperclip, FileText, Image as ImageIcon, File,
-  Table
+  Table, Volume2
 } from 'lucide-vue-next'
 import { extractTextFromMessage, extractReasoningFromMessage } from '~/composables/useDigiSetuChatSSR'
 import ReasoningDisplay from './ReasoningDisplay.vue'
@@ -459,6 +505,10 @@ const isImageGenerationTool = (toolPart) => {
 
 const isDiagramTool = (toolPart) => {
   return toolPart.toolName === 'createDiagram' || toolPart.type === 'tool-createDiagram'
+}
+
+const isAudioGenerationTool = (toolPart) => {
+  return toolPart.toolName === 'generateAudio' || toolPart.type === 'tool-generateAudio' || toolPart.toolName === 'textToSpeech'
 }
 
 // File utilities

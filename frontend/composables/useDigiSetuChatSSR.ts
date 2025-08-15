@@ -213,6 +213,157 @@ export const useDigiSetuChatSSR = () => {
           },
           required: ['prompt', 'type']
         }
+      },
+
+      // 🎵 AUDIO GENERATION TOOLS  
+      generateAudio: {
+        description: 'Generate speech audio from text using AI text-to-speech. Use when users request audio, voice narration, or when audio would enhance the experience.',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            text: { 
+              type: 'string', 
+              description: 'The text to convert to speech. Should be clear and well-formatted for natural speech synthesis.' 
+            },
+            voice: { 
+              type: 'string', 
+              enum: ['alloy', 'echo', 'fable', 'onyx', 'nova', 'shimmer'], 
+              description: 'Voice style for the generated audio',
+              default: 'alloy'
+            },
+            model: {
+              type: 'string',
+              enum: ['tts-1', 'tts-1-hd'],
+              description: 'TTS model quality (tts-1 for speed, tts-1-hd for quality)',
+              default: 'tts-1'
+            },
+            speed: {
+              type: 'number',
+              minimum: 0.25,
+              maximum: 4.0,
+              description: 'Speech speed multiplier (0.25 to 4.0)',
+              default: 1.0
+            }
+          },
+          required: ['text']
+        }
+      },
+
+      // 🎤 SPEECH-TO-TEXT TOOLS
+      speechToText: {
+        description: 'Transcribe audio to text using AI speech recognition. Use when users provide audio files or recordings that need to be converted to text.',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            audio_data: { 
+              type: 'string', 
+              description: 'Base64 encoded audio data to transcribe' 
+            },
+            audio_file: { 
+              type: 'string', 
+              description: 'Path to audio file to transcribe (alternative to audio_data)' 
+            },
+            language: { 
+              type: 'string', 
+              description: 'Language of the audio (auto-detect if not specified)',
+              default: 'auto'
+            },
+            model: { 
+              type: 'string', 
+              enum: ['whisper-1'], 
+              description: 'Speech recognition model to use',
+              default: 'whisper-1'
+            }
+          },
+          required: []
+        }
+      },
+      
+      transcribeAudio: {
+        description: 'Alternative name for speech-to-text tool',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            audio_data: { 
+              type: 'string', 
+              description: 'Base64 encoded audio data to transcribe' 
+            },
+            audio_file: { 
+              type: 'string', 
+              description: 'Path to audio file to transcribe' 
+            },
+            language: { 
+              type: 'string', 
+              description: 'Language of the audio',
+              default: 'auto'
+            }
+          },
+          required: []
+        }
+      },
+
+      // 📄 FILE PROCESSING TOOLS
+      processFile: {
+        description: 'Process, analyze, or summarize file content. Use when users upload files or need content analysis.',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            file_content: { 
+              type: 'string', 
+              description: 'The content of the file to process' 
+            },
+            file_type: { 
+              type: 'string', 
+              description: 'Type of file being processed (text, pdf, docx, etc.)',
+              default: 'text'
+            },
+            task: { 
+              type: 'string', 
+              enum: ['summarize', 'analyze', 'extract'], 
+              description: 'Processing task to perform',
+              default: 'summarize'
+            }
+          },
+          required: ['file_content']
+        }
+      },
+      
+      analyzeFile: {
+        description: 'Analyze file content in detail, providing insights and observations',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            file_content: { 
+              type: 'string', 
+              description: 'The content of the file to analyze' 
+            },
+            file_type: { 
+              type: 'string', 
+              description: 'Type of file being analyzed',
+              default: 'text'
+            }
+          },
+          required: ['file_content']
+        }
+      },
+      
+      summarizeFile: {
+        description: 'Summarize file content, highlighting key points and main ideas',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            file_content: { 
+              type: 'string', 
+              description: 'The content of the file to summarize' 
+            },
+            file_type: { 
+              type: 'string', 
+              description: 'Type of file being summarized',
+              default: 'text'
+            }
+          },
+          required: ['file_content']
+        }
       }
     }
 
@@ -246,10 +397,8 @@ export const useDigiSetuChatSSR = () => {
         })
         
         // Direct streaming approach - no Chat class needed
-        console.log('🚀 Direct streaming chat initialized')
         
         isInitialized.value = true
-        console.log('🚀 AI SDK 5 Chat initialized')
         
       } catch (error) {
         console.error('Failed to initialize Chat:', error)
@@ -287,12 +436,10 @@ export const useDigiSetuChatSSR = () => {
     if (provider && provider.models.length > 0) {
       selectedModel.value = provider.models[0] || ''
     }
-    console.log('🔄 Provider changed:', newProvider)
   }
 
   const changeModel = (newModel: string) => {
     selectedModel.value = newModel
-    console.log('🔄 Model changed:', newModel)
   }
 
   // File upload handling
@@ -302,7 +449,6 @@ export const useDigiSetuChatSSR = () => {
         const { convertFileListToFileUIParts } = await import('ai')
         const fileUIParts = await convertFileListToFileUIParts(files)
         uploadedFiles.value = [...uploadedFiles.value, ...fileUIParts]
-        console.log('📁 Files processed:', fileUIParts.length)
         return fileUIParts
       }
       return []
@@ -361,7 +507,6 @@ export const useDigiSetuChatSSR = () => {
       }
 
       const toolsToSend = getAvailableTools()
-      console.log(`🔧 Sending ${toolsToSend.length} tools to backend:`, toolsToSend.map(t => t.name))
 
       // Use Nuxt API route for proper stream conversion
       const response = await fetch('/api/chat', {
@@ -404,16 +549,13 @@ export const useDigiSetuChatSSR = () => {
           for (const line of lines) {
             if (line.trim().startsWith('data: ')) {
               const data = line.trim().slice(6)
-              console.log('📦 Received chunk:', data)
               
               if (data === '[DONE]') {
-                console.log('✅ Stream completed')
                 continue
               }
               
               try {
                 const parsed = JSON.parse(data)
-                console.log('🔍 Parsed data:', parsed)
                 
                 const lastMessage = messages.value[messages.value.length - 1]
                 
@@ -422,22 +564,18 @@ export const useDigiSetuChatSSR = () => {
                   // Enhanced reasoning with multimodal content
                   isThinking.value = true
                   currentThought.value = parsed.content || ''
-                  console.log('🤔 Enhanced reasoning:', parsed.content)
                 } else if (parsed.type === 'thinking') {
                   // AI thinking/planning phase
                   isThinking.value = true
                   currentThought.value = parsed.content || ''
-                  console.log('💭 AI thinking:', parsed.content)
                 } else if (parsed.type === 'tool_loading') {
                   // Tool preparation phase
                   isThinking.value = true
                   currentThought.value = parsed.content || 'Preparing tools...'
-                  console.log('🔧 Tool loading:', parsed.content)
                 } else if (parsed.type === 'tool_executing') {
                   // Tool execution with loading animation
                   isThinking.value = true
                   currentThought.value = parsed.content || 'Executing tool...'
-                  console.log('⚡ Tool executing:', parsed.content)
                   
                   // Add multimodal reasoning part
                   if (lastMessage && lastMessage.role === 'assistant') {
@@ -461,7 +599,6 @@ export const useDigiSetuChatSSR = () => {
                   }
                 } else if (parsed.type === 'content') {
                   // Enhanced content with multimodal support
-                  console.log('💬 Enhanced content:', parsed.content_type, parsed.multimodal_content)
                   
                   if (lastMessage && lastMessage.role === 'assistant') {
                     // Update main content for backward compatibility
@@ -515,12 +652,10 @@ export const useDigiSetuChatSSR = () => {
                     }
                     mainTextPart.text = lastMessage.content
                     
-                    console.log('💬 Enhanced message updated:', lastMessage)
                     nextTick(() => scrollToBottom())
                   }
                 } else if (parsed.type === 'tool_call') {
                   // Enhanced tool call with multimodal support
-                  console.log('🔧 Enhanced tool call:', parsed.tool_call)
                   
                   if (lastMessage && lastMessage.role === 'assistant') {
                     if (!lastMessage.parts) lastMessage.parts = []
@@ -539,7 +674,7 @@ export const useDigiSetuChatSSR = () => {
                   }
                 } else if (parsed.type === 'tool_result') {
                   // Handle tool execution results
-                  console.log('🔧 Tool result:', parsed.tool_result)
+
                   
                   if (lastMessage && lastMessage.role === 'assistant' && lastMessage.parts) {
                     // Find the corresponding tool call part
@@ -547,17 +682,20 @@ export const useDigiSetuChatSSR = () => {
                       part.type === 'tool-call' && part.toolId === parsed.tool_result?.id
                     )
                     
+
+                    
                     if (toolCallPart) {
+
                       // Update the tool call with results
                       toolCallPart.state = 'output-available' as const
                       toolCallPart.output = parsed.tool_result?.result
                       
-                      console.log('🔧 Tool call updated with result:', toolCallPart)
+                    } else {
+                      console.warn('❌ No matching tool call found for result ID:', parsed.tool_result?.id)
                     }
                   }
                 } else if (parsed.type === 'tool_error') {
                   // Handle tool execution errors
-                  console.log('❌ Tool error:', parsed.tool_error)
                   
                   if (lastMessage && lastMessage.role === 'assistant' && lastMessage.parts) {
                     // Find the corresponding tool call part
@@ -570,12 +708,10 @@ export const useDigiSetuChatSSR = () => {
                       toolCallPart.state = 'output-error' as const
                       toolCallPart.errorText = parsed.tool_error?.error
                       
-                      console.log('❌ Tool call updated with error:', toolCallPart)
                     }
                   }
                 } else if (parsed.type === 'image_generation') {
                   // Handle image generation results
-                  console.log('🖼️ Image generated:', parsed.multimodal_content)
                   
                   if (lastMessage && lastMessage.role === 'assistant') {
                     if (!lastMessage.parts) lastMessage.parts = []
@@ -597,7 +733,6 @@ export const useDigiSetuChatSSR = () => {
                   if (parsed.type === 'reasoning-start') {
                     isThinking.value = true
                     currentThought.value = ''
-                    console.log('🤔 Reasoning started (legacy)')
                   } else if (parsed.type === 'reasoning-delta') {
                     currentThought.value += parsed.delta || ''
                     isThinking.value = true
@@ -616,7 +751,6 @@ export const useDigiSetuChatSSR = () => {
                       nextTick(() => scrollToBottom())
                     }
                   } else if (parsed.type === 'finish') {
-                    console.log('✅ Stream finished')
                     isLoading.value = false
                     isThinking.value = false
                   } else if (parsed.content !== undefined) {
@@ -657,7 +791,6 @@ export const useDigiSetuChatSSR = () => {
   // Enhanced regeneration
   const regenerateMessage = async (messageId: string) => {
     // Note: Direct fetch approach doesn't use chat.value.regenerate
-    console.log('Regenerate message:', messageId)
     // Implementation would go here if needed
   }
 

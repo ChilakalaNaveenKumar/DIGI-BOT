@@ -22,16 +22,6 @@
           Thinking...
         </UBadge>
         <UBadge 
-          v-else-if="isToolExecuting" 
-          color="blue" 
-          variant="soft" 
-          size="xs"
-          class="animate-pulse"
-        >
-          <Loader2 class="w-3 h-3 mr-1 animate-spin" />
-          Executing Tool
-        </UBadge>
-        <UBadge 
           v-else-if="state === 'done'" 
           color="green" 
           variant="soft" 
@@ -122,32 +112,15 @@
         >
           <div class="flex items-start space-x-3">
             <div class="flex-shrink-0 mt-1">
-              <div 
-                class="w-6 h-6 rounded-full flex items-center justify-center animate-spin"
-                :class="isToolExecuting ? 'bg-blue-500' : 'bg-purple-500'"
-              >
+              <div class="w-6 h-6 bg-purple-500 rounded-full flex items-center justify-center animate-spin">
                 <Loader2 class="w-3 h-3 text-white" />
               </div>
             </div>
             <div class="flex-1">
-              <div 
-                class="rounded-xl p-4 border"
-                :class="isToolExecuting 
-                  ? 'bg-blue-50 dark:bg-blue-900/20 border-blue-200 dark:border-blue-700' 
-                  : 'bg-gray-50 dark:bg-gray-800 border-gray-200 dark:border-gray-700'"
-              >
-                <div 
-                  class="text-sm leading-relaxed flex items-center"
-                  :class="isToolExecuting 
-                    ? 'text-blue-800 dark:text-blue-200' 
-                    : 'text-purple-800 dark:text-purple-200'"
-                >
-                  <!-- Tool execution icon -->
-                  <div v-if="isToolExecuting" class="mr-2">
-                    <div class="w-4 h-4 bg-blue-500 rounded animate-pulse"></div>
-                  </div>
+                              <div class="bg-gray-50 dark:bg-gray-800 rounded-xl p-4 border border-gray-200 dark:border-gray-700">
+                <div class="text-sm text-purple-800 dark:text-purple-200 leading-relaxed">
                   {{ currentThinking }}
-                  <span class="animate-pulse ml-1">|</span>
+                  <span class="animate-pulse">|</span>
                 </div>
               </div>
             </div>
@@ -189,16 +162,6 @@ const isExpanded = ref(props.initialExpanded)
 const toggleExpanded = () => {
   isExpanded.value = !isExpanded.value
 }
-
-// Detect tool execution states
-const isToolExecuting = computed(() => {
-  return props.currentThinking && (
-    props.currentThinking.includes('Generating') ||
-    props.currentThinking.includes('Executing') ||
-    props.currentThinking.includes('Creating') ||
-    props.currentThinking.includes('Preparing tools')
-  )
-})
 
 // Process reasoning into steps
 const reasoningSteps = computed(() => {

@@ -22,7 +22,6 @@ export const useAiChatSimple = () => {
     if (import.meta.server) return null // Skip on server
     
     try {
-      console.log('🚀 Initializing simple AI SDK...')
       
       // Simple chat implementation without AI SDK Chat class
       const chat = {
@@ -35,7 +34,6 @@ export const useAiChatSimple = () => {
       }
       
       aiSdk.value = chat
-      console.log('✅ Simple AI SDK initialized successfully')
       
       return chat
       

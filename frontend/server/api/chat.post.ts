@@ -4,12 +4,6 @@
 export default defineEventHandler(async (event) => {
   try {
     const body = await readBody(event)
-    console.log('🚀 AI SDK 5 Enhanced Request:', {
-      messagesCount: body.messages?.length || 0,
-      provider: body.data?.provider || body.provider,
-      hasFiles: body.files?.length > 0,
-      hasTools: body.tools?.length > 0
-    })
     
     // Extract AI SDK 5 data
     const messages = body.messages || []

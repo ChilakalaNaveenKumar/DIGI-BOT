@@ -94,11 +94,13 @@ async def chat_endpoint(request: ChatRequest):
                 files = getattr(request, 'files', [])
                 tools = getattr(request, 'tools', [])
                 
+                print(f"🚀 Enhanced Chat Request: reasoning={enable_reasoning}, tools={enable_tools}, files={len(files)}")
                 
                 # Don't send fake reasoning - let the AI models provide real reasoning
                 
                 # Route to appropriate enhanced stream handler
                 if request.provider == "openai":
+                    print(f"🔍 Processing OpenAI request - tools: {len(tools) if tools else 0}, model: {request.model}")
                     async for chunk in get_enhanced_openai_stream(service, request.messages, request.model, enable_reasoning, tools, files):
                         yield chunk
                 elif request.provider == "grok":
@@ -132,6 +134,7 @@ async def chat_endpoint(request: ChatRequest):
 
 async def get_enhanced_openai_stream(service, messages, model, enable_reasoning=False, tools=None, files=None):
     """Enhanced OpenAI stream with reasoning, tool calling, and file support"""
+    print(f"🎯 get_enhanced_openai_stream called - tools: {len(tools) if tools else 0}, model: {model}")
     try:
         openai_messages = []
         
@@ -223,19 +226,27 @@ You have access to tools that you can use when appropriate. Use your best judgme
             request_params["tool_choice"] = "auto"
 
             # Use auto mode - let the AI decide when to use tools (forced mode was causing failures)
+            print(f"🔧 Tools being sent to OpenAI: {len(openai_tools)} tools (AUTO mode)")
             
             # Log user message for debugging
             user_message = openai_messages[-1]["content"] if openai_messages else ""
+            print(f"🎯 User message: '{user_message[:100]}...'")
+            print(f"🎨 Tools available - AI will decide when to use them")
             
             for tool in openai_tools:
                 print(f"   - {tool['function']['name']}: {tool['function']['description'][:50]}...")
             # Debug: Print the exact tool format being sent
+            print(f"🔍 Tool format: {json.dumps(openai_tools[0], indent=2)}")
         else:
             print(f"⚠️ Tools disabled for debugging - tools: {len(openai_tools) if openai_tools else 0}, model: {actual_model}")
 
+        print(f"🚀 OpenAI Request params keys: {list(request_params.keys())}")
         
         try:
+            print(f"🚀 Making OpenAI request with {len(request_params)} parameters...")
+            print(f"🔍 Request params: {json.dumps({k: v for k, v in request_params.items() if k != 'messages'}, indent=2)}")
             response = service.client.chat.completions.create(**request_params)
+            print(f"✅ OpenAI request successful, starting stream processing...")
         except Exception as e:
             print(f"❌ OpenAI API Error: {str(e)}")
             # Return error response instead of crashing
@@ -259,11 +270,12 @@ You have access to tools that you can use when appropriate. Use your best judgme
         has_content_started = False  # Track if actual response content has started
 
         # Process enhanced streaming response with multimodal support
+        print(f"🔄 Starting to process streaming chunks...")
         chunk_count = 0
         for chunk in response:
             chunk_count += 1
             if chunk_count % 10 == 0:
-                pass
+                print(f"🔄 Processed {chunk_count} chunks...")
             
             delta = chunk.choices[0].delta
             
@@ -362,6 +374,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
             
             # Handle tool calls - ACCUMULATE during streaming, DON'T spam messages
             if hasattr(delta, 'tool_calls') and delta.tool_calls:
+                print(f"🔧 Tool calls detected: {delta.tool_calls}")
                 for tool_call_delta in delta.tool_calls:
                     # Use index as the key since OpenAI sends id=None for continuation chunks
                     tool_call_index = getattr(tool_call_delta, 'index', 0)
@@ -388,6 +401,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                 
                 # Show enhanced tool preparation with loading state
                 if not tool_prep_shown and accumulated_tool_calls:
+                    print(f"🔧 DEBUG: Showing tool preparation. Tool calls detected: {list(accumulated_tool_calls.keys())}")
                     tool_prep_shown = True
                     
                     # Send tool loading state
@@ -403,9 +417,14 @@ You have access to tools that you can use when appropriate. Use your best judgme
                     yield f"data: {json.dumps(tool_loading)}\n\n"
             
         # After streaming completes, check if there were any tool calls to process
+        print(f"✅ Initial streaming completed with {chunk_count} chunks")
+        print(f"🔍 Accumulated tool calls: {accumulated_tool_calls}")
+        print(f"🔍 Number of accumulated tool calls: {len(accumulated_tool_calls) if accumulated_tool_calls else 0}")
         
         # Process any accumulated tool calls AFTER the main stream
         if accumulated_tool_calls:
+            print(f"🔧 Processing {len(accumulated_tool_calls)} tool calls after stream completion...")
+            print(f"🔧 Tool calls data: {accumulated_tool_calls}")
             
             # Execute all tool calls in parallel
             for tool_call_index, tool_data in list(accumulated_tool_calls.items()):
@@ -413,6 +432,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                     try:
                         # Try to parse complete arguments
                         tool_args = json.loads(tool_data['arguments'])
+                        print(f"🎨 Executing {tool_data['name']} with complete args: {tool_args}")
                         
                         # Stream enhanced loading state for tool execution
                         tool_name_clean = tool_data['name'].replace('generate', '').replace('create', '').lower().strip()
@@ -434,16 +454,25 @@ You have access to tools that you can use when appropriate. Use your best judgme
                         
                         # Execute tool
                         if tool_data['name'] in ['generateImage', 'createDiagram']:
+                            print(f"🎨 Executing {tool_data['name']} with args: {tool_args}")
                             tool_result = await execute_image_generation_tool(tool_data['name'], tool_args, 'openai')
+                            print(f"🔍 Tool execution result: {tool_result}")
                         elif tool_data['name'] in ['generateAudio', 'textToSpeech']:
+                            print(f"🎵 Executing {tool_data['name']} with args: {tool_args}")
                             tool_result = await execute_audio_generation_tool(tool_data['name'], tool_args, 'openai')
+                            print(f"🔍 Audio tool execution result: {tool_result}")
                         elif tool_data['name'] in ['speechToText', 'transcribeAudio']:
+                            print(f"🎤 Executing {tool_data['name']} with args: {tool_args}")
                             tool_result = await execute_speech_to_text_tool(tool_data['name'], tool_args, 'openai')
+                            print(f"🔍 Speech tool execution result: {tool_result}")
                         elif tool_data['name'] in ['processFile', 'analyzeFile', 'summarizeFile']:
+                            print(f"📄 Executing {tool_data['name']} with args: {tool_args}")
                             tool_result = await execute_file_processing_tool(tool_data['name'], tool_args, 'openai')
+                            print(f"🔍 File tool execution result: {tool_result}")
                             
                             # Check if tool execution was successful
                             if tool_result.get('success'):
+                                print(f"✅ Tool execution successful")
                                 
                                 # Stream tool result with image
                                 tool_result_response = {
@@ -490,6 +519,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                                 yield f"data: {json.dumps(error_msg)}\n\n"
                             
                             # Continue conversation with tool result
+                            print(f"🔄 Continuing conversation with tool result...")
                             
                             # Create continued conversation
                             continued_messages = openai_messages + [
@@ -519,6 +549,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                                 )
                                 
                                 # Stream the continuation
+                                print(f"🔄 Streaming follow-up response...")
                                 for follow_chunk in follow_up_response:
                                     if follow_chunk.choices[0].delta.content:
                                         content = follow_chunk.choices[0].delta.content
@@ -591,6 +622,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                     if tool_data['name'] in ['generateImage', 'createDiagram']:
                         try:
                             tool_args = json.loads(tool_data['arguments'])
+                            print(f"🎨 Executing {tool_data['name']} with args: {tool_args}")
                             
                             # Add smooth transition message before tool execution
                             transition_response = {
@@ -609,6 +641,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                             yield f"data: {json.dumps(transition_response)}\n\n"
                             
                             tool_result = await execute_image_generation_tool(tool_data['name'], tool_args, 'openai')
+                            print(f"✅ Tool execution successful: {tool_result}")
                             
                             # Stream tool result
                             tool_result_response = {
@@ -635,6 +668,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                     elif tool_data['name'] in ['generateAudio', 'textToSpeech']:
                             try:
                                 tool_args = json.loads(tool_data['arguments'])
+                                print(f"🎵 Executing {tool_data['name']} with args: {tool_args}")
                                 
                                 # Add smooth transition message before tool execution
                                 transition_response = {
@@ -653,6 +687,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                                 yield f"data: {json.dumps(transition_response)}\n\n"
                                 
                                 tool_result = await execute_audio_generation_tool(tool_data['name'], tool_args, 'openai')
+                                print(f"✅ Audio tool execution successful: {tool_result}")
                                 
                                 # Stream tool result
                                 tool_result_response = {
@@ -679,6 +714,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                     elif tool_data['name'] in ['speechToText', 'transcribeAudio']:
                             try:
                                 tool_args = json.loads(tool_data['arguments'])
+                                print(f"🎤 Executing {tool_data['name']} with args: {tool_args}")
                                 
                                 # Add smooth transition message before tool execution
                                 transition_response = {
@@ -697,6 +733,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                                 yield f"data: {json.dumps(transition_response)}\n\n"
                                 
                                 tool_result = await execute_speech_to_text_tool(tool_data['name'], tool_args, 'openai')
+                                print(f"✅ Speech tool execution successful: {tool_result}")
                                 
                                 # Stream tool result
                                 tool_result_response = {
@@ -723,6 +760,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                     elif tool_data['name'] in ['processFile', 'analyzeFile', 'summarizeFile']:
                             try:
                                 tool_args = json.loads(tool_data['arguments'])
+                                print(f"📄 Executing {tool_data['name']} with args: {tool_args}")
                                 
                                 # Add smooth transition message before tool execution
                                 transition_response = {
@@ -741,6 +779,7 @@ You have access to tools that you can use when appropriate. Use your best judgme
                                 yield f"data: {json.dumps(transition_response)}\n\n"
                                 
                                 tool_result = await execute_file_processing_tool(tool_data['name'], tool_args, 'openai')
+                                print(f"✅ File tool execution successful: {tool_result}")
                                 
                                 # Stream tool result
                                 tool_result_response = {
@@ -764,11 +803,17 @@ You have access to tools that you can use when appropriate. Use your best judgme
                             except Exception as e:
                                 print(f"❌ File processing error: {str(e)}")
                         
-                    # Remove processed tool call after successful execution
+                        # Remove processed tool call after successful execution
                     del accumulated_tool_calls[tool_call_index]
-        else:
+                        
+                except json.JSONDecodeError:
+                    # Arguments not complete yet, continue accumulating
+                    print(f"⚠️ JSON decode error for tool {tool_data.get("name", "unknown")}")
+                except Exception as e:
+                    print(f"❌ Tool execution error: {str(e)}")        else:
             print(f"⚠️ No tool calls were accumulated during streaming!")
         
+        print(f"✅ Completed processing {chunk_count} chunks")
         
     except Exception as e:
         print(f"❌ Enhanced OpenAI Error: {str(e)}")
@@ -1353,6 +1398,9 @@ async def execute_audio_generation_tool(tool_name: str, tool_args: dict, provide
         if not text:
             raise ValueError("Text is required for audio generation")
         
+        print(f"🎵 Executing {tool_name} with cross-platform OpenAI TTS")
+        print(f"📝 Text: {text[:100]}...")
+        print(f"🗣️ Voice: {voice}, Model: {model}, Speed: {speed}")
         
         # Always use OpenAI TTS for audio generation (cross-platform)
         service = get_service(AIProvider.OPENAI)
@@ -1376,6 +1424,7 @@ async def execute_audio_generation_tool(tool_name: str, tool_args: dict, provide
         audio_base64 = base64.b64encode(audio_data).decode('utf-8')
         audio_url = f"data:audio/mpeg;base64,{audio_base64}"
         
+        print(f"✅ Audio generated successfully: {len(audio_data)} bytes")
         
         return {
             "success": True,
@@ -1415,6 +1464,8 @@ async def execute_speech_to_text_tool(tool_name: str, tool_args: dict, provider:
         if not audio_file and not audio_data:
             raise ValueError("Either audio_file or audio_data is required")
         
+        print(f"🎤 Executing {tool_name} with cross-platform OpenAI Whisper")
+        print(f"🗣️ Language: {language}, Model: {model}")
         
         from openai import OpenAI
         import io
@@ -1443,6 +1494,7 @@ async def execute_speech_to_text_tool(tool_name: str, tool_args: dict, provider:
         if not audio_data:
             audio_file_obj.close()
         
+        print(f"✅ Speech transcribed successfully! Text: {transcript.text[:100]}...")
         
         return {
             'success': True,
@@ -1477,6 +1529,7 @@ async def execute_file_processing_tool(tool_name: str, tool_args: dict, provider
         if not file_content:
             raise ValueError("File content is required")
         
+        print(f"📄 Executing {tool_name} with task: {task}")
         print(f"📋 File type: {file_type}, Content length: {len(str(file_content))}")
         
         # Process based on task type
@@ -1493,6 +1546,7 @@ async def execute_file_processing_tool(tool_name: str, tool_args: dict, provider
         # This is a simplified version - in practice, you'd integrate with the actual AI providers
         processed_result = f"File processed successfully with task: {task}\n\nContent preview: {str(file_content)[:500]}..."
         
+        print(f"✅ File processed successfully!")
         
         return {
             'success': True,

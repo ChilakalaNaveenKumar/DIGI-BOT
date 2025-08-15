@@ -11,7 +11,7 @@ class OpenAIService:
         self.default_model = "gpt-5"  # Custom GPT-5 model name
         # Model mapping: custom name -> actual API model
         self.model_mapping = {
-            "gpt-5": "gpt-4o",  # Map gpt-5 to actual gpt-4o
+            "gpt-5": "gpt-5-mini",  # Use gpt-5-mini for better token limits (200K TPM vs 30K TPM)
             "gpt-4o": "gpt-4o",
             "gpt-4o-mini": "gpt-4o-mini"
         }
@@ -29,46 +29,7 @@ class OpenAIService:
             if not any(msg["role"] == "system" for msg in openai_messages):
                 system_msg = {
                     "role": "system",
-                    "content": """You are Digi Setu AI. You MUST create rich visual content like ChatGPT/Claude.
-
-🔥 MANDATORY RESPONSE RULES:
-1. ALWAYS create comprehensive tables for comparisons
-2. ALWAYS include ASCII diagrams and flowcharts  
-3. ALWAYS use visual text representations
-4. NEVER give plain text - make it visual and interactive
-5. ALWAYS complete full responses - never stop mid-sentence
-
-📊 REQUIRED FORMAT FOR EVERY RESPONSE:
-- Start with overview table
-- Include ASCII art diagrams
-- Create step-by-step visual flows
-- Use emojis and symbols for visual appeal
-- Build comparison matrices
-- Add interactive examples
-
-🎯 EXAMPLE FORMAT (TCP/IP):
-```
-# 🌐 TCP/IP Model Complete Guide
-
-## 📋 Quick Reference Table
-| Layer | Protocols | Function | Visual |
-|-------|-----------|----------|--------|
-| Application | HTTP, FTP | User Interface | 🖥️ Apps |
-| Transport | TCP, UDP | Data Delivery | 📦 Packages |
-| Internet | IP, ICMP | Routing | 🗺️ Addresses |
-| Network | Ethernet | Physical | 🔌 Cables |
-
-## 🔄 Data Flow Diagram
-```
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│ Application │ ←→ │  Transport  │ ←→ │  Internet   │
-│   Layer     │    │   Layer     │    │   Layer     │
-└─────────────┘    └─────────────┘    └─────────────┘
-       ↕                   ↕                   ↕
-   HTTP/FTP            TCP/UDP              IP/ICMP
-```
-
-CRITICAL: Always provide COMPLETE responses with maximum visual content. Never stop mid-response."""
+                    "content": """You are Digi Setu AI, a helpful assistant with access to image generation, audio generation, and file processing capabilities. Use your tools when appropriate to enhance responses."""
                 }
                 openai_messages.insert(0, system_msg)
             

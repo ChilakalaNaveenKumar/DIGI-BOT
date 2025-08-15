@@ -2,7 +2,7 @@
 // TypeScript definitions for the chat system
 
 export interface MultimodalContent {
-  type: 'text' | 'image' | 'audio' | 'json' | 'markdown' | 'table' | 'diagram' | 'tool_call' | 'reasoning' | 'thinking' | 'tool_loading' | 'tool_executing'
+  type: 'text' | 'image' | 'audio' | 'json' | 'markdown' | 'table' | 'diagram' | 'tool_call' | 'reasoning' | 'thinking' | 'tool_loading' | 'tool_executing' | 'tool_result'
   data: unknown
   format?: string
   metadata?: Record<string, unknown>
@@ -10,7 +10,7 @@ export interface MultimodalContent {
 }
 
 export interface MessagePart {
-  type: 'text' | 'reasoning' | 'thinking' | 'tool_loading' | 'tool_executing' | 'file' | 'tool-call' | 'tool-result' | 'image' | 'json' | 'table' | 'diagram' | 'markdown'
+  type: 'text' | 'reasoning' | 'thinking' | 'tool_loading' | 'tool_executing' | 'file' | 'tool-call' | 'tool-result' | 'image' | 'audio' | 'json' | 'table' | 'diagram' | 'markdown'
   text?: string
   url?: string
   mediaType?: string

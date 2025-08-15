@@ -33,7 +33,6 @@ export const useAiChatClient = () => {
   // Only initialize AI SDK on client side
   onMounted(async () => {
     try {
-      console.log('🚀 Initializing AI SDK...')
       
       // Simple chat implementation without AI SDK Chat class
       chatInstance = {
@@ -56,7 +55,6 @@ export const useAiChatClient = () => {
         }
       }
       
-      console.log('✅ AI SDK chat instance created:', chatInstance)
       
       // Wait for next tick to ensure everything is initialized
       await nextTick()
