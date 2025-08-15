@@ -1,17 +1,25 @@
 import { ref } from 'vue'
 
+interface ChatMessage {
+  id: string
+  role: 'user' | 'assistant'
+  content: string
+  createdAt: string
+  thinking?: string
+}
+
 export const useAiChat = () => {
-  const messages = ref([])
-  const isLoading = ref(false)
-  const error = ref(null)
-  const selectedProvider = ref('openai')
+  const messages = ref<ChatMessage[]>([])
+  const isLoading = ref<boolean>(false)
+  const error = ref<string | null>(null)
+  const selectedProvider = ref<string>('openai')
 
   // AI SDK-style streaming implementation
   const append = async (message: { content: string; role: string }) => {
     if (isLoading.value) return
 
     // Add user message
-    const userMessage = {
+    const userMessage: ChatMessage = {
       id: generateId(),
       role: 'user',
       content: message.content,
@@ -24,7 +32,7 @@ export const useAiChat = () => {
 
     try {
       // Create assistant message for streaming
-      const assistantMessage = {
+      const assistantMessage: ChatMessage = {
         id: generateId(),
         role: 'assistant',
         content: '',
@@ -88,7 +96,7 @@ export const useAiChat = () => {
               } else if (parsed.error) {
                 throw new Error(parsed.error)
               }
-            } catch (parseError) {
+            } catch {
               // Skip invalid JSON chunks
               continue
             }
@@ -96,14 +104,14 @@ export const useAiChat = () => {
         }
       }
 
-    } catch (err) {
+    } catch (err: unknown) {
       console.error('Chat error:', err)
-      error.value = err.message
+      error.value = err instanceof Error ? err.message : 'Unknown error occurred'
       
       // Update the last message with error
       const lastMessage = messages.value[messages.value.length - 1]
       if (lastMessage && lastMessage.role === 'assistant') {
-        lastMessage.content = `Error: ${err.message}`
+        lastMessage.content = `Error: ${err instanceof Error ? err.message : 'Unknown error'}`
       }
     } finally {
       isLoading.value = false
@@ -115,7 +123,7 @@ export const useAiChat = () => {
     
     // Remove last assistant message and regenerate
     const lastMessage = messages.value[messages.value.length - 1]
-    if (lastMessage.role === 'assistant') {
+    if (lastMessage && lastMessage.role === 'assistant') {
       messages.value.pop()
     }
     

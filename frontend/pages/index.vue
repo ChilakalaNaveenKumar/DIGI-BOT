@@ -5,7 +5,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import AiChatContainer from '~/components/Chat/AiChatContainer.vue'
 
 // Page metadata

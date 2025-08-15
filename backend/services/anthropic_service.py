@@ -8,12 +8,15 @@ class AnthropicService:
     def __init__(self):
         self.client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
         # Use latest available Claude model with maximum capabilities
-        self.default_model = "claude-4-opus"  # Custom Claude 4 Opus model name
+        self.default_model = "claude-sonnet-4-20250514"  # Latest Claude 4 Sonnet with 64K output
         # Model mapping: custom name -> actual API model
         self.model_mapping = {
-            "claude-4-opus": "claude-3-5-sonnet-20241022",  # Map claude-4-opus to actual claude-3-5-sonnet
-            "claude-3-5-sonnet-20241022": "claude-3-5-sonnet-20241022",
-            "claude-3-5-haiku-20241022": "claude-3-5-haiku-20241022"
+            "claude-4-opus": "claude-opus-4-1-20250805",     # Latest Claude 4 Opus (32K output)
+            "claude-4-sonnet": "claude-sonnet-4-20250514",   # Latest Claude 4 Sonnet (64K output)
+            "claude-3-7-sonnet": "claude-3-7-sonnet-20250219", # Claude 3.7 Sonnet (64K output)
+            "claude-3-5-sonnet-20241022": "claude-3-5-sonnet-20241022", # Old model (8K output)
+            "claude-3-5-haiku-20241022": "claude-3-5-haiku-20241022",
+            "claude-3-opus-20240229": "claude-3-opus-20240229"
         }
         
     async def stream_chat(self, messages: List[Message], model: str = None) -> AsyncGenerator[str, None]:
@@ -96,10 +99,12 @@ CRITICAL: Always provide COMPLETE responses with maximum visual content. Never s
     def get_available_models(self) -> List[str]:
         """Get list of latest Anthropic models with maximum capabilities"""
         return [
-            "claude-3-5-sonnet-20241022",  # Latest Claude 3.5 Sonnet (Oct 2024)
-            "claude-3-5-sonnet-20240620",  # Claude 3.5 Sonnet (June 2024)
-            "claude-3-5-haiku-20241022",   # Claude 3.5 Haiku (fast)
-            "claude-3-opus-20240229",      # Claude 3 Opus
-            "claude-3-sonnet-20240229",    # Claude 3 Sonnet
-            "claude-3-haiku-20240307"      # Claude 3 Haiku
+            "claude-opus-4-1-20250805",    # Latest Claude 4 Opus (32K output) 🔥
+            "claude-sonnet-4-20250514",    # Latest Claude 4 Sonnet (64K output) 🔥🔥
+            "claude-3-7-sonnet-20250219",  # Claude 3.7 Sonnet (64K output) 🔥🔥
+            "claude-3-5-sonnet-20241022",  # Claude 3.5 Sonnet (8K output)
+            "claude-3-5-haiku-20241022",   # Claude 3.5 Haiku (8K output)
+            "claude-3-opus-20240229",      # Claude 3 Opus (4K output)
+            "claude-3-sonnet-20240229",    # Claude 3 Sonnet (4K output)
+            "claude-3-haiku-20240307"      # Claude 3 Haiku (4K output)
         ]

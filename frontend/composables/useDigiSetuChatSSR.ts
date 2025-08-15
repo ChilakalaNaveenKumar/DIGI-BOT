@@ -1,29 +1,38 @@
 // composables/useDigiSetuChatSSR.ts
 // SSR-safe AI SDK 5 composable with enhanced features
 
-import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import { ref, computed, onMounted, nextTick } from 'vue'
+import type { 
+  ChatMessage, 
+  FileUIPart, 
+  Provider, 
+  ChatOptions,
+  ToolDefinition,
+  MessagePart,
+  MultimodalContent
+} from '~/types/chat'
 
 export const useDigiSetuChatSSR = () => {
   // Provider and model management
-  const selectedProvider = ref('openai')
-  const selectedModel = ref('')
-  const uploadedFiles = ref([])
+  const selectedProvider = ref<string>('openai')
+  const selectedModel = ref<string>('')
+  const uploadedFiles = ref<FileUIPart[]>([])
   
   // SSR-safe state
-  const messages = ref([])
-  const isLoading = ref(false)
-  const chatError = ref(null)
-  const isThinking = ref(false)
-  const currentThought = ref('')
-  const input = ref('')
+  const messages = ref<ChatMessage[]>([])
+  const isLoading = ref<boolean>(false)
+  const chatError = ref<string | null>(null)
+  const isThinking = ref<boolean>(false)
+  const currentThought = ref<string>('')
+  const input = ref<string>('')
   
-  // Chat instance (client-only)
-  const chat = ref(null)
-  const isInitialized = ref(false)
-  const interactiveTools = ref(null)
+  // Chat instance (client-only) - unused but kept for compatibility
+  const _chat = ref<unknown>(null)
+  const isInitialized = ref<boolean>(false)
+  const interactiveTools = ref<Record<string, unknown> | null>(null)
   
   // Provider options
-  const providers = [
+  const providers: Provider[] = [
     { 
       id: 'openai', 
       name: 'GPT-5', 
@@ -34,10 +43,10 @@ export const useDigiSetuChatSSR = () => {
     },
     { 
       id: 'anthropic', 
-      name: 'Claude 4 Opus', 
+      name: 'Claude 4 Sonnet', 
       icon: 'claude',
-      models: ['claude-opus-4-20250514', 'claude-3-5-sonnet-20241022', 'claude-3-5-haiku-20241022'],
-      description: '1M context, 200k output',
+      models: ['claude-4-sonnet', 'claude-4-opus', 'claude-3-7-sonnet', 'claude-3-5-sonnet-20241022'],
+      description: '200k context, 64k output',
       reasoning: true
     },
     { 
@@ -50,89 +59,191 @@ export const useDigiSetuChatSSR = () => {
     }
   ]
 
+  // Get available tools (works on both client and server)
+  const getAvailableTools = () => {
+    // Define tools directly to ensure they're always available
+    const toolDefinitions = {
+      createTable: {
+        description: 'Create an interactive data table from information',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            title: { type: 'string', description: 'Table title' },
+            headers: { type: 'array', items: { type: 'string' }, description: 'Column headers' },
+            rows: { 
+              type: 'array', 
+              items: { 
+                type: 'array',
+                items: { type: 'string' }
+              }, 
+              description: 'Table data rows (array of arrays)' 
+            },
+            sortable: { type: 'boolean', description: 'Enable sorting' },
+            searchable: { type: 'boolean', description: 'Enable search' }
+          },
+          required: ['title', 'headers', 'rows']
+        }
+      },
+      
+      createQuiz: {
+        description: 'Create an interactive quiz from content',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            title: { type: 'string', description: 'Quiz title' },
+            questions: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  question: { type: 'string' },
+                  options: { type: 'array', items: { type: 'string' } },
+                  correct: { type: 'number' },
+                  explanation: { type: 'string' }
+                }
+              }
+            }
+          },
+          required: ['title', 'questions']
+        }
+      },
+      
+      createChart: {
+        description: 'Create an interactive chart from data',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            title: { type: 'string', description: 'Chart title' },
+            type: { type: 'string', enum: ['bar', 'line', 'pie', 'scatter'], description: 'Chart type' },
+            data: { 
+              type: 'array', 
+              items: { 
+                type: 'object',
+                properties: {
+                  label: { type: 'string' },
+                  value: { type: 'number' }
+                }
+              },
+              description: 'Chart data points with label and value pairs' 
+            },
+            xAxis: { type: 'string', description: 'X-axis label' },
+            yAxis: { type: 'string', description: 'Y-axis label' }
+          },
+          required: ['title', 'type', 'data']
+        }
+      },
+      
+      createFlashcards: {
+        description: 'Create interactive flashcards for learning',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            title: { type: 'string', description: 'Flashcard set title' },
+            cards: {
+              type: 'array',
+              items: {
+                type: 'object',
+                properties: {
+                  front: { type: 'string' },
+                  back: { type: 'string' },
+                  category: { type: 'string' }
+                },
+                required: ['front', 'back']
+              },
+              description: 'Array of flashcard objects with front and back text'
+            }
+          },
+          required: ['title', 'cards']
+        }
+      },
+
+      // 🎨 IMAGE GENERATION TOOLS
+      generateImage: {
+        description: 'Generate an image using AI (DALL-E 3 for OpenAI, Aurora for Grok). Use when users request images or when images would enhance understanding of concepts.',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            prompt: { 
+              type: 'string', 
+              description: 'Detailed description of the image to generate. Be specific about style, composition, colors, and subject matter.' 
+            },
+            size: { 
+              type: 'string', 
+              enum: ['1024x1024', '1024x1792', '1792x1024'], 
+              description: 'Image dimensions',
+              default: '1024x1024'
+            },
+            quality: { 
+              type: 'string', 
+              enum: ['standard', 'hd'], 
+              description: 'Image quality level',
+              default: 'standard'
+            },
+            style: {
+              type: 'string',
+              enum: ['natural', 'vivid'],
+              description: 'Image style preference',
+              default: 'vivid'
+            }
+          },
+          required: ['prompt']
+        }
+      },
+
+      createDiagram: {
+        description: 'Generate a visual diagram or infographic to explain concepts, processes, or relationships. Use when complex information needs visual representation.',
+        parameters: {
+          type: 'object' as const,
+          properties: {
+            prompt: { 
+              type: 'string', 
+              description: 'Description of the diagram to create (e.g., "network topology diagram showing router connections", "flowchart of user authentication process")' 
+            },
+            type: { 
+              type: 'string', 
+              enum: ['flowchart', 'network-diagram', 'process-diagram', 'infographic', 'architectural-diagram', 'concept-map'], 
+              description: 'Type of diagram to create' 
+            },
+            style: {
+              type: 'string',
+              enum: ['technical', 'educational', 'professional', 'colorful'],
+              description: 'Visual style of the diagram',
+              default: 'educational'
+            }
+          },
+          required: ['prompt', 'type']
+        }
+      }
+    }
+
+    // Convert to the format expected by the backend
+    return Object.keys(toolDefinitions).map(name => {
+      const tool = toolDefinitions[name as keyof typeof toolDefinitions] as ToolDefinition
+      return {
+        name,
+        description: tool.description,
+        parameters: tool.parameters
+      }
+    })
+  }
+
   // Initialize chat system (no longer using AI SDK Chat class)
   const initializeChat = async () => {
-    if (process.client && !isInitialized.value) {
+    if (import.meta.client && !isInitialized.value) {
       try {
-        const { tool } = await import('ai')
+        await import('ai')
         
-        // Initialize tools on client side
-        interactiveTools.value = {
-          createTable: tool({
-            description: 'Create an interactive data table from information',
-            parameters: {
-              type: 'object',
-              properties: {
-                title: { type: 'string', description: 'Table title' },
-                headers: { type: 'array', items: { type: 'string' }, description: 'Column headers' },
-                rows: { type: 'array', description: 'Table data rows' },
-                sortable: { type: 'boolean', description: 'Enable sorting' },
-                searchable: { type: 'boolean', description: 'Enable search' }
-              },
-              required: ['title', 'headers', 'rows']
+        // Initialize tools on client side - use the same definitions as getAvailableTools
+        const toolDefs = getAvailableTools()
+        interactiveTools.value = {}
+        toolDefs.forEach(tool => {
+          if (interactiveTools.value) {
+            interactiveTools.value[tool.name] = {
+              description: tool.description,
+              parameters: tool.parameters
             }
-          }),
-          
-          createQuiz: tool({
-            description: 'Create an interactive quiz from content',
-            parameters: {
-              type: 'object',
-              properties: {
-                title: { type: 'string', description: 'Quiz title' },
-                questions: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      question: { type: 'string' },
-                      options: { type: 'array', items: { type: 'string' } },
-                      correct: { type: 'number' },
-                      explanation: { type: 'string' }
-                    }
-                  }
-                }
-              },
-              required: ['title', 'questions']
-            }
-          }),
-          
-          createChart: tool({
-            description: 'Create an interactive chart from data',
-            parameters: {
-              type: 'object',
-              properties: {
-                title: { type: 'string', description: 'Chart title' },
-                type: { type: 'string', enum: ['bar', 'line', 'pie', 'scatter'], description: 'Chart type' },
-                data: { type: 'array', description: 'Chart data points' },
-                xAxis: { type: 'string', description: 'X-axis label' },
-                yAxis: { type: 'string', description: 'Y-axis label' }
-              },
-              required: ['title', 'type', 'data']
-            }
-          }),
-          
-          createFlashcards: tool({
-            description: 'Create interactive flashcards for learning',
-            parameters: {
-              type: 'object',
-              properties: {
-                title: { type: 'string', description: 'Flashcard set title' },
-                cards: {
-                  type: 'array',
-                  items: {
-                    type: 'object',
-                    properties: {
-                      front: { type: 'string' },
-                      back: { type: 'string' },
-                      category: { type: 'string' }
-                    }
-                  }
-                }
-              },
-              required: ['title', 'cards']
-            }
-          })
-        }
+          }
+        })
         
         // Direct streaming approach - no Chat class needed
         console.log('🚀 Direct streaming chat initialized')
@@ -152,7 +263,7 @@ export const useDigiSetuChatSSR = () => {
     if (!messages.value || !Array.isArray(messages.value)) {
       return []
     }
-    return messages.value.map(message => {
+    return messages.value.map((message: ChatMessage) => {
       const hasReasoning = message.parts?.some(part => part.type === 'reasoning')
       const hasTools = message.parts?.some(part => part.type?.startsWith('tool-'))
       const hasFiles = message.parts?.some(part => part.type === 'file')
@@ -170,24 +281,24 @@ export const useDigiSetuChatSSR = () => {
   })
 
   // Provider management
-  const changeProvider = (newProvider) => {
+  const changeProvider = (newProvider: string) => {
     selectedProvider.value = newProvider
     const provider = providers.find(p => p.id === newProvider)
     if (provider && provider.models.length > 0) {
-      selectedModel.value = provider.models[0]
+      selectedModel.value = provider.models[0] || ''
     }
     console.log('🔄 Provider changed:', newProvider)
   }
 
-  const changeModel = (newModel) => {
+  const changeModel = (newModel: string) => {
     selectedModel.value = newModel
     console.log('🔄 Model changed:', newModel)
   }
 
   // File upload handling
-  const handleFileUpload = async (files) => {
+  const handleFileUpload = async (files: FileList): Promise<FileUIPart[]> => {
     try {
-      if (process.client) {
+      if (import.meta.client) {
         const { convertFileListToFileUIParts } = await import('ai')
         const fileUIParts = await convertFileListToFileUIParts(files)
         uploadedFiles.value = [...uploadedFiles.value, ...fileUIParts]
@@ -195,14 +306,14 @@ export const useDigiSetuChatSSR = () => {
         return fileUIParts
       }
       return []
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('File upload error:', error)
-      chatError.value = `File upload failed: ${error.message}`
+      chatError.value = `File upload failed: ${error instanceof Error ? error.message : 'Unknown error'}`
       return []
     }
   }
 
-  const removeFile = (index) => {
+  const removeFile = (index: number) => {
     uploadedFiles.value.splice(index, 1)
   }
 
@@ -211,7 +322,7 @@ export const useDigiSetuChatSSR = () => {
   }
 
   // Enhanced message sending
-  const sendMessage = async (content, options = {}) => {
+  const sendMessage = async (content: string, options: ChatOptions = {}) => {
     if (!isInitialized.value) {
       console.warn('Chat not initialized yet')
       return
@@ -223,7 +334,7 @@ export const useDigiSetuChatSSR = () => {
       isThinking.value = true
       
       // Add user message immediately
-      const userMessage = {
+      const userMessage: ChatMessage = {
         id: `user-${Date.now()}`,
         role: 'user',
         content: content,
@@ -233,7 +344,7 @@ export const useDigiSetuChatSSR = () => {
       messages.value.push(userMessage)
       
       // Prepare assistant message
-      const assistantMessage = {
+      const assistantMessage: ChatMessage = {
         id: `assistant-${Date.now()}`,
         role: 'assistant',
         content: '',
@@ -249,21 +360,28 @@ export const useDigiSetuChatSSR = () => {
         filesToSend = [...filesToSend, ...newFiles]
       }
 
-      // Direct fetch to backend (bypass AI SDK Chat class)
-      const response = await fetch('http://localhost:8000/api/chat', {
+      const toolsToSend = getAvailableTools()
+      console.log(`🔧 Sending ${toolsToSend.length} tools to backend:`, toolsToSend.map(t => t.name))
+
+      // Use Nuxt API route for proper stream conversion
+      const response = await fetch('/api/chat', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: messages.value.slice(0, -1).map(msg => ({
+          messages: messages.value.slice(0, -1).map((msg: ChatMessage) => ({
             role: msg.role,
-            content: msg.content
+            content: msg.content,
+            parts: msg.parts
           })),
-          provider: selectedProvider.value,
+          data: {
+            provider: selectedProvider.value
+          },
           model: selectedModel.value,
           enableReasoning: options.enableReasoning ?? true,
-          files: filesToSend
+          files: filesToSend,
+          tools: toolsToSend
         })
       })
 
@@ -297,27 +415,205 @@ export const useDigiSetuChatSSR = () => {
                 const parsed = JSON.parse(data)
                 console.log('🔍 Parsed data:', parsed)
                 
-                if (parsed.content !== undefined) {
-                  // Update the last assistant message
-                  const lastMessage = messages.value[messages.value.length - 1]
+                const lastMessage = messages.value[messages.value.length - 1]
+                
+                // Handle Enhanced Multimodal Response Format
+                if (parsed.type === 'reasoning') {
+                  // Enhanced reasoning with multimodal content
+                  isThinking.value = true
+                  currentThought.value = parsed.content || ''
+                  console.log('🤔 Enhanced reasoning:', parsed.content)
+                  
+                  // Add multimodal reasoning part
                   if (lastMessage && lastMessage.role === 'assistant') {
-                    lastMessage.content += parsed.content
-                    // Also update the parts array for compatibility
-                    if (lastMessage.parts && lastMessage.parts[0]) {
-                      lastMessage.parts[0].text = lastMessage.content
+                    if (!lastMessage.parts) lastMessage.parts = []
+                    let reasoningPart = lastMessage.parts.find(part => part.type === 'reasoning')
+                    if (!reasoningPart) {
+                      reasoningPart = { 
+                        type: 'reasoning', 
+                        text: '', 
+                        state: 'streaming',
+                        multimodal_content: [],
+                        content_type: parsed.content_type || 'reasoning'
+                      }
+                      lastMessage.parts.push(reasoningPart)
                     }
-                    console.log('💬 Updated message content:', lastMessage.content)
-                    // Trigger reactivity and scroll
+                    if (reasoningPart) {
+                      reasoningPart.text += parsed.content || ''
+                      reasoningPart.multimodal_content = parsed.multimodal_content || []
+                      reasoningPart.preserve_formatting = parsed.preserve_formatting
+                    }
+                  }
+                } else if (parsed.type === 'content') {
+                  // Enhanced content with multimodal support
+                  console.log('💬 Enhanced content:', parsed.content_type, parsed.multimodal_content)
+                  
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    // Update main content for backward compatibility
+                    lastMessage.content += parsed.content || ''
+                    
+                    // Handle multimodal content parts
+                    if (!lastMessage.parts) lastMessage.parts = []
+                    
+                    // Process each multimodal content item
+                    if (parsed.multimodal_content && Array.isArray(parsed.multimodal_content)) {
+                      parsed.multimodal_content.forEach((multiContent: MultimodalContent) => {
+                        let contentPart = lastMessage.parts?.find(part => 
+                          part.type === multiContent.type && part.format === multiContent.format
+                        )
+                        
+                        if (!contentPart) {
+                          contentPart = {
+                            type: multiContent.type as MessagePart['type'],
+                            text: '',
+                            state: 'streaming' as const,
+                            format: multiContent.format,
+                            data: multiContent.data,
+                            metadata: multiContent.metadata,
+                            content_type: parsed.content_type,
+                            preserve_formatting: parsed.preserve_formatting
+                          }
+                          lastMessage.parts?.push(contentPart)
+                        }
+                        
+                        // Update content based on type
+                        if (multiContent.type === 'text' || multiContent.type === 'markdown') {
+                          contentPart.text = (contentPart.text || '') + (multiContent.data || '')
+                        } else if (multiContent.type === 'json') {
+                          contentPart.data = multiContent.data
+                          contentPart.text = JSON.stringify(multiContent.data, null, 2)
+                        } else if (multiContent.type === 'table') {
+                          contentPart.text = (contentPart.text || '') + (multiContent.data || '')
+                          contentPart.format = 'markdown_table'
+                        } else if (multiContent.type === 'diagram') {
+                          contentPart.text = (contentPart.text || '') + (multiContent.data || '')
+                          contentPart.format = 'ascii_art'
+                        }
+                      })
+                    }
+                    
+                    // Also maintain a main text part for legacy support
+                    let mainTextPart = lastMessage.parts.find(part => part.type === 'text' && !part.format)
+                    if (!mainTextPart) {
+                      mainTextPart = { type: 'text', text: '', state: 'streaming' }
+                      lastMessage.parts.unshift(mainTextPart) // Add at beginning for priority
+                    }
+                    mainTextPart.text = lastMessage.content
+                    
+                    console.log('💬 Enhanced message updated:', lastMessage)
                     nextTick(() => scrollToBottom())
                   }
-                }
-                if (parsed.reasoning) {
-                  currentThought.value = parsed.reasoning
-                  isThinking.value = true
-                  console.log('🤔 Updated reasoning:', parsed.reasoning)
-                }
-                if (parsed.error) {
-                  throw new Error(parsed.error)
+                } else if (parsed.type === 'tool_call') {
+                  // Enhanced tool call with multimodal support
+                  console.log('🔧 Enhanced tool call:', parsed.tool_call)
+                  
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    if (!lastMessage.parts) lastMessage.parts = []
+                    
+                    const toolPart = {
+                      type: 'tool-call' as const,
+                      toolName: parsed.tool_call?.name || 'unknown',
+                      toolId: parsed.tool_call?.id || '',
+                      input: parsed.tool_call?.arguments ? JSON.parse(parsed.tool_call.arguments || '{}') : {},
+                      state: 'input-streaming' as const, // Start as streaming
+                      multimodal_content: parsed.multimodal_content || [],
+                      content_type: parsed.content_type
+                    }
+                    
+                    lastMessage.parts.push(toolPart)
+                  }
+                } else if (parsed.type === 'tool_result') {
+                  // Handle tool execution results
+                  console.log('🔧 Tool result:', parsed.tool_result)
+                  
+                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.parts) {
+                    // Find the corresponding tool call part
+                    const toolCallPart = lastMessage.parts.find(part => 
+                      part.type === 'tool-call' && part.toolId === parsed.tool_result?.id
+                    )
+                    
+                    if (toolCallPart) {
+                      // Update the tool call with results
+                      toolCallPart.state = 'output-available' as const
+                      toolCallPart.output = parsed.tool_result?.result
+                      
+                      console.log('🔧 Tool call updated with result:', toolCallPart)
+                    }
+                  }
+                } else if (parsed.type === 'tool_error') {
+                  // Handle tool execution errors
+                  console.log('❌ Tool error:', parsed.tool_error)
+                  
+                  if (lastMessage && lastMessage.role === 'assistant' && lastMessage.parts) {
+                    // Find the corresponding tool call part
+                    const toolCallPart = lastMessage.parts.find(part => 
+                      part.type === 'tool-call' && part.toolId === parsed.tool_error?.id
+                    )
+                    
+                    if (toolCallPart) {
+                      // Update the tool call with error
+                      toolCallPart.state = 'output-error' as const
+                      toolCallPart.errorText = parsed.tool_error?.error
+                      
+                      console.log('❌ Tool call updated with error:', toolCallPart)
+                    }
+                  }
+                } else if (parsed.type === 'image_generation') {
+                  // Handle image generation results
+                  console.log('🖼️ Image generated:', parsed.multimodal_content)
+                  
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    if (!lastMessage.parts) lastMessage.parts = []
+                    
+                    const imagePart = {
+                      type: 'image' as const,
+                      url: parsed.multimodal_content?.[0]?.url || parsed.multimodal_content?.[0]?.data,
+                      metadata: parsed.multimodal_content?.[0]?.metadata,
+                      format: parsed.multimodal_content?.[0]?.format || 'png',
+                      state: 'done' as const
+                    }
+                    
+                    lastMessage.parts.push(imagePart)
+                  }
+                } else if (parsed.type === 'error') {
+                  throw new Error(parsed.error || 'Unknown error')
+                } else {
+                  // Handle legacy AI SDK 5 format for backward compatibility
+                  if (parsed.type === 'reasoning-start') {
+                    isThinking.value = true
+                    currentThought.value = ''
+                    console.log('🤔 Reasoning started (legacy)')
+                  } else if (parsed.type === 'reasoning-delta') {
+                    currentThought.value += parsed.delta || ''
+                    isThinking.value = true
+                  } else if (parsed.type === 'reasoning-end') {
+                    isThinking.value = false
+                  } else if (parsed.type === 'text-delta') {
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      lastMessage.content += parsed.delta || ''
+                      if (!lastMessage.parts) lastMessage.parts = []
+                      let textPart = lastMessage.parts.find(part => part.type === 'text')
+                      if (!textPart) {
+                        textPart = { type: 'text', text: '', state: 'streaming' }
+                        lastMessage.parts.push(textPart)
+                      }
+                      textPart.text = lastMessage.content
+                      nextTick(() => scrollToBottom())
+                    }
+                  } else if (parsed.type === 'finish') {
+                    console.log('✅ Stream finished')
+                    isLoading.value = false
+                    isThinking.value = false
+                  } else if (parsed.content !== undefined) {
+                    // Very legacy format
+                    if (lastMessage && lastMessage.role === 'assistant') {
+                      lastMessage.content += parsed.content
+                      if (lastMessage.parts && lastMessage.parts[0]) {
+                        lastMessage.parts[0].text = lastMessage.content
+                      }
+                      nextTick(() => scrollToBottom())
+                    }
+                  }
                 }
               } catch (parseError) {
                 console.warn('❌ Parse error for line:', line, parseError)
@@ -335,41 +631,23 @@ export const useDigiSetuChatSSR = () => {
       // Final scroll to bottom
       nextTick(() => scrollToBottom())
       
-    } catch (error) {
+    } catch (error: unknown) {
       console.error('Send message error:', error)
-      chatError.value = error.message
+      chatError.value = error instanceof Error ? error.message : 'Unknown error occurred'
       isLoading.value = false
       isThinking.value = false
     }
   }
 
   // Enhanced regeneration
-  const regenerateMessage = async (messageId) => {
-    if (!chat.value) return
-    
-    try {
-      chatError.value = null
-      isLoading.value = true
-      await chat.value.regenerate({ 
-        messageId,
-        body: {
-          provider: selectedProvider.value,
-          model: selectedModel.value,
-          enableReasoning: true
-        }
-      })
-    } catch (error) {
-      console.error('Regenerate error:', error)
-      chatError.value = error.message
-      isLoading.value = false
-    }
+  const regenerateMessage = async (messageId: string) => {
+    // Note: Direct fetch approach doesn't use chat.value.regenerate
+    console.log('Regenerate message:', messageId)
+    // Implementation would go here if needed
   }
 
   // Chat management
   const clearChat = () => {
-    if (chat.value) {
-      chat.value.messages = []
-    }
     messages.value = []
     clearFiles()
     chatError.value = null
@@ -394,7 +672,7 @@ export const useDigiSetuChatSSR = () => {
       timestamp: new Date().toISOString(),
       provider: selectedProvider.value,
       model: selectedModel.value,
-      messages: (messages.value || []).map(msg => ({
+      messages: (messages.value || []).map((msg: ChatMessage) => ({
         role: msg?.role || 'user',
         content: msg.parts?.filter(part => part && part.type === 'text').map(part => part.text || '').join('') || msg?.content || '',
         reasoning: msg.parts?.filter(part => part && part.type === 'reasoning').map(part => part.text || '').join('') || '',
@@ -485,7 +763,7 @@ export const useDigiSetuChatSSR = () => {
 }
 
 // Helper functions for message processing
-export const extractTextFromMessage = (message) => {
+export const extractTextFromMessage = (message: ChatMessage | null): string => {
   if (!message) return ''
   if (!message.parts && message.content) return message.content
   if (!message.parts || !Array.isArray(message.parts)) return ''
@@ -496,7 +774,7 @@ export const extractTextFromMessage = (message) => {
     .join('')
 }
 
-export const extractReasoningFromMessage = (message) => {
+export const extractReasoningFromMessage = (message: ChatMessage | null): string => {
   if (!message || !message.parts || !Array.isArray(message.parts)) return ''
   
   return message.parts
@@ -505,7 +783,7 @@ export const extractReasoningFromMessage = (message) => {
     .join('')
 }
 
-export const getToolCallsFromMessage = (message) => {
+export const getToolCallsFromMessage = (message: ChatMessage | null): unknown[] => {
   if (!message || !message.parts || !Array.isArray(message.parts)) return []
   
   return message.parts.filter(part => 

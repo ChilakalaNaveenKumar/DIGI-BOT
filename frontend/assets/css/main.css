@@ -1,6 +1,16 @@
 
 @import "tailwindcss";
+@plugin "@tailwindcss/typography";
+
+/* Help Tailwind find files in v4 style */
+@source "../components/**/*.{vue,js,ts}" "../layouts/**/*.vue" "../pages/**/*.vue" "../plugins/**/*.{js,ts}" "../app.vue" "../error.vue";
+
 @import "highlight.js/styles/github-dark.css";
+
+@theme {
+  /* Tailwind v4 CSS-first theme tokens */
+  --color-brand: #4f46e5;
+}
 
 /* Design system CSS variables */
 :root {
@@ -161,3 +171,5 @@
   color: #ffffff !important;
   border-color: #374151 !important;
 }
+
+/* Custom utilities that might not be available in v4 */

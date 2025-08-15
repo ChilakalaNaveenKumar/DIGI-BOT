@@ -10,14 +10,14 @@
               <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center shadow-lg rotate-3 hover:rotate-0 transition-transform duration-300">
                 <span class="text-white font-bold text-lg">DS</span>
               </div>
-              <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse"></div>
+              <div class="absolute -bottom-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white animate-pulse" />
             </div>
             <div>
               <h1 class="text-xl font-bold text-gray-900 dark:text-white">
                 Digi Setu AI
               </h1>
               <p class="text-sm text-gray-600 dark:text-gray-300 flex items-center">
-                <span class="w-2 h-2 bg-green-400 rounded-full mr-2 inline-block"></span>
+                <span class="w-2 h-2 bg-green-400 rounded-full mr-2 inline-block" />
                 {{ getProviderName(selectedProvider) }} • Ready
               </p>
             </div>
@@ -25,9 +25,9 @@
           
           <div class="flex items-center gap-3">
             <button
-              @click="toggleTheme"
               class="p-2 text-gray-600 dark:text-gray-400 hover:text-blue-600 dark:hover:text-blue-400 hover:bg-blue-50 dark:hover:bg-gray-700 rounded-lg transition-all duration-200"
               :title="theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'"
+              @click="toggleTheme"
             >
               <Sun v-if="theme === 'dark'" class="w-5 h-5" />
               <Moon v-else class="w-5 h-5" />
@@ -45,7 +45,10 @@
     <!-- AI SDK Chat Area -->
     <main class="flex-1 overflow-hidden">
       <div class="max-w-5xl mx-auto h-full">
-        <div class="px-6 py-8 h-full overflow-y-auto" ref="messagesContainer">
+        <div 
+          ref="messagesContainer"
+          class="px-6 py-8 h-full overflow-y-auto"
+        >
           
           <!-- Client-Only AI SDK Integration -->
           <ClientOnly>
@@ -55,12 +58,14 @@
             <div class="flex items-center justify-between">
               <div class="flex items-center space-x-4">
                 <div class="flex items-center space-x-2">
-                  <div class="w-3 h-3 rounded-full animate-pulse" :class="{
+                  <div 
+                    class="w-3 h-3 rounded-full animate-pulse" 
+                    :class="{
                     'bg-green-400': connectionStatus === 'Ready',
                     'bg-blue-400': connectionStatus === 'Generating...',
                     'bg-purple-400': connectionStatus === 'Thinking...',
                     'bg-red-400': connectionStatus === 'Error'
-                  }"></div>
+                  }" />
                   <span class="text-sm font-medium text-gray-700 dark:text-gray-300">
                     {{ connectionStatus }}
                   </span>
@@ -68,32 +73,32 @@
                 <div class="text-sm text-gray-600 dark:text-gray-400">
                   {{ getProviderDisplayName(selectedProvider) }}
                 </div>
-                <UBadge color="blue" variant="soft" size="xs">
+                <UBadge color="primary" variant="soft" size="xs">
                   AI SDK 5 Enhanced
                 </UBadge>
               </div>
               
               <div class="flex items-center space-x-2">
                 <UButton 
-                  @click="showSettings = !showSettings"
                   size="xs" 
                   variant="ghost"
                   :icon="showSettings ? 'i-lucide-settings-x' : 'i-lucide-settings'"
+                  @click="showSettings = !showSettings"
                 />
                 <UButton 
-                  @click="handleExport"
                   size="xs" 
                   variant="ghost"
                   icon="i-lucide-download"
                   :disabled="messages.length === 0"
+                  @click="handleExport"
                 />
                 <UButton 
-                  @click="handleClear"
                   size="xs" 
                   variant="ghost" 
-                  color="red"
+                  color="error"
                   icon="i-lucide-trash-2"
                   :disabled="messages.length === 0"
+                  @click="handleClear"
                 />
               </div>
             </div>
@@ -111,19 +116,19 @@
                       :options="providers"
                       option-attribute="name"
                       value-attribute="id"
-                      @change="handleProviderChange"
                       size="sm"
+                      @update:model-value="handleProviderChange"
                     />
                   </div>
-                  <div v-if="providers.find(p => p.id === selectedProvider)?.models?.length > 1">
+                  <div v-if="(providers.find(p => p.id === selectedProvider)?.models?.length || 0) > 1">
                     <label class="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-2">
                       Model
                     </label>
                     <USelectMenu
                       v-model="selectedModel"
                       :options="providers.find(p => p.id === selectedProvider)?.models || []"
-                      @change="handleModelChange"
                       size="sm"
+                      @update:model-value="handleModelChange"
                     />
                   </div>
                 </div>
@@ -190,10 +195,10 @@
                 </p>
               </div>
               <UButton 
-                @click="clearError" 
                 size="xs"
-                color="red"
+                color="error"
                 variant="soft"
+                @click="clearError" 
               >
                 Retry
               </UButton>
@@ -211,16 +216,16 @@
               :current-thought="isThinking && index === messages.length - 1 ? currentThought : ''"
               @regenerate="handleRegenerate"
               @stop="handleStop"
-              @copy="(msg) => console.log('Copied:', msg.id)"
-              @export="(msg) => console.log('Exported:', msg.id)"
-              @like="(msg) => console.log('Liked:', msg.id)"
+              @copy="(msg: { id: string }) => console.log('Copied:', msg.id)"
+              @export="(msg: { id: string }) => console.log('Exported:', msg.id)"
+              @like="(msg: { id: string }) => console.log('Liked:', msg.id)"
             />
           </div>
             
             <!-- SSR Fallback -->
             <template #fallback>
               <div class="flex items-center justify-center h-64">
-                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600" />
                 <span class="ml-3 text-gray-600 dark:text-gray-300">Loading AI Chat...</span>
               </div>
             </template>
@@ -244,8 +249,8 @@
                 <Icon name="lucide:file" class="w-4 h-4" />
                 <span class="text-sm font-medium">{{ file.filename || 'Uploaded file' }}</span>
                 <button 
-                  @click="removeFile(index)" 
                   class="p-1 hover:bg-blue-200 dark:hover:bg-blue-800 rounded-full transition-colors"
+                  @click="removeFile(index)" 
                 >
                   <Icon name="lucide:x" class="w-3 h-3" />
                 </button>
@@ -254,7 +259,7 @@
           </div>
 
           <!-- Enhanced Input Form -->
-          <form @submit="handleSubmit" class="space-y-3">
+          <form class="space-y-3" @submit="handleSubmit">
             <!-- Input Row -->
             <div class="flex items-end space-x-4">
               <!-- Main Input -->
@@ -284,9 +289,9 @@
                     type="file" 
                     multiple 
                     accept=".pdf,.doc,.docx,.txt,.png,.jpg,.jpeg,.gif,.webp,.md,.csv,.xlsx"
-                    @change="handleFileUploadEvent"
                     class="hidden"
-                  />
+                    @change="handleFileUploadEvent"
+                  >
                   <div class="p-3 bg-gray-100 dark:bg-gray-700 hover:bg-blue-100 dark:hover:bg-blue-800 rounded-xl border border-gray-200 dark:border-gray-600 hover:border-blue-300 dark:hover:border-blue-600 transition-all duration-200 group-hover:scale-105">
                     <Upload class="w-5 h-5 text-gray-600 dark:text-gray-400 group-hover:text-blue-600 dark:group-hover:text-blue-400" />
                   </div>
@@ -295,8 +300,8 @@
                 <!-- Send Button -->
                 <button
                   type="submit"
-                  :disabled="!input.trim() || isLoading"
                   class="p-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl disabled:opacity-50 disabled:cursor-not-allowed transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95 disabled:hover:scale-100"
+                  :disabled="!input.trim() || isLoading"
                 >
                   <Icon v-if="isLoading" name="lucide:loader-2" class="w-5 h-5 animate-spin" />
                   <Icon v-else name="lucide:send" class="w-5 h-5" />
@@ -305,9 +310,9 @@
                 <!-- Stop Button (when generating) -->
                 <button
                   v-if="isLoading"
-                  @click="handleStop"
                   type="button"
                   class="p-3 bg-red-500 hover:bg-red-600 text-white rounded-xl transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 active:scale-95"
+                  @click="handleStop"
                 >
                   <Icon name="lucide:square" class="w-5 h-5" />
                 </button>
@@ -323,20 +328,20 @@
               
               <div class="flex items-center space-x-2">
                 <button 
-                  @click="input = 'Create an interactive table from this data: [sample data]'"
                   class="px-3 py-1 text-xs bg-blue-50 dark:bg-blue-900 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-800 transition-colors"
+                  @click="input = 'Create an interactive table from this data: [sample data]'"
                 >
                   📊 Table
                 </button>
                 <button 
-                  @click="input = 'Create a quiz about this topic'"
                   class="px-3 py-1 text-xs bg-green-50 dark:bg-green-900 text-green-600 dark:text-green-400 rounded-lg hover:bg-green-100 dark:hover:bg-green-800 transition-colors"
+                  @click="input = 'Create a quiz about this topic'"
                 >
                   🧠 Quiz
                 </button>
                 <button 
-                  @click="input = 'Explain your reasoning step by step'"
                   class="px-3 py-1 text-xs bg-purple-50 dark:bg-purple-900 text-purple-600 dark:text-purple-400 rounded-lg hover:bg-purple-100 dark:hover:bg-purple-800 transition-colors"
+                  @click="input = 'Explain your reasoning step by step'"
                 >
                   🤔 Reasoning
                 </button>
@@ -347,8 +352,8 @@
           <!-- Input fallback for SSR -->
           <template #fallback>
             <div class="flex items-center space-x-3">
-              <div class="flex-1 h-14 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse"></div>
-              <div class="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse"></div>
+              <div class="flex-1 h-14 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />
+              <div class="w-14 h-14 bg-gray-100 dark:bg-gray-800 rounded-2xl animate-pulse" />
             </div>
           </template>
         </ClientOnly>
@@ -357,7 +362,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, computed, onMounted, watch } from 'vue'
 import { Sun, Moon, Sparkles, Upload } from 'lucide-vue-next'
 import { useTheme } from '~/composables/useTheme.js'
@@ -370,13 +375,11 @@ const { theme, toggleTheme } = useTheme()
 
 // Enhanced AI SDK 5 Chat with SSR support
 const {
-  chat,
   messages,
   isLoading,
   error,
   isThinking,
   currentThought,
-  input: chatInput,
   selectedProvider,
   selectedModel,
   providers,
@@ -391,14 +394,13 @@ const {
   stopGeneration,
   exportChat,
   scrollToBottom,
-  isInitialized,
   clearError
 } = useDigiSetuChatSSR()
 
 // Local state
-const messagesContainer = ref(null)
-const input = ref('')
-const showSettings = ref(false)
+const messagesContainer = ref<HTMLElement | null>(null)
+const input = ref<string>('')
+const showSettings = ref<boolean>(false)
 
 // Connection status
 const connectionStatus = computed(() => {
@@ -409,7 +411,7 @@ const connectionStatus = computed(() => {
 })
 
 // Enhanced form submission
-const handleSubmit = async (e) => {
+const handleSubmit = async (e?: Event) => {
   e?.preventDefault()
   if (!input.value?.trim() || isLoading.value) return
 
@@ -422,37 +424,38 @@ const handleSubmit = async (e) => {
   
   try {
     await sendMessage(input.value.trim(), {
-      enableReasoning: true,
-      metadata: {
-        timestamp: new Date().toISOString(),
-        userAgent: navigator.userAgent
-      }
+      enableReasoning: true
     })
     input.value = ''
-  } catch (error) {
+  } catch (error: unknown) {
     console.error('Send message error:', error)
   }
 }
 
 // Provider management
-const handleProviderChange = (newProvider) => {
-  changeProvider(newProvider)
+const handleProviderChange = (newProvider: string | { id: string } | unknown) => {
+  const providerId = typeof newProvider === 'string' ? newProvider : 
+    (newProvider as { id: string })?.id || String(newProvider)
+  changeProvider(providerId)
 }
 
-const handleModelChange = (newModel) => {
-  changeModel(newModel)
+const handleModelChange = (newModel: string | { id: string } | unknown) => {
+  const modelId = typeof newModel === 'string' ? newModel : 
+    (newModel as { id: string })?.id || String(newModel)
+  changeModel(modelId)
 }
 
 // File handling
-const handleFileUploadEvent = async (event) => {
-  const files = event.target.files
+const handleFileUploadEvent = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const files = target.files
   if (files && files.length > 0) {
     await handleFileUpload(files)
   }
 }
 
 // Message actions
-const handleRegenerate = (messageId) => {
+const handleRegenerate = (messageId: string) => {
   regenerateMessage(messageId)
 }
 
@@ -471,13 +474,13 @@ const handleClear = () => {
 }
 
 // Utility functions
-const getProviderDisplayName = (provider) => {
+const getProviderDisplayName = (provider: string) => {
   const providerInfo = providers.find(p => p.id === provider)
   return providerInfo ? `${providerInfo.name} ${providerInfo.description}` : provider
 }
 
-const autoResize = (event) => {
-  const textarea = event.target
+const autoResize = (event: Event) => {
+  const textarea = event.target as HTMLTextAreaElement
   textarea.style.height = 'auto'
   textarea.style.height = Math.min(textarea.scrollHeight, 128) + 'px'
 }
@@ -495,8 +498,8 @@ watch([isThinking, currentThought], () => {
 })
 
 // Utility functions
-const getProviderName = (provider) => {
-  const names = {
+const getProviderName = (provider: string) => {
+  const names: Record<string, string> = {
     'openai': 'GPT-5 (128k/64k)',
     'grok': 'Grok-4 (256k/256k)',
     'anthropic': 'Claude-4-Opus (1M/200k)'

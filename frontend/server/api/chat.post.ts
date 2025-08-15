@@ -165,25 +165,22 @@ export default defineEventHandler(async (event) => {
                     })}\n\n`))
                   }
                   
-                  // Handle tool calls
-                  if (parsed.tool_call) {
-                    const toolCall = parsed.tool_call
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                      type: 'tool-call',
-                      toolCallId: toolCall.id,
-                      toolName: toolCall.function?.name || toolCall.name,
-                      args: toolCall.function?.arguments || toolCall.arguments
-                    })}\n\n`))
+                  // Handle tool calls - pass through the backend format directly
+                  if (parsed.type === 'tool_call' && parsed.tool_call) {
+                    // Pass through the tool call data as-is since the composable handles it
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(parsed)}\n\n`))
                   }
                   
-                  // Handle tool results
-                  if (parsed.tool_result) {
-                    const toolResult = parsed.tool_result
-                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify({
-                      type: 'tool-result',
-                      toolCallId: toolResult.id,
-                      result: toolResult.output || toolResult.result
-                    })}\n\n`))
+                  // Handle tool results - pass through the backend format directly  
+                  if (parsed.type === 'tool_result' && parsed.tool_result) {
+                    // Pass through the tool result data as-is since the composable handles it
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(parsed)}\n\n`))
+                  }
+                  
+                  // Handle tool errors - pass through the backend format directly
+                  if (parsed.type === 'tool_error' && parsed.tool_error) {
+                    // Pass through the tool error data as-is since the composable handles it
+                    controller.enqueue(new TextEncoder().encode(`data: ${JSON.stringify(parsed)}\n\n`))
                   }
                   
                   // Handle errors

@@ -11,16 +11,14 @@ export default defineNuxtConfig({
     '@nuxt/image',
     '@nuxt/scripts',
     '@nuxt/test-utils',
-    '@nuxt/ui',        // This includes Tailwind v4 support
+    // '@nuxt/ui',        // Removed - using manual Tailwind v4 setup instead
     '@nuxt/icon'
   ],
 
   css: ['~/assets/css/main.css'],
 
   vite: {
-    plugins: [
-      tailwindcss()
-    ]
+    plugins: [tailwindcss()]
   },
 
   // SSR configuration for AI SDK compatibility

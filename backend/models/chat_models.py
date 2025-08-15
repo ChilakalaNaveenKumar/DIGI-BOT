@@ -2,6 +2,20 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Literal, Dict, Any, Union
 from enum import Enum
 
+class ContentType(str, Enum):
+    TEXT = "text"
+    IMAGE = "image" 
+    AUDIO = "audio"
+    JSON = "json"
+    MARKDOWN = "markdown"
+    TABLE = "table"
+    DIAGRAM = "diagram"
+    TOOL_CALL = "tool_call"
+    TOOL_RESULT = "tool_result"
+    REASONING = "reasoning"
+    ERROR = "error"
+    STRUCTURED = "structured"
+
 class MessageRole(str, Enum):
     USER = "user"
     ASSISTANT = "assistant"
@@ -81,11 +95,30 @@ class ToolResult(BaseModel):
     success: bool = Field(default=True)
     error: Optional[str] = Field(default=None)
 
+class MultimodalContent(BaseModel):
+    type: ContentType
+    data: Any  # Can be text, base64 image, audio data, JSON object, etc.
+    metadata: Optional[Dict[str, Any]] = Field(default=None)
+    format: Optional[str] = Field(default=None)  # e.g., "markdown", "json", "png", "wav"
+    url: Optional[str] = Field(default=None)  # For generated images/audio
+    
 class EnhancedChatResponse(BaseModel):
+    # Legacy fields for backward compatibility
     content: Optional[str] = Field(default=None)
     reasoning: Optional[str] = Field(default=None)
     tool_call: Optional[ToolCall] = Field(default=None)
     tool_result: Optional[ToolResult] = Field(default=None)
+    
+    # Enhanced multimodal fields
+    multimodal_content: List[MultimodalContent] = Field(default_factory=list)
+    content_type: ContentType = Field(default=ContentType.TEXT)
+    structured_data: Optional[Dict[str, Any]] = Field(default=None)
+    
+    # Provider info
     provider: str
     model: Optional[str] = Field(default=None)
     error: Optional[str] = Field(default=None)
+    
+    # Streaming metadata
+    is_complete: bool = Field(default=False)
+    chunk_id: Optional[str] = Field(default=None)
