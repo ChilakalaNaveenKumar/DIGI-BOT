@@ -27,6 +27,7 @@
     "@nuxt/test-utils": "^3.19.2",
     "@nuxt/ui": "^3.3.0",
     "@tailwindcss/vite": "^4.1.11",
+    "@types/highlight.js": "^9.12.4",
     "@unhead/vue": "^2.0.14",
     "@vueuse/core": "^13.6.0",
     "ai": "^5.0.11",

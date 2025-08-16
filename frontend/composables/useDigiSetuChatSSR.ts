@@ -7,9 +7,7 @@ import type {
   FileUIPart, 
   Provider, 
   ChatOptions,
-  ToolDefinition,
-  MessagePart,
-  MultimodalContent
+  ToolDefinition
 } from '~/types/chat'
 
 export const useDigiSetuChatSSR = () => {
@@ -508,8 +506,9 @@ export const useDigiSetuChatSSR = () => {
 
       const toolsToSend = getAvailableTools()
 
-      // Use Nuxt API route for proper stream conversion
-      const response = await fetch('/api/chat', {
+      // Direct backend connection for faster response (bypass Nuxt proxy)
+      const apiUrl = import.meta.client ? 'http://localhost:8000/api/chat' : '/api/chat'
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -564,20 +563,7 @@ export const useDigiSetuChatSSR = () => {
                   // Enhanced reasoning with multimodal content
                   isThinking.value = true
                   currentThought.value = parsed.content || ''
-                } else if (parsed.type === 'thinking') {
-                  // AI thinking/planning phase
-                  isThinking.value = true
-                  currentThought.value = parsed.content || ''
-                } else if (parsed.type === 'tool_loading') {
-                  // Tool preparation phase
-                  isThinking.value = true
-                  currentThought.value = parsed.content || 'Preparing tools...'
-                } else if (parsed.type === 'tool_executing') {
-                  // Tool execution with loading animation
-                  isThinking.value = true
-                  currentThought.value = parsed.content || 'Executing tool...'
                   
-                  // Add multimodal reasoning part
                   if (lastMessage && lastMessage.role === 'assistant') {
                     if (!lastMessage.parts) lastMessage.parts = []
                     let reasoningPart = lastMessage.parts.find(part => part.type === 'reasoning')
@@ -587,62 +573,57 @@ export const useDigiSetuChatSSR = () => {
                         text: '', 
                         state: 'streaming',
                         multimodal_content: [],
-                        content_type: parsed.content_type || 'reasoning'
+                        content_type: 'reasoning'
                       }
                       lastMessage.parts.push(reasoningPart)
                     }
-                    if (reasoningPart) {
-                      reasoningPart.text += parsed.content || ''
-                      reasoningPart.multimodal_content = parsed.multimodal_content || []
-                      reasoningPart.preserve_formatting = parsed.preserve_formatting
-                    }
+                    reasoningPart.text += parsed.content || ''
+                    reasoningPart.multimodal_content = parsed.multimodal_content || []
                   }
-                } else if (parsed.type === 'content') {
+                } else if (parsed.type === 'thinking') {
+                  // AI thinking/planning phase
+                  isThinking.value = true
+                  currentThought.value = parsed.content || ''
+                  
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    if (!lastMessage.parts) lastMessage.parts = []
+                    let reasoningPart = lastMessage.parts.find(part => part.type === 'reasoning')
+                    if (!reasoningPart) {
+                      reasoningPart = { 
+                        type: 'reasoning', 
+                        text: '', 
+                        state: 'streaming',
+                        multimodal_content: [],
+                        content_type: 'reasoning'
+                      }
+                      lastMessage.parts.push(reasoningPart)
+                    }
+                    reasoningPart.text += parsed.content || ''
+                    reasoningPart.multimodal_content = parsed.multimodal_content || []
+                  }
+                } else if (parsed.type === 'tool_loading') {
+                  // Tool preparation phase
+                  isThinking.value = true
+                  currentThought.value = parsed.content || 'Preparing tools...'
+                } else if (parsed.type === 'tool_executing') {
+                  // Tool execution with loading animation
+                  isThinking.value = true
+                  currentThought.value = parsed.content || 'Executing tool...'
+                } else if (parsed.type === 'content' || parsed.type === 'text-delta') {
                   // Enhanced content with multimodal support
                   
                   if (lastMessage && lastMessage.role === 'assistant') {
-                    // Update main content for backward compatibility
-                    lastMessage.content += parsed.content || ''
+                    // Only add content if it's not already included (avoid duplication)
+                    const newContent = parsed.content || parsed.delta || ''
+                    if (newContent && !lastMessage.content.includes(newContent)) {
+                      lastMessage.content += newContent
+                    }
                     
                     // Handle multimodal content parts
                     if (!lastMessage.parts) lastMessage.parts = []
                     
-                    // Process each multimodal content item
-                    if (parsed.multimodal_content && Array.isArray(parsed.multimodal_content)) {
-                      parsed.multimodal_content.forEach((multiContent: MultimodalContent) => {
-                        let contentPart = lastMessage.parts?.find(part => 
-                          part.type === multiContent.type && part.format === multiContent.format
-                        )
-                        
-                        if (!contentPart) {
-                          contentPart = {
-                            type: multiContent.type as MessagePart['type'],
-                            text: '',
-                            state: 'streaming' as const,
-                            format: multiContent.format,
-                            data: multiContent.data,
-                            metadata: multiContent.metadata,
-                            content_type: parsed.content_type,
-                            preserve_formatting: parsed.preserve_formatting
-                          }
-                          lastMessage.parts?.push(contentPart)
-                        }
-                        
-                        // Update content based on type
-                        if (multiContent.type === 'text' || multiContent.type === 'markdown') {
-                          contentPart.text = (contentPart.text || '') + (multiContent.data || '')
-                        } else if (multiContent.type === 'json') {
-                          contentPart.data = multiContent.data
-                          contentPart.text = JSON.stringify(multiContent.data, null, 2)
-                        } else if (multiContent.type === 'table') {
-                          contentPart.text = (contentPart.text || '') + (multiContent.data || '')
-                          contentPart.format = 'markdown_table'
-                        } else if (multiContent.type === 'diagram') {
-                          contentPart.text = (contentPart.text || '') + (multiContent.data || '')
-                          contentPart.format = 'ascii_art'
-                        }
-                      })
-                    }
+                    // Skip multimodal processing for simple text to avoid duplication
+                    // The main content is already being added above
                     
                     // Also maintain a main text part for legacy support
                     let mainTextPart = lastMessage.parts.find(part => part.type === 'text' && !part.format)
@@ -653,6 +634,26 @@ export const useDigiSetuChatSSR = () => {
                     mainTextPart.text = lastMessage.content
                     
                     nextTick(() => scrollToBottom())
+                  }
+                } 
+                // Handle legacy content format (direct from backend) - avoid duplication
+                else if (parsed.content && !parsed.type && parsed.content.trim()) {
+                  if (lastMessage && lastMessage.role === 'assistant') {
+                    // Only add if it's not already in the message content
+                    if (!lastMessage.content.includes(parsed.content)) {
+                      lastMessage.content += parsed.content || ''
+                      
+                      // Ensure we have a text part
+                      if (!lastMessage.parts) lastMessage.parts = []
+                      let mainTextPart = lastMessage.parts.find(part => part.type === 'text')
+                      if (!mainTextPart) {
+                        mainTextPart = { type: 'text', text: '', state: 'streaming' }
+                        lastMessage.parts.push(mainTextPart)
+                      }
+                      mainTextPart.text = lastMessage.content
+                      
+                      nextTick(() => scrollToBottom())
+                    }
                   }
                 } else if (parsed.type === 'tool_call') {
                   // Enhanced tool call with multimodal support
@@ -750,9 +751,17 @@ export const useDigiSetuChatSSR = () => {
                       textPart.text = lastMessage.content
                       nextTick(() => scrollToBottom())
                     }
-                  } else if (parsed.type === 'finish') {
+                  } else if (parsed.type === 'finish' || data === '[DONE]') {
                     isLoading.value = false
                     isThinking.value = false
+                    // Mark all streaming parts as done
+                    if (lastMessage && lastMessage.parts) {
+                      lastMessage.parts.forEach(part => {
+                        if (part.state === 'streaming') {
+                          part.state = 'done'
+                        }
+                      })
+                    }
                   } else if (parsed.content !== undefined) {
                     // Very legacy format
                     if (lastMessage && lastMessage.role === 'assistant') {
@@ -777,6 +786,16 @@ export const useDigiSetuChatSSR = () => {
       isLoading.value = false
       isThinking.value = false
       
+      // Mark all parts as done when stream ends
+      const lastMessage = messages.value[messages.value.length - 1]
+      if (lastMessage && lastMessage.role === 'assistant' && lastMessage.parts) {
+        lastMessage.parts.forEach(part => {
+          if (part.state === 'streaming') {
+            part.state = 'done'
+          }
+        })
+      }
+      
       // Final scroll to bottom
       nextTick(() => scrollToBottom())
       
@@ -789,7 +808,7 @@ export const useDigiSetuChatSSR = () => {
   }
 
   // Enhanced regeneration
-  const regenerateMessage = async (messageId: string) => {
+  const regenerateMessage = async () => {
     // Note: Direct fetch approach doesn't use chat.value.regenerate
     // Implementation would go here if needed
   }

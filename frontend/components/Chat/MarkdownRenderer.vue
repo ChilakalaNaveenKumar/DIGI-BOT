@@ -20,14 +20,26 @@ marked.setOptions({
   breaks: true,
   gfm: true,
   headerIds: false,
-  mangle: false
+  mangle: false,
+  pedantic: false,
+  smartypants: true
 })
 
 const renderedContent = computed(() => {
   if (!props.content) return ''
   
   try {
-    return marked(props.content)
+    // Ensure proper line breaks and spacing
+    let content = props.content
+    
+    // Add extra line breaks for better paragraph separation
+    content = content.replace(/\n\n/g, '\n\n\n')
+    
+    // Handle numbered lists and bullet points better
+    content = content.replace(/^(\d+\.\s)/gm, '\n$1')
+    content = content.replace(/^([•\-\*]\s)/gm, '\n$1')
+    
+    return marked(content)
   } catch (error) {
     console.error('Markdown rendering error:', error)
     return `<pre>${props.content}</pre>`

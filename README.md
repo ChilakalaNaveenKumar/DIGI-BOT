@@ -1,238 +1,323 @@
-# 🧠 Digi Bot - AI-Powered Educational Content Platform
+# 🚀 Digi Setu AI - Advanced AI Assistant Platform
 
-A modern, multi-AI provider chat application built with **Nuxt 3** (frontend) and **Python FastAPI** (backend). Transform static content into interactive learning experiences with the power of GPT-5, Grok 4, and Claude 4.
+A modern, scalable AI assistant platform with multi-provider orchestration, reasoning display, activity streaming, and comprehensive content handling.
 
 ## ✨ Features
 
-### 🤖 **Multi-AI Provider Support**
-- **GPT-5** (OpenAI) - Latest multimodal AI with 1M token responses
-- **Grok 4** (X.AI) - Real-time information with 256k token responses
-- **Claude 4 Opus** (Anthropic) - Superior code generation with 200k token responses
+### 🧠 **AI Orchestration**
+- **GPT-5 as Conductor**: Intelligent task analysis and provider selection
+- **Multi-Model Workflows**: OpenAI, Anthropic, Grok coordination
+- **Reasoning Generation**: Step-by-step thought process display
+- **Activity Streaming**: Privacy-aware, user-friendly progress updates
 
-### 🎨 **Beautiful User Interface**
-- **Modern gradient design** with smooth animations
-- **Responsive layout** that works on all devices
-- **Enhanced message bubbles** with markdown support
-- **Thinking indicators** showing AI processing
-- **File upload** with drag-and-drop support
-- **Quick action buttons** for common tasks
+### 🎨 **Modern UI/UX**
+- **Professional Design**: Clean, responsive interface with Digi Setu branding
+- **Theme System**: Light/dark/system modes with smooth transitions
+- **Responsive Design**: Perfect experience on mobile, tablet, and desktop
+- **Accessibility**: WCAG compliant with keyboard navigation
 
-### 🚀 **Advanced Features**
-- **Markdown rendering** with syntax highlighting
-- **Code block highlighting** for technical content
-- **File processing** (images, PDFs, documents)
-- **Message actions** (copy, regenerate, export, like)
-- **Smooth scrolling** and animations
-- **Real-time provider switching**
+### 💬 **Advanced Chat System**
+- **Streaming Responses**: Real-time SSE with proper error handling
+- **Message Parts**: Structured content (reasoning, tools, multimodal)
+- **Tool Execution**: Step-by-step tool calling with expandable context
+- **Content Rendering**: Code, images, tables, JSON, and more
 
-## 🏗️ Project Structure
+### 📁 **Project Management**
+- **Organization**: Projects with conversation grouping
+- **Collaboration**: Role-based access and team features
+- **History**: Persistent conversation and message storage
 
+## 🏗️ Architecture
+
+### Frontend (Vue.js/Nuxt.js)
 ```
-digi-bot/
-├── frontend/                 # Nuxt 3 Vue.js application
-│   ├── components/
-│   │   ├── Chat/            # Chat-related components
-│   │   │   ├── ChatContainer.vue
-│   │   │   ├── MessageBubble.vue
-│   │   │   ├── ChatInput.vue
-│   │   │   ├── ThinkingIndicator.vue
-│   │   │   └── MarkdownRenderer.vue
-│   │   └── UI/              # Reusable UI components
-│   ├── pages/               # Nuxt pages
-│   ├── assets/              # CSS and static assets
-│   └── nuxt.config.ts       # Nuxt configuration
-│
-├── backend/                 # Python FastAPI application
-│   ├── main.py              # FastAPI app entry point
-│   ├── routers/             # API route handlers
-│   │   └── chat.py          # Chat endpoints
-│   ├── services/            # AI provider services
-│   │   ├── openai_service.py
-│   │   ├── grok_service.py
-│   │   └── anthropic_service.py
-│   ├── models/              # Pydantic models
-│   └── requirements.txt     # Python dependencies
-│
-└── README.md                # This file
+frontend/
+├── components/
+│   ├── layout/           # Layout components
+│   ├── chat/            # Chat-related components
+│   └── ui/              # Reusable UI components
+├── composables/         # Vue composables
+├── assets/css/          # Design system and styles
+└── pages/               # Application pages
+```
+
+### Backend (FastAPI/Python)
+```
+backend/
+├── app/
+│   ├── core/            # Core configuration and database
+│   ├── models/          # SQLAlchemy models
+│   ├── routers/         # API endpoints
+│   ├── services/        # Business logic
+│   └── schemas/         # Pydantic schemas
+├── requirements.txt     # Python dependencies
+└── Dockerfile          # Container configuration
 ```
 
 ## 🚀 Quick Start
 
 ### Prerequisites
-- **Node.js** 18+ and **npm**
-- **Python** 3.8+
-- **Git**
+- **Docker & Docker Compose**
+- **Python 3.11+**
+- **Node.js 18+**
+- **PostgreSQL** (or use Docker)
+- **Redis** (or use Docker)
 
 ### 1. Clone the Repository
 ```bash
-git clone https://github.com/[your-username]/digi-bot.git
-cd digi-bot
+git clone <repository-url>
+cd digi-setu-demo
 ```
 
-### 2. Backend Setup (Python FastAPI)
+### 2. Run the Setup Script
 ```bash
+./start-development.sh
+```
+
+### 3. Configure Environment Variables
+
+**Backend** (`backend/.env`):
+```env
+# AI Provider API Keys (Required)
+OPENAI_API_KEY=your-openai-api-key-here
+ANTHROPIC_API_KEY=your-anthropic-api-key-here
+GROK_API_KEY=your-grok-api-key-here
+
+# Database
+DATABASE_URL=postgresql+asyncpg://postgres:password@localhost:5432/digi_setu_ai
+
+# Security
+SECRET_KEY=your-super-secret-key-change-this-in-production
+```
+
+**Frontend** (`frontend/.env`):
+```env
+NUXT_PUBLIC_API_BASE=http://localhost:8000
+```
+
+### 4. Start the Applications
+
+**Option A: Development Mode**
+```bash
+# Terminal 1 - Backend
 cd backend
+source venv/bin/activate
+uvicorn app.main:app --reload
 
-# Create virtual environment
-python3 -m venv venv
-source venv/bin/activate  # On Windows: venv\Scripts\activate
-
-# Install dependencies
-pip install -r requirements.txt
-
-# Create environment file from example
-cp .env.example .env
-
-# Edit .env file and add your API keys:
-# OPENAI_API_KEY=your_actual_openai_api_key_here
-# GROK_API_KEY=your_actual_grok_api_key_here
-# ANTHROPIC_API_KEY=your_actual_anthropic_api_key_here
-
-# Start the backend server
-uvicorn main:app --reload --port 8000
-```
-
-### 3. Frontend Setup (Nuxt 3)
-```bash
+# Terminal 2 - Frontend
 cd frontend
-
-# Install dependencies
-npm install
-
-# Create environment file
-echo "NUXT_PUBLIC_API_BASE=http://localhost:8000/api" > .env
-
-# Start the development server
 npm run dev
 ```
 
-### 4. Access the Application
+**Option B: Docker Compose**
+```bash
+docker-compose up
+```
+
+### 5. Access the Application
 - **Frontend**: http://localhost:3000
 - **Backend API**: http://localhost:8000
 - **API Documentation**: http://localhost:8000/docs
 
 ## 🔧 Configuration
 
+### AI Providers
+
+The system supports multiple AI providers:
+
+| Provider | Models | Features |
+|----------|--------|----------|
+| **OpenAI** | GPT-5, GPT-4o, GPT-4o-mini | Tools, Vision, 1M context |
+| **Anthropic** | Claude-4, Claude-3.5-sonnet | Analysis, Safety, 200k context |
+| **Grok** | Grok-4, Grok-4-vision | Real-time search, 256k context |
+
 ### Environment Variables
 
-#### Backend (.env or export)
-```bash
-OPENAI_API_KEY=your_openai_api_key_here
-GROK_API_KEY=your_grok_api_key_here
-ANTHROPIC_API_KEY=your_anthropic_api_key_here
-ENVIRONMENT=development
-DEBUG=true
-```
-
-#### Frontend (.env)
-```bash
-NUXT_PUBLIC_API_BASE=http://localhost:8000/api
-```
-
-## 🎯 API Endpoints
-
-### Chat Endpoints
-- `POST /api/chat` - Send message to AI provider
-- `GET /api/providers` - Get available AI providers
-- `GET /api/test/{provider}` - Test AI provider connection
-
-### Example API Usage
-```javascript
-// Send a chat message
-const response = await fetch('http://localhost:8000/api/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({
-    messages: [
-      { role: 'user', content: 'Explain photosynthesis' }
-    ],
-    provider: 'openai'
-  })
-})
-```
+| Variable | Description | Default |
+|----------|-------------|---------|
+| `ENVIRONMENT` | Application environment | `development` |
+| `DATABASE_URL` | PostgreSQL connection string | Required |
+| `REDIS_URL` | Redis connection string | `redis://localhost:6379` |
+| `DEFAULT_AI_PROVIDER` | Default AI provider | `openai` |
+| `MAX_TOKENS` | Maximum tokens per request | `4000` |
+| `ENABLE_METRICS` | Enable Prometheus metrics | `true` |
 
 ## 🛠️ Development
 
-### Frontend Development
-```bash
-cd frontend
-npm run dev          # Start development server
-npm run build        # Build for production
-npm run preview      # Preview production build
-npm run lint         # Run ESLint
-```
-
 ### Backend Development
+
+**Install Dependencies**:
 ```bash
 cd backend
+python -m venv venv
 source venv/bin/activate
-uvicorn main:app --reload --port 8000    # Development server
-python -m pytest                         # Run tests (when added)
+pip install -r requirements.txt
 ```
 
-## 🎨 UI Components
+**Run Tests**:
+```bash
+pytest
+```
 
-### Chat Components
-- **ChatContainer** - Main chat layout with header and footer
-- **MessageBubble** - Individual message display with actions
-- **ChatInput** - Enhanced input with file upload and quick actions
-- **ThinkingIndicator** - AI processing visualization
-- **MarkdownRenderer** - Render markdown with syntax highlighting
+**Database Migrations**:
+```bash
+alembic revision --autogenerate -m "Description"
+alembic upgrade head
+```
 
-### UI Components
-- **ProviderSelector** - AI provider switching dropdown
-- **FilePreview** - File upload preview component
+**Code Quality**:
+```bash
+black .
+isort .
+flake8
+mypy .
+```
 
-## 🔒 Security Notes
+### Frontend Development
 
-- **API Keys**: Never commit API keys to version control
-- **Environment Variables**: Use `.env` files for local development
-- **CORS**: Backend configured for localhost development
-- **File Uploads**: Limited file types and sizes for security
-
-## 📦 Dependencies
-
-### Frontend (Nuxt 3)
-- **Nuxt 3** - Vue.js framework
-- **Tailwind CSS** - Utility-first CSS framework
-- **@nuxtjs/tailwindcss** - Nuxt Tailwind integration
-- **@tailwindcss/typography** - Typography plugin
-- **marked** - Markdown parser
-- **highlight.js** - Syntax highlighting
-- **lucide-vue-next** - Modern icons
-- **@vueuse/core** - Vue composition utilities
-
-### Backend (FastAPI)
-- **FastAPI** - Modern Python web framework
-- **Uvicorn** - ASGI server
-- **OpenAI** - OpenAI API client
-- **Anthropic** - Anthropic API client
-- **Pydantic** - Data validation
-- **python-dotenv** - Environment variable management
-
-## 🚀 Deployment
-
-### Frontend (Vercel/Netlify)
+**Install Dependencies**:
 ```bash
 cd frontend
-npm run build
-# Deploy the .output directory
+npm install
 ```
 
-### Backend (Railway/Render/Heroku)
+**Development Server**:
 ```bash
-cd backend
-# Set environment variables in your deployment platform
-# Deploy with: uvicorn main:app --host 0.0.0.0 --port $PORT
+npm run dev
 ```
+
+**Build for Production**:
+```bash
+npm run build
+npm run start
+```
+
+**Linting**:
+```bash
+npm run lint
+npm run lint:fix
+```
+
+## 📊 Monitoring
+
+### Health Checks
+- **Backend**: `GET /api/v1/health`
+- **Database**: `GET /api/v1/health/db`
+- **AI Providers**: `GET /api/v1/chat/providers/status`
+
+### Metrics (Prometheus)
+- Request/response metrics
+- AI provider performance
+- Database connection stats
+- Error rates and latencies
+
+### Logging
+- Structured JSON logging
+- Request/response logging
+- Error tracking with Sentry
+- Performance monitoring
+
+## 🔒 Security
+
+### Authentication
+- JWT-based authentication
+- Secure password hashing (bcrypt)
+- Token expiration and refresh
+
+### API Security
+- CORS configuration
+- Rate limiting
+- Input validation
+- SQL injection prevention
+
+### Data Privacy
+- Activity streaming privacy mode
+- Sensitive data filtering
+- Secure file upload handling
+
+## 🚢 Deployment
+
+### Docker Production
+```bash
+docker-compose -f docker-compose.prod.yml up -d
+```
+
+### Environment Setup
+1. Set `ENVIRONMENT=production`
+2. Configure secure `SECRET_KEY`
+3. Set up SSL/TLS certificates
+4. Configure monitoring and logging
+5. Set up database backups
+
+### Scaling
+- Horizontal scaling with load balancers
+- Database read replicas
+- Redis clustering
+- CDN for static assets
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
+2. Create a feature branch
+3. Make your changes
+4. Add tests
+5. Run quality checks
+6. Submit a pull request
+
+### Code Standards
+- **Python**: Black, isort, flake8, mypy
+- **JavaScript/Vue**: ESLint, Prettier
+- **Commits**: Conventional commits
+- **Documentation**: Comprehensive docstrings
+
+## 📝 API Documentation
+
+### Chat Endpoints
+- `POST /api/v1/chat/stream` - Streaming chat
+- `POST /api/v1/chat` - Non-streaming chat
+- `POST /api/v1/chat/regenerate/{message_id}` - Regenerate message
+
+### Project Endpoints
+- `GET /api/v1/projects` - List projects
+- `POST /api/v1/projects` - Create project
+- `PUT /api/v1/projects/{id}` - Update project
+- `DELETE /api/v1/projects/{id}` - Delete project
+
+### Conversation Endpoints
+- `GET /api/v1/conversations` - List conversations
+- `POST /api/v1/conversations` - Create conversation
+- `GET /api/v1/conversations/{id}` - Get conversation
+- `PUT /api/v1/conversations/{id}` - Update conversation
+
+## 🐛 Troubleshooting
+
+### Common Issues
+
+**Database Connection Error**:
+```bash
+# Check PostgreSQL is running
+docker-compose up postgres
+
+# Verify connection string
+echo $DATABASE_URL
+```
+
+**AI Provider API Errors**:
+```bash
+# Check API keys are set
+echo $OPENAI_API_KEY
+echo $ANTHROPIC_API_KEY
+
+# Test provider status
+curl http://localhost:8000/api/v1/chat/providers/status
+```
+
+**Frontend Build Issues**:
+```bash
+# Clear cache and reinstall
+rm -rf node_modules package-lock.json
+npm install
+```
 
 ## 📄 License
 
@@ -240,15 +325,14 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 
 ## 🙏 Acknowledgments
 
-- **OpenAI** for GPT-5 API
-- **Anthropic** for Claude 4 API
-- **X.AI** for Grok 4 API
-- **Nuxt.js** team for the amazing framework
-- **FastAPI** team for the excellent Python framework
-- **Tailwind CSS** for beautiful styling
+- OpenAI for GPT models
+- Anthropic for Claude models
+- xAI for Grok models
+- FastAPI and Vue.js communities
+- All contributors and testers
 
 ---
 
-**Built with ❤️ using modern web technologies**
+**Built with ❤️ by the Digi Setu Team**
 
-For support or questions, please open an issue in this repository.
+For support, please open an issue or contact us at support@digisetu.ai
