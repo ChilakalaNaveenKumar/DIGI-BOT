@@ -31,7 +31,14 @@
         
         <div v-else>
           <!-- Reasoning Section -->
-          <div v-if="message.reasoning && showReasoning" class="reasoning-section">
+          <ReasoningStepper 
+            v-if="message.reasoningSteps && message.reasoningSteps.length > 0 && showReasoning"
+            :steps="message.reasoningSteps"
+            :initial-expanded="false"
+          />
+          
+          <!-- Fallback for old reasoning format -->
+          <div v-else-if="message.reasoning && showReasoning" class="reasoning-section">
             <div class="reasoning-header" @click="toggleReasoning">
               <UiIcon name="lucide:cpu" :size="14" />
               <span>Thought process</span>

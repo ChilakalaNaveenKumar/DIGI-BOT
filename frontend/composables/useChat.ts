@@ -35,15 +35,61 @@ export const useChat = () => {
     messages.value.push(assistantMessage)
     
     try {
-      // TODO: Temporarily disabled for UI/UX development - simulate response
+      // TODO: Temporarily disabled for UI/UX development - simulate response with enhanced reasoning steps
       setTimeout(() => {
         const index = messages.value.findIndex(m => m.id === assistantMessage.id)
         if (index !== -1) {
           messages.value[index] = {
             ...assistantMessage,
-            content: 'Hi there! How can I help you today?',
+            content: 'Hi there! How can I help you today? I can assist with coding, writing, analysis, research, and much more.',
             isLoading: false,
-            reasoning: 'The user has just said "hi" - this is a simple greeting. I should respond in a warm, natural way without being overly formal or using lists/bullet points since this is casual conversation. I\'ll keep it brief and friendly, and maybe ask how I can help them today.'
+            reasoning: 'The user has just said "hi" - this is a simple greeting. I should respond in a warm, natural way without being overly formal or using lists/bullet points since this is casual conversation. I\'ll keep it brief and friendly, and maybe ask how I can help them today.',
+            reasoningSteps: [
+              {
+                type: 'thinking',
+                content: 'The user has sent a simple greeting "hi". This is a casual, friendly opening to our conversation.',
+                status: 'completed',
+                result: 'This is a basic social interaction. The user is initiating contact in a casual way, which suggests they want a friendly, approachable response rather than something formal or robotic. I should match their casual tone while being helpful.'
+              },
+              {
+                type: 'thinking', 
+                content: 'I should analyze what kind of response would be most appropriate here. Since this is just a greeting, I want to be warm and welcoming.',
+                status: 'completed',
+                result: 'For greeting responses, the key elements are: acknowledgment of their greeting, reciprocal friendliness, and an invitation to continue the conversation. I should avoid being overly enthusiastic or too brief. A balanced approach works best.'
+              },
+              {
+                type: 'tool_call',
+                tool_name: 'codebase_search',
+                content: 'Searching for appropriate greeting patterns and response templates',
+                status: 'completed',
+                result: 'Found several greeting patterns in the codebase. Analysis shows that warm, casual responses work best for initial contact. Common patterns include: greeting acknowledgment, brief self-introduction of capabilities, and open-ended question to encourage further interaction.'
+              },
+              {
+                type: 'thinking',
+                content: 'I should keep my response brief but informative. I\'ll acknowledge the greeting and offer help.',
+                status: 'completed',
+                result: 'The optimal response length for greetings is 1-2 sentences. This provides enough information to be helpful without overwhelming the user. I should include a subtle mention of my capabilities and end with an invitation for them to share what they need help with.'
+              },
+              {
+                type: 'tool_call',
+                tool_name: 'web_search', 
+                content: 'Checking for best practices in conversational AI greetings',
+                status: 'completed',
+                result: 'Research indicates that effective AI greetings should be conversational, helpful, and authentic. Users respond better to natural language rather than formal or robotic responses. The greeting should establish a collaborative tone and make the user feel comfortable asking questions.'
+              },
+              {
+                type: 'thinking',
+                content: 'Perfect! I\'ll craft a response that\'s friendly, helpful, and invites further conversation without being too formal.',
+                status: 'completed',
+                result: 'Based on my analysis, I\'ll structure my response as: friendly greeting acknowledgment + brief capability mention + open question. This creates a natural conversation flow and encourages the user to engage further with specific requests or questions.'
+              },
+              {
+                type: 'conclusion',
+                content: 'Final response will be warm, brief, and offer assistance while maintaining a conversational tone.',
+                status: 'completed',
+                result: 'My final response strategy: "Hi there! How can I help you today? I can assist with coding, writing, analysis, research, and much more." This balances friendliness with utility, gives concrete examples of capabilities, and invites further interaction.'
+              }
+            ]
           }
           isLoading.value = false
           isStreaming.value = false

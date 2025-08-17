@@ -7,6 +7,15 @@ export interface ToolCall {
   status?: 'running' | 'completed' | 'error'
 }
 
+export interface ReasoningStep {
+  type: 'thinking' | 'tool_call' | 'conclusion'
+  content: string
+  status?: 'active' | 'completed' | 'error'
+  tool_name?: string
+  result?: any
+  preview?: string
+}
+
 export interface Message {
   id: number
   content: string
@@ -14,6 +23,7 @@ export interface Message {
   timestamp: Date
   isLoading?: boolean
   reasoning?: string
+  reasoningSteps?: ReasoningStep[]
   toolCalls?: ToolCall[]
   error?: string
 }
