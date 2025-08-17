@@ -50,11 +50,13 @@
           :auto-expand="false"
         />
 
-        <!-- Reasoning Display (Legacy) -->
-        <DigiSetuReasoning 
+        <!-- Beautiful Reasoning Display (Re-enabled) -->
+        <ReasoningDisplay 
           v-if="reasoningParts.length > 0"
-          :reasoning-parts="reasoningParts"
-          :is-loading="isLoading"
+          :reasoning="reasoningParts"
+          :state="isLoading ? 'streaming' : 'done'"
+          :current-thinking="isLoading ? 'Processing your request...' : ''"
+          :initial-expanded="true"
         />
 
         <!-- Tool Calling Stepper -->
@@ -64,12 +66,11 @@
           :is-loading="isLoading"
         />
 
-        <!-- Message Content - Smart Content Detection -->
+        <!-- Message Content - Simple Clean Rendering -->
         <div v-if="message.content" class="ds-message-text-content">
-          <DigiSetuContentRenderer
+          <DigiSetuTextRenderer
             :content="cleanMessageContent(message.content)"
-            :content-type="contentType"
-            :provider="message.provider"
+            :is-streaming="isLoading"
           />
         </div>
 
@@ -125,11 +126,12 @@ import {
 import DigiSetuActivityStream from './DigiSetuActivityStream.vue'
 import DigiSetuReasoning from './DigiSetuReasoning.vue'
 import DigiSetuToolStepper from './DigiSetuToolStepper.vue'
-import DigiSetuContentRenderer from './DigiSetuContentRenderer.vue'
-import { useSimpleContentRouter } from '~/composables/useSimpleContentRouter'
+import DigiSetuTextRenderer from './DigiSetuTextRenderer.vue'
+import { useRealPatternDetection } from '~/composables/useRealPatternDetection'
 import DigiSetuThoughtProcess from './DigiSetuThoughtProcess.vue'
+import ReasoningDisplay from './ReasoningDisplay.vue'
 
-const { cleanContent, detectContentType: detectContentTypeFromRouter } = useSimpleContentRouter()
+const { cleanContent, detectContentType, getContentMetadata } = useRealPatternDetection()
 
 const props = defineProps({
   message: {
@@ -277,34 +279,13 @@ const cleanMessageContent = (content) => {
 const contentType = computed(() => {
   if (!props.message.content) return 'text'
   
-  // Always try to detect keywords first, even during streaming
-  const detection = detectContentTypeFromRouter(props.message.content)
-  
-  // Debug logging for content detection issues
-  if (process.client && (props.message.content.includes('💻') || props.message.content.includes('📊') || props.message.content.includes('```'))) {
-    console.log('Content detection:', {
-      contentLength: props.message.content.length,
-      hasCodeKeyword: props.message.content.includes('💻 DIGI_CODE_START'),
-      hasDiagramKeyword: props.message.content.includes('📊 DIGI_DIAGRAM_START'),
-      hasCodeBlock: props.message.content.includes('```'),
-      detectedType: detection.type,
-      confidence: detection.confidence,
-      isStreaming: props.message.isStreaming
-    })
-  }
-  
-  // If we found a keyword-based detection, use it immediately
-  if (detection.confidence >= 1.0) {
-    return detection.type || 'text'
-  }
-  
-  // For pattern-based detection, wait until we have more content during streaming
-  if (props.message.isStreaming && props.message.content.length < 100) {
-    // But still return the detection if we found something
-    return detection.type || 'text'
-  }
-  
-  return detection.type || 'text'
+  // Use REAL AI pattern detection - simple and reliable
+  return detectContentType(props.message.content)
+})
+
+// Get content metadata for specialized rendering
+const contentMetadata = computed(() => {
+  return getContentMetadata(props.message.content, contentType.value)
 })
 
 const messageClasses = computed(() => {

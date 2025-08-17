@@ -20,6 +20,7 @@ from app.services.ai_providers.grok_provider import GrokProvider
 from app.services.activity_streamer import ActivityStreamer
 from app.services.reasoning_processor import ReasoningProcessor
 from app.services.tool_executor import ToolExecutor
+from app.services.adaptive_workflow_engine import AdaptiveWorkflowEngine
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
@@ -64,7 +65,9 @@ class AIOrchestrator:
         self.activity_streamer = ActivityStreamer()
         self.reasoning_processor = ReasoningProcessor()
         self.tool_executor = ToolExecutor()
+        self.adaptive_workflow_engine = None  # Will be initialized after providers
         self.performance_metrics = {}
+        self.use_adaptive_workflow = False  # Feature flag for adaptive workflow - disabled for now
         
     async def initialize(self):
         """Initialize AI providers and services."""
@@ -86,6 +89,12 @@ class AIOrchestrator:
             await self.reasoning_processor.initialize()
             await self.tool_executor.initialize()
             
+            # Initialize adaptive workflow engine
+            if self.use_adaptive_workflow:
+                self.adaptive_workflow_engine = AdaptiveWorkflowEngine(self.providers)
+                await self.adaptive_workflow_engine.initialize()
+                logger.info("🚀 Adaptive Workflow Engine initialized")
+            
             logger.info("🎭 AI Orchestrator initialized successfully")
             
         except Exception as e:
@@ -100,6 +109,9 @@ class AIOrchestrator:
         await self.activity_streamer.cleanup()
         await self.reasoning_processor.cleanup()
         await self.tool_executor.cleanup()
+        
+        if self.adaptive_workflow_engine:
+            await self.adaptive_workflow_engine.cleanup()
         
         logger.info("AI Orchestrator cleaned up")
     
@@ -125,54 +137,116 @@ class AIOrchestrator:
         start_time = time.time()
         
         try:
-            # Step 1: Analyze the request and create orchestration plan
-            yield self._create_keyword_activity("Analyzing your request...", "thinking")
+            # Use adaptive workflow engine if enabled
+            if self.use_adaptive_workflow and self.adaptive_workflow_engine:
+                async for chunk in self.adaptive_workflow_engine.execute_adaptive_workflow(
+                    user_message,
+                    conversation_history,
+                    user_preferences,
+                    project_settings
+                ):
+                    yield chunk
+                return
             
+            # Fallback to legacy orchestration
+            logger.info("Using legacy orchestration workflow")
+            
+            # Step 1: Analyze the request and create orchestration plan (silently)
             task_analysis = await self._analyze_task(
                 user_message, conversation_history, user_preferences
-            )
-            
-            # Show reasoning about task analysis
-            yield self._create_keyword_activity(
-                f"Task identified as: {task_analysis.category} ({task_analysis.complexity} complexity)",
-                "analysis"
             )
             
             orchestration_plan = await self._create_orchestration_plan(
                 task_analysis, user_preferences, project_settings
             )
             
-            # Show reasoning about model selection
-            yield {
-                "type": "activity",
-                "content": f"Selected {orchestration_plan.primary_provider.upper()} as the best model for this task"
-            }
+            # Step 1.5: Generate real AI reasoning for beautiful thinking process
+            logger.info(f"Task analysis: requires_reasoning={task_analysis.requires_reasoning}, category={task_analysis.category}")
             
-            if orchestration_plan.reasoning_required:
-                yield {
-                    "type": "activity",
-                    "content": "Task requires step-by-step reasoning - enabling thought process"
-                }
+            # Always generate reasoning for thinking process
+            logger.info("Generating reasoning for thinking process...")
+            provider = self.providers[orchestration_plan.primary_provider]
             
-            if orchestration_plan.tools_required:
-                yield {
-                    "type": "activity", 
-                    "content": f"Task requires tools: {', '.join(orchestration_plan.tools_required)}"
-                }
+            # Create a simple reasoning prompt
+            reasoning_prompt = f"""Think step by step about how to approach this request: "{user_message}"
+
+Please provide your reasoning process in clear steps."""
+
+            try:
+                async for chunk in provider.stream_completion(
+                    messages=[{"role": "user", "content": reasoning_prompt}],
+                    max_tokens=300,
+                    temperature=0.3
+                ):
+                    if chunk.get("type") == "content":
+                        # Yield as reasoning content
+                        yield {
+                            "type": "reasoning",
+                            "content": chunk["content"],
+                            "provider": provider.name
+                        }
+            except Exception as e:
+                logger.warning(f"Reasoning generation failed: {e}")
+                # Continue without reasoning if it fails
             
-            yield {
-                "type": "orchestration_plan",
-                "content": orchestration_plan.dict()
-            }
+            # Step 2: Execute orchestration plan with enhanced prompts
+            provider = self.providers[orchestration_plan.primary_provider]
             
-            # Step 2: Execute orchestration plan
-            async for chunk in self._execute_orchestration_plan(
-                orchestration_plan,
-                user_message,
-                conversation_history,
-                user_preferences
-            ):
-                yield chunk
+            # Enhance user message for better diagram generation
+            enhanced_message = await self._enhance_user_message(user_message, task_analysis)
+            
+            # Special handling for diagram requests - try Claude first for better ASCII art
+            is_diagram_request = any(keyword in user_message.lower() for keyword in ['venn', 'diagram', 'chart', 'graph'])
+            
+            if is_diagram_request and orchestration_plan.primary_provider == "openai":
+                # For diagrams, try Claude first as it's often better at ASCII art
+                logger.info("Diagram request detected - trying Claude first for better ASCII art generation")
+                fallback_provider = "anthropic"
+                
+                if fallback_provider in self.providers:
+                    try:
+                        async for chunk in self.providers[fallback_provider].stream_completion(
+                            messages=[{"role": "user", "content": enhanced_message}],
+                            max_tokens=2000,
+                            temperature=0.7
+                        ):
+                            yield chunk
+                        return  # Success with Claude, no need to try OpenAI
+                        
+                    except Exception as claude_error:
+                        logger.warning(f"Claude failed for diagram: {claude_error}, falling back to OpenAI")
+            
+            # Try primary provider
+            try:
+                async for chunk in provider.stream_completion(
+                    messages=[{"role": "user", "content": enhanced_message}],
+                    max_tokens=2000,
+                    temperature=0.7
+                ):
+                    yield chunk
+                    
+            except Exception as e:
+                logger.warning(f"Primary provider {orchestration_plan.primary_provider} failed: {e}")
+                
+                # Try fallback provider
+                if is_diagram_request:
+                    fallback_provider = await self._get_fallback_provider(orchestration_plan.primary_provider)
+                    if fallback_provider:
+                        logger.info(f"Trying fallback provider: {fallback_provider}")
+                        try:
+                            async for chunk in self.providers[fallback_provider].stream_completion(
+                                messages=[{"role": "user", "content": enhanced_message}],
+                                max_tokens=2000,
+                                temperature=0.7
+                            ):
+                                yield chunk
+                        except Exception as fallback_error:
+                            logger.error(f"Fallback provider also failed: {fallback_error}")
+                            raise e
+                    else:
+                        raise e
+                else:
+                    raise e
             
             # Step 3: Record performance metrics
             processing_time = time.time() - start_time
@@ -250,11 +324,20 @@ class AIOrchestrator:
             
             # Parse the JSON response from ChatCompletion object
             content = response.choices[0].message.content
-            analysis_data = json.loads(content)
-            return TaskType(**analysis_data)
+            
+            # Try to extract JSON from the response
+            json_start = content.find('{')
+            json_end = content.rfind('}') + 1
+            
+            if json_start >= 0 and json_end > json_start:
+                json_content = content[json_start:json_end]
+                analysis_data = json.loads(json_content)
+                return TaskType(**analysis_data)
+            else:
+                raise ValueError("No JSON found in response")
             
         except Exception as e:
-            logger.warning("Task analysis failed, using defaults", error=str(e))
+            logger.warning(f"Task analysis failed, using defaults. Error: {str(e)}, Response: {content[:200] if 'content' in locals() else 'No content'}")
             # Fallback to default analysis with reasoning enabled
             return TaskType(
                 category="general",
@@ -765,3 +848,160 @@ class AIOrchestrator:
             "type": "activity",
             "content": f"{keyword}\n{content}"
         }
+    
+    def _apply_keyword_injection(self, chunk: Dict[str, Any], generated_content: str) -> Dict[str, Any]:
+        """Apply keyword injection for content routing."""
+        
+        # Detect content type and inject appropriate keywords
+        content = chunk.get("content", "")
+        if not content:
+            return chunk
+        
+        # Create a copy to avoid modifying the original
+        modified_chunk = chunk.copy()
+        
+        # Table detection and injection
+        if self._detect_table_content(generated_content):
+            if "DIGI_TABLE_START" not in generated_content:
+                modified_chunk["content"] = "📈 DIGI_TABLE_START\n" + content
+                return modified_chunk
+        
+        # Code detection and injection  
+        elif self._detect_code_content(generated_content):
+            if "DIGI_CODE_START" not in generated_content:
+                modified_chunk["content"] = "💻 DIGI_CODE_START\n" + content
+                return modified_chunk
+                
+        # JSON detection and injection
+        elif self._detect_json_content(generated_content):
+            if "DIGI_JSON_START" not in generated_content:
+                modified_chunk["content"] = "📋 DIGI_JSON_START\n" + content
+                return modified_chunk
+                
+        # Diagram detection and injection
+        elif self._detect_diagram_content(generated_content):
+            if "DIGI_DIAGRAM_START" not in generated_content:
+                modified_chunk["content"] = "📊 DIGI_DIAGRAM_START\n" + content
+                return modified_chunk
+        
+        # Return original chunk if no injection
+        return chunk
+    
+    def _detect_table_content(self, content: str) -> bool:
+        """Detect if content contains table data."""
+        content_lower = content.lower()
+        table_indicators = [
+            "table", "column", "row", "header", 
+            "|", "data", "csv", "spreadsheet"
+        ]
+        return any(indicator in content_lower for indicator in table_indicators)
+    
+    def _detect_code_content(self, content: str) -> bool:
+        """Detect if content contains code using standard markdown format."""
+        # Simple and reliable: just look for markdown code blocks
+        return "```" in content
+    
+    def _detect_json_content(self, content: str) -> bool:
+        """Detect if content contains JSON data."""
+        content_stripped = content.strip()
+        return (
+            (content_stripped.startswith("{") and content_stripped.endswith("}")) or
+            (content_stripped.startswith("[") and content_stripped.endswith("]")) or
+            "json" in content.lower()
+        )
+    
+    def _detect_diagram_content(self, content: str) -> bool:
+        """Detect if content contains diagram data."""
+        diagram_indicators = [
+            "mermaid", "flowchart", "graph", "diagram", "chart",
+            "-->", "->", "graph TD", "graph LR", "sequenceDiagram"
+        ]
+        return any(indicator in content for indicator in diagram_indicators)
+    
+    def _apply_end_tag_injection(self, generated_content: str) -> Dict[str, Any]:
+        """Apply end tag injection for content routing."""
+        
+        logger.info(f"Checking for END tags in content: {generated_content[:100]}...")
+        
+        # Determine which end tag to inject based on what start tag was used
+        if "DIGI_CODE_START" in generated_content:
+            logger.info("Found DIGI_CODE_START, sending DIGI_CODE_END")
+            return {
+                "type": "content",
+                "content": "\n💻 DIGI_CODE_END",
+                "provider": "system"
+            }
+        elif "DIGI_TABLE_START" in generated_content:
+            logger.info("Found DIGI_TABLE_START, sending DIGI_TABLE_END")
+            return {
+                "type": "content", 
+                "content": "\n📈 DIGI_TABLE_END",
+                "provider": "system"
+            }
+        elif "DIGI_JSON_START" in generated_content:
+            logger.info("Found DIGI_JSON_START, sending DIGI_JSON_END")
+            return {
+                "type": "content",
+                "content": "\n📋 DIGI_JSON_END", 
+                "provider": "system"
+            }
+        elif "DIGI_DIAGRAM_START" in generated_content:
+            logger.info("Found DIGI_DIAGRAM_START, sending DIGI_DIAGRAM_END")
+            return {
+                "type": "content",
+                "content": "\n📊 DIGI_DIAGRAM_END",
+                "provider": "system"
+            }
+        
+        logger.warning("No START tag found, no END tag to send")
+        return None
+    
+    async def _enhance_user_message(self, user_message: str, task_analysis: TaskType) -> str:
+        """
+        Enhance user message with better prompts for specific content types.
+        """
+        message_lower = user_message.lower()
+        
+        # Enhance Venn diagram requests
+        if any(keyword in message_lower for keyword in ['venn', 'diagram']):
+            if 'ascii' not in message_lower and 'svg' not in message_lower:
+                # Add ASCII art specification for better results
+                enhanced = f"{user_message}\n\nPlease create this as ASCII art using text characters like / \\ ( ) - _ | + for the visual representation."
+                return enhanced
+        
+        # Enhance math requests
+        if any(keyword in message_lower for keyword in ['formula', 'equation', 'math', 'calculate']):
+            if 'latex' not in message_lower:
+                enhanced = f"{user_message}\n\nPlease format any mathematical expressions using LaTeX notation with \\[ \\] for display math and \\( \\) for inline math."
+                return enhanced
+        
+        # Enhance code requests
+        if any(keyword in message_lower for keyword in ['code', 'function', 'script', 'program']):
+            if 'syntax' not in message_lower:
+                enhanced = f"{user_message}\n\nPlease provide the code with proper syntax highlighting using markdown code blocks with language specification."
+                return enhanced
+        
+        return user_message
+    
+    async def _get_fallback_provider(self, primary_provider: str) -> Optional[str]:
+        """
+        Get fallback provider when primary fails.
+        """
+        fallback_map = {
+            "openai": "anthropic",  # Try Claude if OpenAI fails
+            "anthropic": "grok",    # Try Grok if Claude fails  
+            "grok": "openai"        # Try OpenAI if Grok fails
+        }
+        
+        fallback = fallback_map.get(primary_provider)
+        
+        # Check if fallback provider is available
+        if fallback and fallback in self.providers:
+            return fallback
+        
+        # Find any available provider that's not the primary
+        for provider_name in self.providers:
+            if provider_name != primary_provider:
+                return provider_name
+        
+        return None

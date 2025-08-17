@@ -4,6 +4,7 @@
 
 <script setup>
 import { computed } from 'vue'
+import { marked } from 'marked'
 
 const props = defineProps({
   content: {
@@ -13,18 +14,42 @@ const props = defineProps({
   metadata: {
     type: Object,
     default: () => ({})
+  },
+  isStreaming: {
+    type: Boolean,
+    default: false
+  },
+  enableMarkdown: {
+    type: Boolean,
+    default: true
   }
 })
 
 const processedContent = computed(() => {
   let processed = String(props.content)
   
-  // Convert URLs to clickable links
-  const urlRegex = /(https?:\/\/[^\s]+)/g
-  processed = processed.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" class="ds-link">$1</a>')
+  if (props.enableMarkdown) {
+    try {
+      // Use marked for markdown processing
+      processed = marked(processed, {
+        breaks: true,
+        gfm: true
+      })
+    } catch (e) {
+      console.warn('Markdown processing failed, falling back to plain text:', e)
+      // Fallback to simple processing
+      processed = processed.replace(/\n/g, '<br>')
+    }
+  } else {
+    // Simple text processing without markdown
+    processed = processed.replace(/\n/g, '<br>')
+  }
   
-  // Convert line breaks to <br> tags
-  processed = processed.replace(/\n/g, '<br>')
+  // Convert URLs to clickable links if not already processed by markdown
+  if (!props.enableMarkdown) {
+    const urlRegex = /(https?:\/\/[^\s]+)/g
+    processed = processed.replace(urlRegex, '<a href="$1" target="_blank" rel="noopener noreferrer" class="ds-link">$1</a>')
+  }
   
   return processed
 })

@@ -198,6 +198,12 @@ async def stream_chat_message(
                 if chunk_type == "activity":
                     # Stream thought process steps in real-time
                     yield f"data: {json.dumps({'type': 'activity', 'content': chunk_content})}\n\n"
+                elif chunk_type == "reasoning":
+                    # Stream beautiful reasoning process (RESTORED!)
+                    yield f"data: {json.dumps({'type': 'reasoning', 'content': chunk_content, 'provider': chunk.get('provider', 'system')})}\n\n"
+                elif chunk_type == "thinking":
+                    # Stream thinking process
+                    yield f"data: {json.dumps({'type': 'thinking', 'content': chunk_content, 'provider': chunk.get('provider', 'system')})}\n\n"
                 elif chunk_type == "content":
                     # Stream response content
                     response_content += chunk_content

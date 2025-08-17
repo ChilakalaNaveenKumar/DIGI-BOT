@@ -81,6 +81,86 @@
       />
     </div>
 
+    <!-- Vision/Image Analysis Content -->
+    <div v-else-if="contentType === 'vision'" class="ds-vision-content">
+      <DigiSetuVisionRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Audio Transcription Content -->
+    <div v-else-if="contentType === 'audio_transcription'" class="ds-audio-transcription-content">
+      <DigiSetuAudioRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Audio Analysis Content -->
+    <div v-else-if="contentType === 'audio_analysis'" class="ds-audio-analysis-content">
+      <DigiSetuAudioRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Tool Result Content -->
+    <div v-else-if="contentType === 'tool'" class="ds-tool-content">
+      <DigiSetuToolRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Batch Tools Content -->
+    <div v-else-if="contentType === 'batch_tools'" class="ds-batch-tools-content">
+      <DigiSetuToolRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Search Results Content -->
+    <div v-else-if="contentType === 'search'" class="ds-search-content">
+      <DigiSetuSearchRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- News Search Content -->
+    <div v-else-if="contentType === 'news'" class="ds-news-content">
+      <DigiSetuSearchRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Reasoning Chain-of-Thought -->
+    <div v-else-if="contentType === 'reasoning'" class="ds-reasoning-content">
+      <DigiSetuReasoningRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Structured Output -->
+    <div v-else-if="contentType === 'structured_output'" class="ds-structured-content">
+      <DigiSetuStructuredRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
+    <!-- Live Search -->
+    <div v-else-if="contentType === 'live_search'" class="ds-live-search-content">
+      <DigiSetuLiveSearchRenderer 
+        :content="content"
+        :metadata="metadata"
+      />
+    </div>
+
     <!-- Interactive Content -->
     <div v-else-if="contentType === 'interactive'" class="ds-interactive-content">
       <component 
@@ -116,6 +196,15 @@ import DigiSetuImage from './DigiSetuImage.vue'
 import DigiSetuAudio from './DigiSetuAudio.vue'
 import DigiSetuVideo from './DigiSetuVideo.vue'
 import DigiSetuFile from './DigiSetuFile.vue'
+// Import new multimodal renderer components
+import DigiSetuVisionRenderer from './DigiSetuVisionRenderer.vue'
+import DigiSetuAudioRenderer from './DigiSetuAudioRenderer.vue'
+import DigiSetuToolRenderer from './DigiSetuToolRenderer.vue'
+import DigiSetuSearchRenderer from './DigiSetuSearchRenderer.vue'
+// Import advanced feature renderers
+import DigiSetuReasoningRenderer from './DigiSetuReasoningRenderer.vue'
+import DigiSetuStructuredRenderer from './DigiSetuStructuredRenderer.vue'
+import DigiSetuLiveSearchRenderer from './DigiSetuLiveSearchRenderer.vue'
 
 const props = defineProps({
   content: {
@@ -330,6 +419,26 @@ const getInteractiveComponent = () => {
 /* === FILE CONTENT === */
 .ds-file-content {
   margin: var(--ds-space-3) 0;
+}
+
+/* === MULTIMODAL CONTENT === */
+.ds-vision-content {
+  margin: var(--ds-space-4) 0;
+}
+
+.ds-audio-transcription-content,
+.ds-audio-analysis-content {
+  margin: var(--ds-space-4) 0;
+}
+
+.ds-tool-content,
+.ds-batch-tools-content {
+  margin: var(--ds-space-4) 0;
+}
+
+.ds-search-content,
+.ds-news-content {
+  margin: var(--ds-space-4) 0;
 }
 
 /* === INTERACTIVE CONTENT === */

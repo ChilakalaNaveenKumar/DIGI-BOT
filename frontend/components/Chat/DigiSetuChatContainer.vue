@@ -95,6 +95,9 @@
         @file-upload="handleFileUpload"
       />
     </div>
+
+    <!-- Customization Panel -->
+    <DigiSetuCustomizationPanel />
   </div>
 </template>
 
@@ -104,6 +107,7 @@ import { Brain, Zap, FileText, Lightbulb, Code, Image, HelpCircle } from 'lucide
 
 // Import components with explicit .vue extension
 import DigiSetuMessage from './DigiSetuMessage.vue'
+import DigiSetuCustomizationPanel from './DigiSetuCustomizationPanel.vue'
 import DigiSetuInput from './DigiSetuInput.vue'
 
 const props = defineProps({

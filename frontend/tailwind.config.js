@@ -1,5 +1,5 @@
 /** @type {import('tailwindcss').Config} */
 export default {
-  // In v4, plugins are loaded via @plugin in CSS, not here
+  // In Tailwind v4, configuration is handled via CSS @theme directive
   // Content detection handled by @source in CSS
 }

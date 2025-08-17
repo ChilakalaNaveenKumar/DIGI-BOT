@@ -7,11 +7,6 @@
 
 @import "highlight.js/styles/github-dark.css";
 
-@theme {
-  /* Tailwind v4 CSS-first theme tokens */
-  --color-brand: #4f46e5;
-}
-
 /* Design system CSS variables */
 :root {
   --background: 0 0% 100%;
@@ -172,4 +167,4 @@
   border-color: #374151 !important;
 }
 
-/* Custom utilities that might not be available in v4 */
+/* Components use ds- CSS variables, not Tailwind utilities */
