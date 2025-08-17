@@ -120,7 +120,6 @@
 
 <script setup lang="ts">
 import type { Message } from '~/types'
-import type { MarkdownBlock } from '~/composables/useMarkdown'
 
 interface Props {
   message: Message
@@ -131,8 +130,7 @@ interface Props {
 interface Emits {
   (e: 'copy', content: string): void
   (e: 'regenerate', messageId: string | number): void
-  (e: 'content-updated'): void
-  (e: 'streaming-complete'): void
+  (e: 'content-updated' | 'streaming-complete'): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -153,8 +151,8 @@ const handleStreamingComplete = () => {
   emit('streaming-complete')
 }
 
-const handleBlockCompleted = (block: MarkdownBlock) => {
-  console.log('Block completed:', block.type)
+const handleBlockCompleted = (block: unknown) => {
+  console.log('Block completed:', block)
 }
 
 const formatTime = (timestamp?: Date) => {
