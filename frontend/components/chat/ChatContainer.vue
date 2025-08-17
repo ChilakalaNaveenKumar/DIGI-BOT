@@ -38,24 +38,26 @@
     </div>
       
     <!-- Chat Messages (When messages exist) -->
-    <div v-else class="chat-messages">
-      <div class="messages-list">
-        <Message
-          v-for="message in messages" 
-          :key="message.id"
-          :message="message"
-          @copy="handleCopyMessage"
-          @regenerate="handleRegenerateMessage"
-        />
-        
-        <Message
-          v-if="isLoading"
-          :message="{ id: Date.now() + 999, role: 'assistant', content: 'Thinking...', isLoading: true, timestamp: new Date() }"
-        />
+    <div v-else class="chat-mode">
+      <div class="chat-messages">
+        <div class="messages-list">
+          <Message
+            v-for="message in messages" 
+            :key="message.id"
+            :message="message"
+            @copy="handleCopyMessage"
+            @regenerate="handleRegenerateMessage"
+          />
+          
+          <Message
+            v-if="isLoading"
+            :message="{ id: Date.now() + 999, role: 'assistant', content: 'Thinking...', isLoading: true, timestamp: new Date() }"
+          />
+        </div>
       </div>
       
-      <!-- Input at bottom when in chat mode -->
-      <div class="chat-input-area">
+      <!-- Fixed Input at bottom when in chat mode -->
+      <div class="chat-input-area-fixed">
         <UiClaudeInput
           :loading="isLoading"
           placeholder="Reply to Claude..."
@@ -218,7 +220,15 @@ watch(messages, () => {
   max-width: 600px;
 }
 
-/* Chat Messages */
+/* Chat Mode Layout */
+.chat-mode {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+
 .chat-messages {
   flex: 1;
   display: flex;
@@ -226,22 +236,57 @@ watch(messages, () => {
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
-  min-height: 100vh;
+  overflow-y: auto;
+  padding-bottom: 100px; /* Reduced space since input is smaller */
 }
 
 .messages-list {
-  flex: 1;
   padding: 24px;
-  overflow-y: auto;
 }
 
-.chat-input-area {
-  padding: 16px 24px;
-  border-top: 1px solid var(--border-primary);
-  background: var(--bg-primary);
+/* Fixed Input Area */
+.chat-input-area-fixed {
+  position: fixed;
+  bottom: 0;
+  left: 260px; /* Account for sidebar width */
+  right: 0;
+  background: transparent; /* Remove background to blend with chat */
+  z-index: 100;
+  padding: 16px 0;
+}
+
+.chat-input-area-fixed .claude-input-wrapper {
+  max-width: 800px; /* Match messages container width */
+  margin: 0 auto;
+  padding: 0 24px; /* Match messages-list padding */
+  width: 100%;
+  box-sizing: border-box;
 }
 
 /* Responsive */
+@media (max-width: 1024px) {
+  .chat-input-area-fixed {
+    left: 260px; /* Keep sidebar offset */
+    right: 0;
+    padding: 16px 0;
+  }
+  
+  .chat-input-area-fixed .claude-input-wrapper {
+    max-width: calc(100vw - 260px - 48px); /* Viewport width minus sidebar width minus padding */
+    padding: 0 24px;
+    margin: 0 auto;
+  }
+}
+
+/* Medium screens - better transition */
+@media (min-width: 768px) and (max-width: 1024px) {
+  .chat-input-area-fixed .claude-input-wrapper {
+    max-width: min(800px, calc(100vw - 260px - 48px)); /* Account for sidebar + padding, capped at 800px */
+    padding: 0 24px;
+  }
+}
+
+/* Mobile screens */
 @media (max-width: 768px) {
   .example-prompts {
     grid-template-columns: repeat(2, 1fr);
@@ -254,6 +299,43 @@ watch(messages, () => {
   
   .welcome-section {
     padding: 20px 16px;
+  }
+  
+  .chat-messages {
+    padding-bottom: 120px; /* Adjusted for smaller input */
+  }
+  
+  .chat-input-area-fixed {
+    left: 260px; /* Keep sidebar offset */
+    right: 0;
+    padding: 0px; /* Match chat message container */
+  }
+  
+  .chat-input-area-fixed .claude-input-wrapper {
+    max-width: calc(100vw - 260px - 32px); /* Account for sidebar width minus padding */
+    padding: 0; /* Match mobile messages padding */
+    margin: 0 auto;
+  }
+  
+  .messages-list {
+    padding: 16px;
+  }
+}
+
+/* Very small screens */
+@media (max-width: 480px) {
+  .chat-input-area-fixed {
+    left: 260px; /* Keep sidebar offset */
+    padding: 0px; /* Match chat message container */
+  }
+  
+  .chat-input-area-fixed .claude-input-wrapper {
+    max-width: calc(100vw - 260px - 24px); /* Account for sidebar width minus padding */
+    padding: 0;
+  }
+  
+  .messages-list {
+    padding: 12px;
   }
 }
 </style>
