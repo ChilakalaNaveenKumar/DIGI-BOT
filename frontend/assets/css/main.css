@@ -1,170 +1,32 @@
-
-@import "tailwindcss";
-@plugin "@tailwindcss/typography";
-
-/* Help Tailwind find files in v4 style */
-@source "../components/**/*.{vue,js,ts}" "../layouts/**/*.vue" "../pages/**/*.vue" "../plugins/**/*.{js,ts}" "../app.vue" "../error.vue";
-
-@import "highlight.js/styles/github-dark.css";
-
-/* Design system CSS variables */
-:root {
-  --background: 0 0% 100%;
-  --foreground: 222.2 84% 4.9%;
-  --card: 0 0% 100%;
-  --card-foreground: 222.2 84% 4.9%;
-  --popover: 0 0% 100%;
-  --popover-foreground: 222.2 84% 4.9%;
-  --primary: 222.2 47.4% 11.2%;
-  --primary-foreground: 210 40% 98%;
-  --secondary: 210 40% 96%;
-  --secondary-foreground: 222.2 84% 4.9%;
-  --muted: 210 40% 96%;
-  --muted-foreground: 215.4 16.3% 46.9%;
-  --accent: 210 40% 96%;
-  --accent-foreground: 222.2 84% 4.9%;
-  --destructive: 0 84.2% 60.2%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 214.3 31.8% 91.4%;
-  --input: 214.3 31.8% 91.4%;
-  --ring: 222.2 84% 4.9%;
-  --radius: 0.5rem;
+/* Base styles and resets */
+* {
+  box-sizing: border-box;
 }
 
-.dark {
-  --background: 222.2 84% 4.9%;
-  --foreground: 210 40% 98%;
-  --card: 222.2 84% 4.9%;
-  --card-foreground: 210 40% 98%;
-  --popover: 222.2 84% 4.9%;
-  --popover-foreground: 210 40% 98%;
-  --primary: 210 40% 98%;
-  --primary-foreground: 222.2 47.4% 11.2%;
-  --secondary: 217.2 32.6% 17.5%;
-  --secondary-foreground: 210 40% 98%;
-  --muted: 217.2 32.6% 17.5%;
-  --muted-foreground: 215 20.2% 65.1%;
-  --accent: 217.2 32.6% 17.5%;
-  --accent-foreground: 210 40% 98%;
-  --destructive: 0 62.8% 30.6%;
-  --destructive-foreground: 210 40% 98%;
-  --border: 217.2 32.6% 17.5%;
-  --input: 217.2 32.6% 17.5%;
-  --ring: 212.7 26.8% 83.9%;
+html, body {
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-@layer base {
-  * {
-    border-color: hsl(var(--border));
-    outline-color: hsl(var(--ring) / 0.5);
-  }
-  body {
-    background-color: hsl(var(--background));
-    color: hsl(var(--foreground));
-  }
+/* Scrollbar styles for webkit browsers */
+::-webkit-scrollbar {
+  width: 6px;
 }
 
-/* Custom animations */
-.animate-fade-in {
-  animation: fadeIn 0.5s ease-in-out;
+::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
 }
 
-.animate-pulse-slow {
-  animation: pulse-slow 3s ease-in-out infinite;
+::-webkit-scrollbar-thumb {
+  background: var(--border-secondary);
+  border-radius: 3px;
 }
 
-@keyframes fadeIn {
-  from { 
-    opacity: 0; 
-    transform: translateY(10px); 
-  }
-  to { 
-    opacity: 1; 
-    transform: translateY(0); 
-  }
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
 }
-
-@keyframes pulse-slow {
-  0%, 100% {
-    opacity: 1;
-  }
-  50% {
-    opacity: 0.7;
-  }
-}
-
-/* EMERGENCY FIX for text visibility - HIGH CONTRAST */
-.chat-message,
-.message-content,
-.ai-response,
-.ai-code-content {
-  color: #ffffff !important;
-}
-
-.chat-message p,
-.chat-message li,
-.chat-message span,
-.chat-message div,
-.ai-code-content p,
-.ai-code-content li,
-.ai-code-content span,
-.ai-code-content div {
-  color: #ffffff !important;
-}
-
-/* Fix numbered lists specifically */
-.chat-message ol,
-.chat-message ul,
-.ai-code-content ol,
-.ai-code-content ul {
-  color: #ffffff !important;
-}
-
-.chat-message ol li,
-.chat-message ul li,
-.ai-code-content ol li,
-.ai-code-content ul li {
-  color: #ffffff !important;
-  margin-bottom: 12px;
-}
-
-/* Make sure bold text is visible */
-.chat-message strong,
-.chat-message b,
-.ai-code-content strong,
-.ai-code-content b {
-  color: #ffffff !important;
-  font-weight: 600;
-}
-
-/* Force visibility for all text elements */
-.dark .ai-code-content,
-.dark .message-content,
-.dark .chat-message {
-  color: #ffffff !important;
-}
-
-.dark .ai-code-content *,
-.dark .message-content *,
-.dark .chat-message * {
-  color: #ffffff !important;
-}
-
-/* Fix all heading visibility */
-.dark h1, .dark h2, .dark h3, .dark h4, .dark h5, .dark h6,
-.ai-code-content h1, .ai-code-content h2, .ai-code-content h3,
-.ai-code-content h4, .ai-code-content h5, .ai-code-content h6,
-.message-content h1, .message-content h2, .message-content h3,
-.message-content h4, .message-content h5, .message-content h6 {
-  color: #ffffff !important;
-}
-
-/* Fix table headers and cells */
-.dark table, .dark th, .dark td,
-.ai-code-content table, .ai-code-content th, .ai-code-content td,
-.message-content table, .message-content th, .message-content td {
-  color: #ffffff !important;
-  border-color: #374151 !important;
-}
-
-/* Components use ds- CSS variables, not Tailwind utilities */
