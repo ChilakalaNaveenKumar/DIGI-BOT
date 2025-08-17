@@ -22,6 +22,7 @@ export interface Message {
   role: 'user' | 'assistant'
   timestamp: Date
   isLoading?: boolean
+  isStreaming?: boolean
   reasoning?: string
   reasoningSteps?: ReasoningStep[]
   toolCalls?: ToolCall[]

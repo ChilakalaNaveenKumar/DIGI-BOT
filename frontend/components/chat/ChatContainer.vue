@@ -48,11 +48,6 @@
             @copy="handleCopyMessage"
             @regenerate="handleRegenerateMessage"
           />
-          
-          <Message
-            v-if="isLoading"
-            :message="{ id: Date.now() + 999, role: 'assistant', content: 'Thinking...', isLoading: true, timestamp: new Date() }"
-          />
         </div>
       </div>
       
@@ -154,8 +149,9 @@ watch(messages, () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  overflow-y: auto;
+  overflow: visible;
   padding: 0;
+  min-height: 100%;
 }
 
 /* Welcome Section */
@@ -225,8 +221,8 @@ watch(messages, () => {
   flex: 1;
   display: flex;
   flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
+  min-height: 100%;
+  overflow: visible;
 }
 
 .chat-messages {
@@ -236,8 +232,8 @@ watch(messages, () => {
   max-width: 800px;
   margin: 0 auto;
   width: 100%;
-  overflow-y: auto;
-  padding-bottom: 100px; /* Reduced space since input is smaller */
+  overflow: visible;
+  padding-bottom: 140px; /* Extra space for message actions visibility */
 }
 
 .messages-list {
@@ -302,7 +298,7 @@ watch(messages, () => {
   }
   
   .chat-messages {
-    padding-bottom: 120px; /* Adjusted for smaller input */
+    padding-bottom: 160px; /* Extra space for message actions on mobile */
   }
   
   .chat-input-area-fixed {

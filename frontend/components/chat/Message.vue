@@ -50,12 +50,31 @@
               />
             </div>
             <div v-if="reasoningExpanded" class="reasoning-content">
-              {{ message.reasoning }}
+              <UiStreamingMarkdown
+                :key="`reasoning-${message.id}`"
+                :content="message.reasoning || ''"
+                :is-streaming="false"
+                :show-cursor="false"
+                mode="static"
+              />
             </div>
           </div>
           
           <!-- Main Content -->
-          <div v-if="message.content" class="message-text">{{ message.content }}</div>
+          <div v-if="message.content" class="message-text">
+            <UiStreamingMarkdown
+              :key="`content-${message.id}`"
+              :content="message.content"
+              :is-streaming="message.isStreaming || false"
+              :show-cursor="message.isStreaming || false"
+              :show-streaming-indicator="message.isStreaming || false"
+              :mode="message.isStreaming ? 'streaming' : 'static'"
+              :auto-scroll="true"
+              @content-updated="handleContentUpdate"
+              @streaming-complete="handleStreamingComplete"
+              @block-completed="handleBlockCompleted"
+            />
+          </div>
           
           <!-- Tool Calls -->
           <div v-if="message.toolCalls && message.toolCalls.length > 0" class="tools-section">
@@ -101,6 +120,7 @@
 
 <script setup lang="ts">
 import type { Message } from '~/types'
+import type { MarkdownBlock } from '~/composables/useMarkdown'
 
 interface Props {
   message: Message
@@ -111,6 +131,8 @@ interface Props {
 interface Emits {
   (e: 'copy', content: string): void
   (e: 'regenerate', messageId: string | number): void
+  (e: 'content-updated'): void
+  (e: 'streaming-complete'): void
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -122,25 +144,22 @@ const emit = defineEmits<Emits>()
 
 const reasoningExpanded = ref(false)
 
+// Event handlers for StreamingMarkdown
+const handleContentUpdate = () => {
+  emit('content-updated')
+}
+
+const handleStreamingComplete = () => {
+  emit('streaming-complete')
+}
+
+const handleBlockCompleted = (block: MarkdownBlock) => {
+  console.log('Block completed:', block.type)
+}
+
 const formatTime = (timestamp?: Date) => {
   if (!timestamp) return ''
   return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-}
-
-// const formatMessage = (content: string) => {
-//   return content
-//     .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-//     .replace(/\*(.*?)\*/g, '<em>$1</em>')
-//     .replace(/`(.*?)`/g, '<code>$1</code>')
-//     .replace(/\n/g, '<br>')
-// }
-
-const getToolStatus = (status?: string) => {
-  switch (status) {
-    case 'completed': return 'success'
-    case 'error': return 'error'
-    default: return 'warning'
-  }
 }
 
 const toggleReasoning = () => {
@@ -157,19 +176,28 @@ const copyMessage = async () => {
 }
 
 const regenerateMessage = () => {
-  emit('regenerate', props.message.id)
+  if (props.message.id) {
+    emit('regenerate', props.message.id)
+  }
+}
+
+const getToolStatus = (status?: string) => {
+  switch (status) {
+    case 'completed': return 'success'
+    case 'failed': return 'error'
+    case 'running': return 'warning'
+    default: return 'secondary'
+  }
 }
 </script>
 
 <style scoped>
 .message {
   display: flex;
+  align-items: flex-start;
   gap: 12px;
-  padding: 16px 0;
-}
-
-.message--user {
-  flex-direction: row-reverse;
+  max-width: 100%;
+  margin-bottom: 16px;
 }
 
 .message-avatar {
@@ -185,13 +213,13 @@ const regenerateMessage = () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 8px;
+  margin-bottom: 6px;
 }
 
 .message-author {
+  font-size: 14px;
   font-weight: 600;
   color: var(--text-primary);
-  font-size: 14px;
 }
 
 .message-time {
@@ -200,33 +228,34 @@ const regenerateMessage = () => {
 }
 
 .message-body {
-  color: var(--text-primary);
+  font-size: 14px;
   line-height: 1.6;
+  color: var(--text-primary);
 }
 
+/* Reasoning section */
 .reasoning-section {
-  background: var(--bg-secondary);
+  margin-bottom: 12px;
   border: 1px solid var(--border-primary);
   border-radius: 8px;
-  margin-bottom: 16px;
-  overflow: hidden;
+  background: var(--bg-secondary);
 }
 
 .reasoning-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px;
-  cursor: pointer;
-  background: var(--bg-tertiary);
-  border-bottom: 1px solid var(--border-primary);
-  font-size: 14px;
+  padding: 8px 12px;
+  font-size: 12px;
   font-weight: 500;
   color: var(--text-secondary);
+  cursor: pointer;
+  user-select: none;
+  transition: all 0.2s ease;
 }
 
 .reasoning-header:hover {
-  background: var(--bg-hover);
+  background: var(--bg-tertiary);
 }
 
 .reasoning-chevron {
@@ -249,8 +278,9 @@ const regenerateMessage = () => {
   margin-bottom: 8px;
 }
 
+/* Tool calls */
 .tools-section {
-  margin: 16px 0;
+  margin: 12px 0;
 }
 
 .tool-call {
@@ -258,40 +288,45 @@ const regenerateMessage = () => {
   border: 1px solid var(--border-primary);
   border-radius: 8px;
   margin-bottom: 8px;
-  overflow: hidden;
 }
 
 .tool-header {
   display: flex;
   align-items: center;
   gap: 8px;
-  padding: 12px;
-  background: var(--bg-tertiary);
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
   border-bottom: 1px solid var(--border-primary);
 }
 
 .tool-name {
-  font-weight: 500;
-  color: var(--text-primary);
+  flex: 1;
+  font-family: monospace;
 }
 
 .tool-result {
   padding: 12px;
-  background: var(--bg-primary);
 }
 
 .tool-result pre {
-  font-size: 12px;
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
   color: var(--text-secondary);
-  overflow-x: auto;
+  background: none;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
+/* Error message */
 .error-message {
   display: flex;
   align-items: center;
-  gap: 8px;
-  padding: 12px;
-  background: #fee2e2;
+  gap: 6px;
+  padding: 8px 12px;
+  background: var(--error-bg, #fef2f2);
   color: #dc2626;
   border-radius: 8px;
   margin-top: 8px;
@@ -301,11 +336,16 @@ const regenerateMessage = () => {
   display: flex;
   gap: 8px;
   margin-top: 12px;
+  margin-bottom: 24px;
+  padding: 8px 0 16px 0;
   opacity: 0;
   transition: opacity 0.2s ease;
+  background: var(--bg-primary);
+  border-radius: 8px;
 }
 
-.message:hover .message-actions {
+.message:hover .message-actions,
+.message:last-child .message-actions {
   opacity: 1;
 }
 
@@ -316,7 +356,7 @@ const regenerateMessage = () => {
 }
 
 .message--user .message-content {
-  text-align: right;
+  align-items: flex-end;
 }
 
 .message--user .message-header {
@@ -327,3 +367,4 @@ const regenerateMessage = () => {
   justify-content: flex-end;
 }
 </style>
+

@@ -1,7 +1,7 @@
 <template>
   <div class="reasoning-stepper">
     <div class="reasoning-accordion">
-      <div class="stepper-line"></div>
+      <div class="stepper-line" />
       <div class="accordion-steps">
         <div 
           v-for="(step, index) in steps" 
@@ -23,7 +23,7 @@
                 v-else
                 class="thinking-dot"
                 :class="{ 'thinking-dot--active': step.status === 'active' }"
-              ></div>
+              />
             </div>
             
             <div class="step-content">
@@ -38,9 +38,15 @@
           </div>
           
           <!-- Expanded content directly under the step -->
-          <p v-if="expandedSteps.has(index) && step.result" class="step-expanded-content">
-            {{ step.result }}
-          </p>
+          <div v-if="expandedSteps.has(index) && step.result" class="step-expanded-content">
+            <UiStreamingMarkdown
+              :key="`step-${index}-result`"
+              :content="String(step.result || '')"
+              :is-streaming="false"
+              :show-cursor="false"
+              mode="static"
+            />
+          </div>
         </div>
       </div>
     </div>
@@ -48,12 +54,14 @@
 </template>
 
 <script setup lang="ts">
+// Removed markdown-it imports - now using StreamingMarkdown component
+
 interface ReasoningStep {
   type: 'thinking' | 'tool_call' | 'conclusion'
   content: string
   status?: 'active' | 'completed' | 'error'
   tool_name?: string
-  result?: any
+  result?: unknown
   preview?: string
 }
 
@@ -62,11 +70,13 @@ interface Props {
   initialExpanded?: boolean
 }
 
-const props = withDefaults(defineProps<Props>(), {
+const _props = withDefaults(defineProps<Props>(), {
   initialExpanded: false
 })
 
 const expandedSteps = ref(new Set<number>())
+
+// Markdown rendering now handled by StreamingMarkdown component
 
 const getStepPreview = (step: ReasoningStep) => {
   return step.content.length > 60 
@@ -102,7 +112,7 @@ const getToolIcon = (toolName?: string) => {
   return iconMap[toolName || ''] || 'settings'
 }
 
-const getStatusVariant = (status?: string) => {
+const _getStatusVariant = (status?: string) => {
   switch (status) {
     case 'completed': return 'success'
     case 'error': return 'error'
@@ -110,7 +120,7 @@ const getStatusVariant = (status?: string) => {
   }
 }
 
-const formatResult = (result: any) => {
+const _formatResult = (result: unknown) => {
   if (typeof result === 'string') {
     return result.length > 200 ? result.substring(0, 200) + '...' : result
   }
@@ -147,9 +157,7 @@ const formatResult = (result: any) => {
   z-index: 2;
 }
 
-.accordion-step {
-  /* No border between steps */
-}
+/* .accordion-step - No border between steps */
 
 .preview-steps {
   flex: 1;
@@ -428,6 +436,339 @@ const formatResult = (result: any) => {
 .reasoning-content::-webkit-scrollbar-thumb {
   background: var(--border-primary);
   border-radius: 3px;
+}
+
+.reasoning-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* 🎨 MARKDOWN STYLING FOR REASONING STEPPER */
+.step-expanded-content.markdown-content {
+  margin-top: 8px;
+  margin-left: 8px;
+  padding: 12px;
+  background: var(--bg-tertiary);
+  border-left: 3px solid var(--border-primary);
+  border-radius: 0 6px 6px 0;
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  overflow-wrap: break-word;
+}
+
+/* Headers in reasoning */
+.step-expanded-content.markdown-content :deep(h1),
+.step-expanded-content.markdown-content :deep(h2),
+.step-expanded-content.markdown-content :deep(h3),
+.step-expanded-content.markdown-content :deep(h4),
+.step-expanded-content.markdown-content :deep(h5),
+.step-expanded-content.markdown-content :deep(h6) {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 8px 0 4px 0;
+  padding: 0;
+  border: none;
+}
+
+/* Paragraphs */
+.step-expanded-content.markdown-content :deep(p) {
+  margin: 6px 0;
+  line-height: 1.5;
+}
+
+/* Text formatting */
+.step-expanded-content.markdown-content :deep(strong) {
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.step-expanded-content.markdown-content :deep(em) {
+  font-style: italic;
+}
+
+.step-expanded-content.markdown-content :deep(del) {
+  text-decoration: line-through;
+  opacity: 0.7;
+}
+
+/* Inline code */
+.step-expanded-content.markdown-content :deep(code) {
+  background: var(--bg-primary);
+  color: var(--accent-primary);
+  padding: 1px 4px;
+  border-radius: 3px;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 12px;
+  border: 1px solid var(--border-primary);
+}
+
+/* Code blocks */
+.step-expanded-content.markdown-content :deep(pre) {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-primary);
+  border-radius: 6px;
+  padding: 8px;
+  margin: 8px 0;
+  overflow-x: auto;
+  font-family: 'Monaco', 'Menlo', 'Consolas', monospace;
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.step-expanded-content.markdown-content :deep(pre code) {
+  background: none;
+  border: none;
+  padding: 0;
+  color: var(--text-primary);
+}
+
+/* Lists */
+.step-expanded-content.markdown-content :deep(ul), 
+.step-expanded-content.markdown-content :deep(ol) {
+  margin: 6px 0;
+  padding-left: 16px;
+}
+
+.step-expanded-content.markdown-content :deep(li) {
+  margin: 2px 0;
+  line-height: 1.4;
+}
+
+.step-expanded-content.markdown-content :deep(ul li) {
+  list-style: disc;
+}
+
+.step-expanded-content.markdown-content :deep(ol li) {
+  list-style: decimal;
+}
+
+/* Blockquotes */
+.step-expanded-content.markdown-content :deep(blockquote) {
+  background: var(--bg-primary);
+  border-left: 3px solid var(--accent-primary);
+  padding: 6px 8px;
+  margin: 8px 0;
+  border-radius: 0 4px 4px 0;
+}
+
+.step-expanded-content.markdown-content :deep(blockquote p) {
+  margin: 0;
+  color: var(--text-secondary);
+  font-style: italic;
+}
+
+/* Tables */
+.step-expanded-content.markdown-content :deep(table) {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 8px 0;
+  background: var(--bg-primary);
+  border-radius: 6px;
+  overflow: hidden;
+  border: 1px solid var(--border-primary);
+  font-size: 12px;
+}
+
+.step-expanded-content.markdown-content :deep(th), 
+.step-expanded-content.markdown-content :deep(td) {
+  padding: 6px 8px;
+  text-align: left;
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.step-expanded-content.markdown-content :deep(th) {
+  background: var(--bg-secondary);
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.step-expanded-content.markdown-content :deep(tr:last-child td) {
+  border-bottom: none;
+}
+
+.step-expanded-content.markdown-content :deep(tr:nth-child(even)) {
+  background: var(--bg-secondary);
+}
+
+/* Links */
+.step-expanded-content.markdown-content :deep(a) {
+  color: var(--accent-primary);
+  text-decoration: none;
+  border-bottom: 1px solid transparent;
+  transition: all 0.2s ease;
+}
+
+.step-expanded-content.markdown-content :deep(a:hover) {
+  border-bottom-color: var(--accent-primary);
+}
+
+/* Horizontal rules */
+.step-expanded-content.markdown-content :deep(hr) {
+  border: none;
+  border-top: 1px solid var(--border-primary);
+  margin: 12px 0;
+}
+
+/* Syntax highlighting - Theme adaptive using data-theme */
+.step-expanded-content.markdown-content :deep(.hljs) {
+  background: var(--bg-primary) !important;
+  color: var(--text-primary) !important;
+  border-radius: 6px;
+}
+
+/* Light theme syntax colors for reasoning stepper */
+:root .step-expanded-content.markdown-content :deep(.hljs-keyword) { 
+  color: #d73a49; 
+  font-weight: 600;
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-string) { 
+  color: #22863a; 
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-comment) { 
+  color: #6a737d; 
+  font-style: italic;
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-function) { 
+  color: #6f42c1; 
+  font-weight: 600;
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-number) { 
+  color: #005cc5; 
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-variable) { 
+  color: #e36209; 
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-title) { 
+  color: #6f42c1; 
+  font-weight: 600;
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-attr) { 
+  color: #005cc5; 
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-built_in) { 
+  color: #d73a49; 
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-literal) { 
+  color: #005cc5; 
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-meta) { 
+  color: #6a737d; 
+}
+
+:root .step-expanded-content.markdown-content :deep(.hljs-tag) { 
+  color: #22863a; 
+}
+
+/* Dark theme syntax colors for reasoning stepper */
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-keyword) { 
+  color: #ff6b6b; 
+  font-weight: 600;
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-string) { 
+  color: #51cf66; 
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-comment) { 
+  color: #868e96; 
+  font-style: italic;
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-function) { 
+  color: #74c0fc; 
+  font-weight: 600;
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-number) { 
+  color: #ffd43b; 
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-variable) { 
+  color: #ff8cc8; 
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-title) { 
+  color: #74c0fc; 
+  font-weight: 600;
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-attr) { 
+  color: #ffd43b; 
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-built_in) { 
+  color: #ff6b6b; 
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-literal) { 
+  color: #ffd43b; 
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-meta) { 
+  color: #868e96; 
+}
+
+[data-theme="dark"] .step-expanded-content.markdown-content :deep(.hljs-tag) { 
+  color: #51cf66; 
+}
+
+/* Task Lists - Enhanced with proper styling */
+.step-expanded-content.markdown-content :deep(.task-list-item) {
+  list-style: none;
+  margin: 2px 0;
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding-left: 0;
+}
+
+.step-expanded-content.markdown-content :deep(.task-list-item-checkbox) {
+  margin: 0;
+  margin-top: 1px;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--accent-primary);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.step-expanded-content.markdown-content :deep(.task-list-item-checkbox:checked + .task-list-item-label) {
+  text-decoration: line-through;
+  opacity: 0.7;
+  color: var(--text-secondary);
+}
+
+.step-expanded-content.markdown-content :deep(.task-list-item-label) {
+  flex: 1;
+  line-height: 1.4;
+  cursor: pointer;
+  font-size: 12px;
+}
+
+/* Task list container */
+.step-expanded-content.markdown-content :deep(ul.contains-task-list) {
+  padding-left: 0;
+}
+
+.step-expanded-content.markdown-content :deep(ul.contains-task-list li) {
+  list-style: none;
+}
+
+/* Legacy support for basic checkbox syntax */
+.step-expanded-content.markdown-content :deep(input[type="checkbox"]) {
+  margin-right: 6px;
+  accent-color: var(--accent-primary);
 }
 
 </style>

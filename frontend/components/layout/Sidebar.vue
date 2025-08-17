@@ -50,11 +50,16 @@
 
 <style scoped>
 .sidebar {
+  position: fixed;
+  top: 0;
+  left: 0;
   width: 260px;
+  height: 100vh;
   background: var(--bg-secondary);
   border-right: 1px solid var(--border-primary);
   display: flex;
   flex-direction: column;
+  z-index: 50;
 }
 
 .sidebar-header {
