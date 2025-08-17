@@ -10,7 +10,7 @@
   </span>
 </template>
 
-<script setup>
+<script setup lang="ts">
 interface Props {
   variant?: 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'error'
   size?: 'sm' | 'md' | 'lg'

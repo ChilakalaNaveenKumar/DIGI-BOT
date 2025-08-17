@@ -17,6 +17,26 @@ export default defineNuxtConfig({
 
   css: ['~/assets/css/main.css'],
 
+  // Component auto-import configuration with prefixes
+  components: [
+    {
+      path: '~/components/ui',
+      prefix: 'Ui'
+    },
+    {
+      path: '~/components/layout',
+      prefix: 'Layout'
+    },
+    {
+      path: '~/components/chat',
+      prefix: ''
+    },
+    {
+      path: '~/components',
+      prefix: ''
+    }
+  ],
+
   vite: {
     plugins: [tailwindcss()]
   },

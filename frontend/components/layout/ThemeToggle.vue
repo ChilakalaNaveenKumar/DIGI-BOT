@@ -1,17 +1,17 @@
 <template>
-  <Toggle
+  <UiToggle
     :model-value="isDark"
     @update:model-value="toggleTheme"
     label="Theme"
-    on-label="Dark"
-    off-label="Light"
-    on-icon="moon"
-    off-icon="sun"
+    :on-label="'Dark'"
+    :off-label="'Light'"
+    :on-icon="'lucide:moon'"
+    :off-icon="'lucide:sun'"
     size="md"
   />
 </template>
 
-<script setup>
+<script setup lang="ts">
 const { theme, toggleTheme, isDark } = useTheme()
 </script>
 

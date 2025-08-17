@@ -6,7 +6,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 interface Props {
   size?: 'sm' | 'md' | 'lg'
 }

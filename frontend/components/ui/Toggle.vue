@@ -12,13 +12,13 @@
   >
     <div class="toggle-track">
       <div class="toggle-thumb">
-        <Icon 
+        <UiIcon 
           v-if="onIcon && modelValue"
           :name="onIcon" 
           :size="iconSize"
           class="toggle-icon"
         />
-        <Icon 
+        <UiIcon 
           v-else-if="offIcon && !modelValue"
           :name="offIcon" 
           :size="iconSize"
@@ -33,7 +33,7 @@
   </button>
 </template>
 
-<script setup>
+<script setup lang="ts">
 interface Props {
   modelValue: boolean
   size?: 'sm' | 'md' | 'lg'

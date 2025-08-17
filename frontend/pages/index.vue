@@ -4,8 +4,8 @@
   </div>
 </template>
 
-<script setup>
-// Main chat page
+<script setup lang="ts">
+// All chat logic is now handled in ChatContainer
 </script>
 
 <style scoped>

@@ -1,16 +1,16 @@
 <template>
   <div class="app-root" :data-theme="theme">
     <div class="app-container">
-      <Sidebar />
+      <LayoutSidebar />
       <main class="main-content">
-        <Header />
+        <LayoutHeader />
         <NuxtPage />
       </main>
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 // Initialize theme system
 const { theme } = useTheme()
 

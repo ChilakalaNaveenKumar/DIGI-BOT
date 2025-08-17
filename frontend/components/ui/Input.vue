@@ -38,12 +38,12 @@
     />
     
     <div v-if="icon" class="input-icon">
-      <Icon :name="icon" :size="iconSize" />
+      <UiIcon :name="icon" :size="iconSize" />
     </div>
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 interface Props {
   modelValue?: string
   type?: 'text' | 'email' | 'password' | 'textarea'

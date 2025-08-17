@@ -3,15 +3,15 @@
     <div class="sidebar-header">
       <div class="logo-section">
         <div class="logo-icon">
-          <Icon name="cpu" :size="20" />
+          <UiIcon name="lucide:cpu" :size="20" />
         </div>
         <h1 class="logo-text">Claude</h1>
       </div>
       
-      <Button variant="ghost" size="sm" class="new-chat-btn">
-        <Icon name="plus" :size="16" />
+      <UiButton variant="ghost" size="sm" class="new-chat-btn">
+        <UiIcon name="lucide:plus" :size="16" />
         New chat
-      </Button>
+      </UiButton>
     </div>
     
     <nav class="sidebar-nav">
@@ -19,15 +19,15 @@
         <h2 class="nav-title">Recents</h2>
         <div class="nav-items">
           <a href="#" class="nav-item active">
-            <Icon name="message-circle" class="nav-icon" :size="16" />
+            <UiIcon name="lucide:message-circle" class="nav-icon" :size="16" />
             Coffee and Claude time?
           </a>
           <a href="#" class="nav-item">
-            <Icon name="message-circle" class="nav-icon" :size="16" />
+            <UiIcon name="lucide:message-circle" class="nav-icon" :size="16" />
             AI Frontend Architecture
           </a>
           <a href="#" class="nav-item">
-            <Icon name="message-circle" class="nav-icon" :size="16" />
+            <UiIcon name="lucide:message-circle" class="nav-icon" :size="16" />
             Project Knowledge Flow
           </a>
         </div>
@@ -35,16 +35,16 @@
     </nav>
     
     <div class="sidebar-footer">
-      <ThemeToggle />
+      <LayoutThemeToggle />
       <div class="user-section">
-        <Avatar initials="NK" variant="primary" size="sm" />
+        <UiAvatar initials="NK" variant="primary" size="sm" />
         <span class="user-name">Naveen Kumar</span>
       </div>
     </div>
   </aside>
 </template>
 
-<script setup>
+<script setup lang="ts">
 // Sidebar logic
 </script>
 

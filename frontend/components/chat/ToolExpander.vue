@@ -2,12 +2,12 @@
   <div class="tool-expander" v-if="tools && tools.length > 0">
     <div class="tool-header" @click="toggleExpanded">
       <div class="tool-info">
-        <Icon name="cpu" :size="16" class="tool-icon" />
+        <UiIcon name="lucide:cpu" :size="16" class="tool-icon" />
         <span class="tool-title">Tools Used</span>
         <span class="tool-count">({{ tools.length }})</span>
       </div>
-      <Icon 
-        name="chevron-down" 
+      <UiIcon 
+        name="lucide:chevron-down" 
         :size="16" 
         class="expand-icon"
         :class="{ 'expand-icon--rotated': isExpanded }"
@@ -17,9 +17,9 @@
     <div v-if="isExpanded" class="tool-content">
       <div v-for="tool in tools" :key="tool.id" class="tool-item">
         <div class="tool-item-header">
-          <Icon :name="tool.icon || 'cpu'" :size="14" />
+          <UiIcon :name="tool.icon || 'lucide:cpu'" :size="14" />
           <span class="tool-name">{{ tool.name }}</span>
-          <Badge 
+          <UiBadge 
             :variant="tool.status === 'completed' ? 'success' : tool.status === 'error' ? 'error' : 'warning'"
             size="sm"
           >
@@ -34,7 +34,7 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 interface Tool {
   id: string
   name: string

@@ -1,15 +1,26 @@
 <template>
   <header class="header">
     <div class="header-content">
-      <h1 class="header-title">Coffee and Claude time?</h1>
+      <div class="header-left">
+        <h1 class="header-title">Claude</h1>
+        <UiBadge variant="success" size="sm">Ready</UiBadge>
+      </div>
+      
       <div class="header-actions">
-        <!-- Additional header actions can go here -->
+        <div class="model-selector">
+          <UiIcon name="lucide:cpu" :size="14" />
+          <span class="model-label">Sonnet 4</span>
+        </div>
+        
+        <UiButton variant="ghost" size="sm">
+          <UiIcon name="lucide:settings" :size="16" />
+        </UiButton>
       </div>
     </div>
   </header>
 </template>
 
-<script setup>
+<script setup lang="ts">
 // Header logic
 </script>
 
@@ -17,17 +28,30 @@
 .header {
   background: var(--bg-primary);
   border-bottom: 1px solid var(--border-primary);
-  padding: 16px 24px;
+  padding: 0 24px;
+  height: 60px;
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
 }
 
 .header-content {
   display: flex;
   align-items: center;
   justify-content: space-between;
+  width: 100%;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .header-title {
-  font-size: 20px;
+  font-size: 18px;
   font-weight: 600;
   color: var(--text-primary);
   margin: 0;
@@ -36,6 +60,27 @@
 .header-actions {
   display: flex;
   align-items: center;
-  gap: 12px;
+  gap: 16px;
+}
+
+.model-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 12px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  transition: all 0.2s ease;
+}
+
+.model-selector:hover {
+  background: var(--bg-tertiary);
+}
+
+.model-label {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text-primary);
 }
 </style>

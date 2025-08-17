@@ -9,12 +9,12 @@
     :disabled="disabled || loading"
     v-bind="$attrs"
   >
-    <Icon v-if="loading" name="loader" class="btn__spinner" />
+    <UiIcon v-if="loading" name="lucide:loader" class="btn__spinner" />
     <slot />
   </button>
 </template>
 
-<script setup>
+<script setup lang="ts">
 interface Props {
   variant?: 'primary' | 'secondary' | 'ghost' | 'outline'
   size?: 'sm' | 'md' | 'lg'
