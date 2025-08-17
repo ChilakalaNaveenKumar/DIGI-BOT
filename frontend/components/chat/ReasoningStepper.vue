@@ -134,8 +134,8 @@ const formatResult = (result: any) => {
 .stepper-line {
   position: absolute;
   left: 25px;
-  top: 0;
-  bottom: 0;
+  top: 22px;
+  bottom: 22px;
   width: 2px;
   background: var(--border-primary);
   border-radius: 1px;
