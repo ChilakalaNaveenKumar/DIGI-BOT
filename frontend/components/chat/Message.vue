@@ -76,6 +76,38 @@
             />
           </div>
           
+          <!-- Generated Components -->
+          <div v-if="message.components && message.components.length > 0" class="components-section">
+            <div class="components-header">
+              <UiIcon name="lucide:bar-chart-3" :size="14" />
+              <span>Generated Components ({{ message.components.length }})</span>
+            </div>
+            <div class="components-list">
+              <div
+                v-for="(component, index) in message.components"
+                :key="`component-${index}`"
+                class="generated-component"
+              >
+                <div class="component-info">
+                  <div class="component-meta">
+                    <UiBadge variant="secondary" size="sm">
+                      {{ component.type }}
+                    </UiBadge>
+                    <span class="component-confidence">
+                      {{ (component.confidence * 100).toFixed(1) }}% confidence
+                    </span>
+                  </div>
+                </div>
+                <div class="component-preview">
+                  <EnhancedComponentRenderer
+                    :component-type="component.type"
+                    :markdown="component.markdown"
+                  />
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- Tool Calls -->
           <div v-if="message.toolCalls && message.toolCalls.length > 0" class="tools-section">
             <div v-for="toolCall in message.toolCalls" :key="toolCall.id" class="tool-call">
@@ -274,6 +306,78 @@ const getToolStatus = (status?: string) => {
 
 .message-text {
   margin-bottom: 8px;
+}
+
+/* Generated Components */
+.components-section {
+  margin: 12px 0;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.components-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+}
+
+.components-list {
+  padding: 8px;
+}
+
+.generated-component {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.generated-component:last-child {
+  margin-bottom: 0;
+}
+
+.component-info {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.component-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.component-confidence {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: monospace;
+}
+
+.component-preview {
+  background: var(--bg-code);
+}
+
+.component-markdown {
+  padding: 12px;
+}
+
+.component-code {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-code);
+  background: none;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', Consolas, 'Courier New', monospace;
 }
 
 /* Tool calls */

@@ -1,3 +1,6 @@
+/* Import Tailwind CSS v4 */
+@import "./tailwind.css";
+
 /* Base styles and resets */
 * {
   box-sizing: border-box;

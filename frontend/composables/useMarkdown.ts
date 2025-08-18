@@ -126,6 +126,7 @@ export const useMarkdown = () => {
   }
 
   return {
+    md,
     render
   }
 }

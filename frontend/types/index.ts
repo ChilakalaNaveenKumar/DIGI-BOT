@@ -16,6 +16,12 @@ export interface ReasoningStep {
   preview?: string
 }
 
+export interface GeneratedComponent {
+  type: string
+  markdown: string
+  confidence: number
+}
+
 export interface Message {
   id: number
   content: string
@@ -26,6 +32,7 @@ export interface Message {
   reasoning?: string
   reasoningSteps?: ReasoningStep[]
   toolCalls?: ToolCall[]
+  components?: GeneratedComponent[]
   error?: string
 }
 

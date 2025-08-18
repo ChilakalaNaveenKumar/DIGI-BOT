@@ -24,6 +24,10 @@ export default defineNuxtConfig({
       prefix: 'Ui'
     },
     {
+      path: '~/components/enhanced',
+      prefix: 'Enhanced'
+    },
+    {
       path: '~/components/layout',
       prefix: 'Layout'
     },

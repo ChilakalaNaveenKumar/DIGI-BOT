@@ -29,7 +29,7 @@ from app.core.middleware import (
     RateLimitMiddleware,
     setup_middleware,
 )
-from app.routers import ai_chat, vision, audio, tools, search, multimodal_chat, advanced_features
+from app.routers import ai_chat, vision, audio, tools, search, multimodal_chat, advanced_features, component_analysis
 
 # Initialize settings
 settings = get_settings()
@@ -212,6 +212,7 @@ def create_application() -> FastAPI:
     app.include_router(ai_chat.router, prefix="/api/v1/chat", tags=["AI Chat"])
     app.include_router(multimodal_chat.router, prefix="/api/v1", tags=["Multimodal Chat"])
     app.include_router(advanced_features.router, prefix="/api/v1", tags=["Advanced Features"])
+    app.include_router(component_analysis.router, prefix="/api/v1/components", tags=["Component Analysis"])
     app.include_router(vision.router, prefix="/api/v1", tags=["Vision"])
     app.include_router(audio.router, prefix="/api/v1", tags=["Audio"])
     app.include_router(tools.router, prefix="/api/v1", tags=["Tools"])

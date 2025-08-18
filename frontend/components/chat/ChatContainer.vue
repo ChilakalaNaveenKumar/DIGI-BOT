@@ -53,16 +53,24 @@
       
       <!-- Fixed Input at bottom when in chat mode -->
       <div class="chat-input-area-fixed">
-        <UiClaudeInput
-          :loading="isLoading"
-          placeholder="Reply to Claude..."
-          @send="handleSend"
-          @add="handleAdd"
-          @options="handleOptions"
-          @research="handleResearch"
-          @upload="handleUpload"
-          @model-select="handleModelSelect"
-        />
+        <div class="input-with-status">
+          <UiClaudeInput
+            :loading="isLoading || isStreaming"
+            placeholder="Reply to Claude..."
+            @send="handleSend"
+            @add="handleAdd"
+            @options="handleOptions"
+            @research="handleResearch"
+            @upload="handleUpload"
+            @model-select="handleModelSelect"
+          />
+          
+          <!-- Analysis Status Indicator -->
+          <div v-if="isAnalyzing" class="analysis-status">
+            <UiIcon name="lucide:bar-chart-3" :size="12" class="analysis-icon" />
+            <span class="analysis-text">Analyzing for components...</span>
+          </div>
+        </div>
       </div>
     </div>
   </div>
@@ -75,7 +83,7 @@ interface ExamplePrompt {
   icon: string
 }
 
-const { messages, isLoading, sendMessage } = useChat()
+const { messages, isLoading, isStreaming, isAnalyzing, sendMessage } = useSmartStreamingChat()
 const messagesArea = ref()
 
 const examplePrompts: ExamplePrompt[] = [
@@ -272,6 +280,43 @@ watch(messages, () => {
     padding: 0 24px;
     margin: 0 auto;
   }
+}
+
+/* Analysis Status */
+.input-with-status {
+  position: relative;
+}
+
+.analysis-status {
+  position: absolute;
+  top: -24px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-primary);
+  border-radius: 12px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  backdrop-filter: blur(8px);
+  z-index: 10;
+}
+
+.analysis-icon {
+  color: var(--accent-primary);
+  animation: pulse 2s infinite;
+}
+
+.analysis-text {
+  white-space: nowrap;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 0.7; }
+  50% { opacity: 1; }
 }
 
 /* Medium screens - better transition */

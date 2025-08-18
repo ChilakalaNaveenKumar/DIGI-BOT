@@ -1,12 +1,30 @@
 <template>
   <div class="streaming-markdown" :class="{ 'streaming-mode': isStreaming }">
-    <!-- Simple streaming content -->
-    <div class="markdown-content" v-html="renderedContent"></div>
+    <!-- Enhanced streaming content with component support -->
+    <div class="markdown-content">
+      <component 
+        :is="'div'" 
+        v-for="(part, index) in contentParts" 
+        :key="`part-${index}`"
+        class="content-part"
+      >
+        <!-- Regular markdown content -->
+        <div v-if="part.type === 'markdown'" v-html="render(part.content || '')" />
+        
+        <!-- Inline component -->
+        <div v-else-if="part.type === 'component'" class="inline-component-wrapper">
+          <EnhancedComponentRenderer
+            :component-type="part.componentType || ''"
+            :markdown="part.markdown || ''"
+          />
+        </div>
+      </component>
+    </div>
     
     <!-- Streaming indicator -->
     <div v-if="isStreaming && showStreamingIndicator" class="streaming-indicator">
       <div class="streaming-dots">
-        <span></span><span></span><span></span>
+        <span /><span /><span />
       </div>
       <span class="streaming-text">Generating...</span>
     </div>
@@ -17,11 +35,11 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed, watch, nextTick } from 'vue'
+import { computed, watch, nextTick } from 'vue'
 import { useMarkdown } from '~/composables/useMarkdown'
 
 interface Props {
-  content: string
+  content?: string
   isStreaming?: boolean
   showCursor?: boolean
   showStreamingIndicator?: boolean
@@ -34,7 +52,7 @@ interface Props {
 interface Emits {
   'content-updated': []
   'streaming-complete': []
-  'block-completed': [block: any]
+  'block-completed': [block: unknown]
 }
 
 const props = withDefaults(defineProps<Props>(), {
@@ -52,10 +70,58 @@ const emit = defineEmits<Emits>()
 
 const { render } = useMarkdown()
 
-// Simple reactive content rendering
-const renderedContent = computed(() => {
-  if (!props.content) return ''
-  return render(props.content)
+// Parse content into markdown and component parts
+const contentParts = computed(() => {
+  if (!props.content) return []
+  
+  const parts = []
+  const componentRegex = /:::(\w+(?:-\w+)*)\s*\n([\s\S]*?)\n:::/g
+  let lastIndex = 0
+  let match
+  
+  while ((match = componentRegex.exec(props.content || '')) !== null) {
+    // Add markdown content before component
+    if ((match.index || 0) > lastIndex) {
+      const markdownContent = (props.content || '').substring(lastIndex, match.index).trim()
+      if (markdownContent) {
+        parts.push({
+          type: 'markdown',
+          content: markdownContent
+        })
+      }
+    }
+    
+    // Add component part
+    parts.push({
+      type: 'component',
+      componentType: match[1],
+      markdown: match[0], // Full component markdown including :::
+      data: match[2]?.trim() || ''
+    })
+    
+    lastIndex = (match.index || 0) + match[0].length
+  }
+  
+  // Add remaining markdown content
+  if (lastIndex < (props.content || '').length) {
+    const remainingContent = (props.content || '').substring(lastIndex).trim()
+    if (remainingContent) {
+      parts.push({
+        type: 'markdown',
+        content: remainingContent
+      })
+    }
+  }
+  
+  // If no components found, return all as markdown
+  if (parts.length === 0) {
+    return [{
+      type: 'markdown',
+      content: props.content || ''
+    }]
+  }
+  
+  return parts
 })
 
 const isStreaming = computed(() => props.isStreaming)
@@ -109,6 +175,18 @@ watch(() => props.isStreaming, (newStreaming, oldStreaming) => {
 .markdown-content {
   width: 100%;
   overflow-wrap: break-word;
+}
+
+.content-part {
+  margin-bottom: 0;
+}
+
+.inline-component-wrapper {
+  margin: 16px 0;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid var(--border-secondary);
+  background: var(--bg-secondary);
 }
 
 /* Streaming indicator */
