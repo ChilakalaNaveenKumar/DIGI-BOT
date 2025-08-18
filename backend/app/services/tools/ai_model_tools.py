@@ -46,6 +46,15 @@ class GPT5Tool(AIModelTool):
             max_tokens = request.get("max_tokens")
             tools = request.get("tools")
             
+            # Add system message for markdown formatting if not already present
+            if not any(msg.get("role") == "system" for msg in messages):
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful AI assistant. Always format your responses in markdown for better readability. Use headers, lists, code blocks, emphasis, and other markdown elements as appropriate."
+                    }
+                ] + messages
+            
             response = await self.provider.generate_completion(
                 messages=messages,
                 model=model,
@@ -88,23 +97,44 @@ class GPT5Tool(AIModelTool):
             max_tokens = request.get("max_tokens")
             tools = request.get("tools")
             
+            # Enable reasoning for GPT-5 and o1/o3 models (disabled by default)
+            reasoning_params = {}
+            if model in ["gpt-5", "gpt-5-mini", "gpt-5-nano", "o1", "o1-mini", "o1-preview", "o3", "o3-mini"]:
+                if request.get("enable_reasoning", False):
+                    reasoning_params["reasoning_effort"] = request.get("reasoning_effort", "medium")
+                    reasoning_params["reasoning_summary"] = request.get("reasoning_summary", "auto")
+            
             async for chunk in self.provider.stream_completion(
                 messages=messages,
                 model=model,
                 temperature=temperature,
                 max_tokens=max_tokens,
-                tools=tools
+                tools=tools,
+                **reasoning_params
             ):
-                yield {
-                    "type": "content",
-                    "content": chunk.get("content", ""),
-                    "metadata": {
-                        "model": model,
-                        "provider": "openai",
-                        "tool": "gpt5_tool"
-                    },
-                    "final": chunk.get("final", False)
-                }
+                # Forward reasoning content if present
+                if chunk.get("type") == "reasoning":
+                    yield {
+                        "type": "reasoning",
+                        "content": chunk.get("content", ""),
+                        "metadata": {
+                            "model": model,
+                            "provider": "openai",
+                            "tool": "gpt5_tool"
+                        },
+                        "final": False
+                    }
+                else:
+                    yield {
+                        "type": "content",
+                        "content": chunk.get("content", ""),
+                        "metadata": {
+                            "model": model,
+                            "provider": "openai",
+                            "tool": "gpt5_tool"
+                        },
+                        "final": chunk.get("final", False)
+                    }
                 
         except Exception as e:
             logger.error("GPT-5 streaming failed", error=str(e))
@@ -146,6 +176,15 @@ class GPT4Tool(AIModelTool):
             temperature = request.get("temperature", 0.7)
             max_tokens = request.get("max_tokens")
             tools = request.get("tools")
+            
+            # Add system message for markdown formatting if not already present
+            if not any(msg.get("role") == "system" for msg in messages):
+                messages = [
+                    {
+                        "role": "system",
+                        "content": "You are a helpful AI assistant. Always format your responses in markdown for better readability. Use headers, lists, code blocks, emphasis, and other markdown elements as appropriate."
+                    }
+                ] + messages
             
             response = await self.provider.generate_completion(
                 messages=messages,
@@ -293,6 +332,7 @@ class Grok4Tool(AIModelTool):
             max_tokens = request.get("max_tokens")
             tools = request.get("tools")
             enable_search = request.get("enable_search", True)
+            enable_thinking = request.get("enable_thinking", False)  # Disable thinking mode by default
             
             async for chunk in self.provider.stream_completion(
                 messages=messages,
@@ -300,7 +340,8 @@ class Grok4Tool(AIModelTool):
                 temperature=temperature,
                 max_tokens=max_tokens,
                 tools=tools,
-                enable_search=enable_search
+                enable_search=enable_search,
+                enable_thinking=enable_thinking
             ):
                 yield {
                     "type": "content",

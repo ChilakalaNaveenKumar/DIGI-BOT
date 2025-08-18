@@ -8,14 +8,14 @@
           <div class="avatar-container">
             <UiIcon name="lucide:sparkles" :size="24" class="sparkle-icon" />
           </div>
-          <h1 class="welcome-title">Coffee and Claude time?</h1>
+          <h1 class="welcome-title">Ready to create with Digi Setu?</h1>
         </div>
         
-        <!-- Main Input (Claude Style) -->
+        <!-- Main Input (Digi Setu Style) -->
         <div class="main-input">
-          <UiClaudeInput
-            :loading="isLoading"
-            @send="handleSend"
+                  <UiDigiSetuInput
+          :loading="isLoading"
+          @send="handleSend"
             @add="handleAdd"
             @options="handleOptions"
             @research="handleResearch"
@@ -54,9 +54,9 @@
       <!-- Fixed Input at bottom when in chat mode -->
       <div class="chat-input-area-fixed">
         <div class="input-with-status">
-          <UiClaudeInput
+          <UiDigiSetuInput
             :loading="isLoading || isStreaming"
-            placeholder="Reply to Claude..."
+            placeholder="Reply to Digi Setu..."
             @send="handleSend"
             @add="handleAdd"
             @options="handleOptions"
@@ -83,7 +83,42 @@ interface ExamplePrompt {
   icon: string
 }
 
-const { messages, isLoading, isStreaming, isAnalyzing, sendMessage } = useSmartStreamingChat()
+// Use Nuxt global state
+const { useDigiSetuSystem } = useSystemState()
+
+// Initialize both chat systems
+const mockChat = useSmartStreamingChat()
+const digiSetuChat = useDigiSetuChat()
+
+// Watch for system changes
+watch(useDigiSetuSystem, () => {
+  // System changed
+}, { immediate: true })
+
+// Reactive properties based on current system
+const messages = computed(() => {
+  return unref(useDigiSetuSystem.value ? digiSetuChat.messages : mockChat.messages)
+})
+
+const isLoading = computed(() => {
+  return unref(useDigiSetuSystem.value ? digiSetuChat.isLoading : mockChat.isLoading)
+})
+
+const isStreaming = computed(() => {
+  return unref(useDigiSetuSystem.value ? digiSetuChat.isStreaming : mockChat.isStreaming)
+})
+
+const isAnalyzing = computed(() => {
+  return unref(useDigiSetuSystem.value ? false : mockChat.isAnalyzing)
+})
+
+const sendMessage = (content: string) => {
+  if (useDigiSetuSystem.value) {
+    digiSetuChat.sendMessage(content)
+  } else {
+    mockChat.sendMessage(content)
+  }
+}
 const messagesArea = ref()
 
 const examplePrompts: ExamplePrompt[] = [

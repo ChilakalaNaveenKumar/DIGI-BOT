@@ -5,7 +5,7 @@
         <div class="logo-icon">
           <UiIcon name="lucide:cpu" :size="20" />
         </div>
-        <h1 class="logo-text">Claude</h1>
+        <h1 class="logo-text">Digi Setu</h1>
       </div>
       
       <UiButton variant="ghost" size="sm" class="new-chat-btn">
@@ -20,7 +20,7 @@
         <div class="nav-items">
           <a href="#" class="nav-item active">
             <UiIcon name="lucide:message-circle" class="nav-icon" :size="16" />
-            Coffee and Claude time?
+            Ready to create with Digi Setu?
           </a>
           <a href="#" class="nav-item">
             <UiIcon name="lucide:message-circle" class="nav-icon" :size="16" />

@@ -29,6 +29,7 @@ export interface Message {
   timestamp: Date
   isLoading?: boolean
   isStreaming?: boolean
+  isAnalyzing?: boolean
   reasoning?: string
   reasoningSteps?: ReasoningStep[]
   toolCalls?: ToolCall[]

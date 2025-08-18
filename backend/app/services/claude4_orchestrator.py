@@ -115,111 +115,140 @@ class Claude4Orchestrator:
             )
         
         try:
-            # Step 1: Show detailed reasoning like Claude
-            yield {
-                "type": "thinking",
-                "content": "I need to analyze this request carefully to understand what the user is asking for and determine the best approach.",
-                "metadata": {"step": "initial_analysis"}
-            }
-            
-            # Step 2: Claude 4 analyzes request and makes orchestration decision
-            yield {
-                "type": "activity",
-                "content": "🧠 Analyzing request and planning tool usage...",
-                "metadata": {"step": "analysis"}
-            }
-            
             decision = await self._make_orchestration_decision(
                 user_message, conversation_history, user_preferences, files
             )
             
-            # Step 3: Show reasoning behind tool selection
-            yield {
-                "type": "reasoning",
-                "content": f"**My Analysis:** {decision.reasoning}",
-                "metadata": {"step": "reasoning_display", "confidence": decision.confidence}
-            }
+            # Let AI models provide their own natural thinking/reasoning
             
-            yield {
-                "type": "activity", 
-                "content": f"🎯 Selected tools: {', '.join(decision.selected_tools)}",
-                "metadata": {"step": "tool_selection", "tools": decision.selected_tools}
-            }
+           
             
             # Step 2: Execute selected tools according to plan
             tool_results = {}
             for step in decision.execution_plan:
+                logger.info(f"Processing execution step: {step}")
                 tool_name = step["tool"]
-                tool_request = step["request"]
+                tool_request = step.get("request", {})
+                logger.info(f"Tool name: {tool_name}, Tool request: {tool_request}")
                 
-                yield {
-                    "type": "activity",
-                    "content": f"⚡ Executing {tool_name}...",
-                    "metadata": {"step": "tool_execution", "tool": tool_name}
+                # Only show execution for complex tasks, hide for simple conversations
+                if any(word in user_message.lower() for word in ['generate', 'create', 'analyze', 'chart', 'audio', 'image']):
+                    friendly_name = tool_name.replace('_tool', '').replace('_', ' ').title()
+        
+                
+                # Handle Claude direct responses
+                if tool_name == "claude_direct":
+                    # Claude responds directly without external tools - enable reasoning
+                    message = tool_request.get("message", user_message)
+                    
+                    # Stream Claude direct response with reasoning
+                    accumulated_content = ""
+                    async for chunk in self._claude_direct_response_stream(
+                        message, conversation_history, enable_reasoning=True
+                    ):
+                        # Only accumulate content chunks, not reasoning chunks
+                        if chunk.get("type") == "content":
+                            accumulated_content += chunk.get("content", "")
+                        yield chunk  # Stream reasoning and content chunks in real-time
+                    
+                    tool_results[tool_name] = accumulated_content
+                    continue
+                
+                # Execute tool - handle name mapping
+                # Map Claude's tool names to actual registered names
+                tool_name_mapping = {
+                    "gpt5": "gpt5_tool",
+                    "gpt4": "gpt4_tool", 
+                    "grok4": "grok4_tool",
+                    "claude_opus_4_1": "claude_direct",
+                    "image_generation": "image_generation_tool",
+                    "image_analysis": "image_analysis_tool",
+                    "audio_generation": "audio_generation_tool",
+                    "audio_transcription": "audio_transcription_tool"
                 }
                 
-                # Execute tool
-                tool = self.tool_registry.get_tool(tool_name)
+                actual_tool_name = tool_name_mapping.get(tool_name, tool_name)
+                tool = self.tool_registry.get_tool(actual_tool_name)
                 if not tool:
-                    logger.error(f"Tool {tool_name} not found")
+                    logger.error(f"Tool {actual_tool_name} (mapped from {tool_name}) not found")
                     continue
                 
                 # Prepare tool context with user info
                 tool_context = {
                     "user_id": user_id,
                     "db": db,
-                    "conversation_history": conversation_history,
-                    "user_preferences": user_preferences
+                    "conversation_history": conversation_history or [],
+                    "user_preferences": user_preferences or {}
                 }
                 
                 # Stream or execute tool based on capabilities
-                if tool.get_capabilities().supports_streaming and decision.requires_streaming:
-                    accumulated_content = ""
-                    async for chunk in tool.stream_execute(tool_request, tool_context):
-                        # Accumulate content
-                        chunk_content = chunk.get("content", "")
-                        accumulated_content += chunk_content
+                try:
+                    logger.info(f"Executing tool {tool_name} with request: {tool_request}")
+                    capabilities = tool.get_capabilities()
+                    if capabilities and capabilities.supports_streaming and decision.requires_streaming:
+                        accumulated_content = ""
+                        async for chunk in tool.stream_execute(tool_request, tool_context):
+                            # Accumulate content
+                            chunk_content = chunk.get("content", "")
+                            accumulated_content += chunk_content
+                            
+                            # Forward tool output with metadata
+                            yield {
+                                "type": "tool_output",
+                                "content": chunk_content,
+                                "metadata": {
+                                    **chunk.get("metadata", {}),
+                                    "source_tool": tool_name,
+                                    "step": "tool_streaming"
+                                },
+                                "final": chunk.get("final", False)
+                            }
+                            
+                            # Store final result for synthesis when streaming is complete
+                            if chunk.get("final", False):
+                                tool_results[tool_name] = accumulated_content
                         
-                        # Forward tool output with metadata
-                        yield {
-                            "type": "tool_output",
-                            "content": chunk_content,
-                            "metadata": {
-                                **chunk.get("metadata", {}),
-                                "source_tool": tool_name,
-                                "step": "tool_streaming"
-                            },
-                            "final": chunk.get("final", False)
-                        }
-                        
-                        # Store final result for synthesis when streaming is complete
-                        if chunk.get("final", False):
+                        # Ensure we store the result even if no final chunk was sent
+                        if tool_name not in tool_results:
                             tool_results[tool_name] = accumulated_content
-                    
-                    # Ensure we store the result even if no final chunk was sent
-                    if tool_name not in tool_results:
-                        tool_results[tool_name] = accumulated_content
-                else:
-                    result = await tool.execute(tool_request, tool_context)
-                    tool_results[tool_name] = result.content
-                    
-                    yield {
-                        "type": "tool_output",
-                        "content": result.content,
-                        "metadata": {
-                            **result.metadata,
-                            "source_tool": tool_name,
-                            "step": "tool_execution"
-                        },
-                        "final": True
-                    }
+                    else:
+                        logger.info(f"About to execute non-streaming tool {tool_name} with request: {tool_request}")
+                        result = await tool.execute(tool_request, tool_context)
+                        
+                        if result and result.success:
+                            tool_results[tool_name] = result.content
+                            
+                            yield {
+                                "type": "tool_output",
+                                "content": result.content,
+                                "metadata": {
+                                    **(result.metadata or {}),
+                                    "source_tool": tool_name,
+                                    "step": "tool_execution"
+                                },
+                                "final": True
+                            }
+                        else:
+                            error_msg = result.error if result else "Unknown error"
+                            tool_results[tool_name] = f"Tool execution failed: {error_msg}"
+                            logger.error(f"Tool {tool_name} execution failed: {error_msg}")
+                            
+                            yield {
+                                "type": "tool_output",
+                                "content": f"Tool execution failed: {error_msg}",
+                                "metadata": {
+                                    "source_tool": tool_name,
+                                    "step": "tool_execution",
+                                    "error": True
+                                },
+                                "final": True
+                            }
+                except Exception as e:
+                    logger.error(f"Tool execution failed for {tool_name}: {e}")
+                    tool_results[tool_name] = f"Tool execution failed: {str(e)}"
             
             # Step 3: Claude 4 synthesizes results into final response
-            yield {
-                "type": "activity",
-                "content": "🎨 Claude 4 synthesizing final response...",
-                "metadata": {"step": "synthesis"}
-            }
+            # Final response ready
             
             async for chunk in self._synthesize_response(
                 user_message, decision, tool_results, conversation_history
@@ -243,7 +272,44 @@ class Claude4Orchestrator:
     ) -> OrchestrationDecision:
         """Claude 4 analyzes request and decides which tools to use."""
         
-        # Analyze the request to determine appropriate tools
+        # Actually use Claude 4 to make real decisions
+        logger.info(f"Making orchestration decision for: {user_message}")
+        if self.claude4_provider:
+            try:
+                decision_prompt = self._build_decision_prompt(user_message, files, user_preferences)
+                logger.info(f"Decision prompt built, calling Claude...")
+                
+                response = await self.claude4_provider.generate_completion(
+                    messages=[{"role": "user", "content": decision_prompt}],
+                    model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1 for decisions
+                    max_tokens=4096,  # Reasonable limit for decision making
+                    temperature=self.decision_temperature
+                )
+                
+                logger.info(f"Claude decision response: {response}")
+                
+                # Parse Claude's decision - handle Anthropic response format
+                decision_text = ""
+                if isinstance(response, dict) and 'content' in response:
+                    content = response['content']
+                    if content and isinstance(content, list) and len(content) > 0:
+                        decision_text = content[0].get('text', '') if isinstance(content[0], dict) else str(content[0])
+                elif hasattr(response, 'content') and response.content:
+                    decision_text = response.content[0].text if response.content else ""
+                
+                logger.info(f"Parsed decision text: {decision_text[:200]}...")
+                result = self._parse_claude_decision(decision_text, user_message)
+                logger.info(f"Final orchestration decision: {result}")
+                return result
+                
+            except Exception as e:
+                logger.error(f"Claude decision-making failed: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                # Fallback to simple logic
+                pass
+        
+        # Fallback: Simple keyword-based logic (what we had before)
         user_lower = user_message.lower()
         file_types = []
         if files:
@@ -308,7 +374,7 @@ class Claude4Orchestrator:
             })
         
         # Check for image generation requests
-        elif any(word in user_lower for word in ['generate image', 'create image', 'draw', 'image of', 'picture of']):
+        elif any(word in user_lower for word in ['generate image', 'create image', 'draw', 'image', 'picture', 'generate a', 'random image']):
             selected_tools.append("image_generation_tool")
             reasoning_parts.append("Image generation needed to create visual content")
             execution_plan.append({
@@ -321,43 +387,20 @@ class Claude4Orchestrator:
                 }
             })
         
-        # Check for current events/search requests
-        elif any(word in user_lower for word in ['recent', 'current', 'latest', 'news', 'today', 'now', 'developments']):
-            selected_tools.append("grok4_tool")
-            reasoning_parts.append("Current information needed - using Grok-4 with real-time search")
-            execution_plan.append({
-                "tool": "grok4_tool",
-                "request": {
-                    "messages": [{"role": "user", "content": user_message}],
-                    "model": "grok-4",
-                    "enable_search": True,
-                    "temperature": 0.7
-                }
-            })
+        # Note: Search requests now handled by Claude's built-in search - no external tool needed
         
-        # Check for complex reasoning/analysis requests
-        elif any(word in user_lower for word in ['analyze', 'complex', 'reasoning', 'advanced', 'trends', 'patterns']):
-            selected_tools.append("gpt5_tool")
-            reasoning_parts.append("Complex analysis requires GPT-5's advanced reasoning capabilities")
-            execution_plan.append({
-                "tool": "gpt5_tool",
-                "request": {
-                    "messages": [{"role": "user", "content": user_message}],
-                    "model": "gpt-5",
-                    "temperature": 0.7
-                }
-            })
+        # Note: Analysis and reasoning now handled by Claude directly - it's very capable
         
-        # Default to GPT-4 for general conversation
+        # Default: Let Claude handle everything it can (including search, analysis, explanations)
+        # Only use external tools for things Claude CANNOT do (generate images, audio, etc.)
         else:
-            selected_tools.append("gpt4_tool")
-            reasoning_parts.append("General conversation - using GPT-4 for reliable assistance")
+            selected_tools.append("claude_direct")
+            reasoning_parts.append("Using Claude's built-in capabilities (including search, analysis, and knowledge)")
             execution_plan.append({
-                "tool": "gpt4_tool",
+                "tool": "claude_direct",
                 "request": {
-                    "messages": [{"role": "user", "content": user_message}],
-                    "model": "gpt-4o",
-                    "temperature": 0.7
+                    "message": user_message,
+                    "conversation_history": conversation_history
                 }
             })
         
@@ -392,20 +435,343 @@ class Claude4Orchestrator:
             }
             return
         
-        # If only one tool was used and it was streaming, we might already have the final response
+        # If only one tool was used and it was streaming, content was already streamed
         if len(tool_results) == 1 and decision.requires_streaming:
-            tool_name = list(tool_results.keys())[0]
+            # Content was already streamed in real-time, just send completion marker
             yield {
-                "type": "content",
-                "content": tool_results[tool_name],
+                "type": "complete",
+                "content": "Response completed",
                 "metadata": {
                     "orchestrator": "claude4",
-                    "tools_used": decision.selected_tools,
-                    "reasoning": decision.reasoning
+                    "tools_used": decision.selected_tools
                 },
                 "final": True
             }
             return
+    
+    async def _claude_direct_response(
+        self, 
+        message: str, 
+        conversation_history: Optional[List[Dict[str, Any]]] = None,
+        enable_reasoning: bool = False
+    ) -> str:
+        """Handle direct Claude responses without external tools."""
+        
+        # Use the actual Claude 4 provider for real responses
+        logger.info(f"Claude provider available: {self.claude4_provider is not None}")
+        if self.claude4_provider:
+            try:
+                # Add system message to encourage markdown formatting
+                messages = [
+                    {
+                        "role": "system", 
+                        "content": "You are a helpful AI assistant. Always format your responses in markdown for better readability. Use headers, lists, code blocks, emphasis, and other markdown elements as appropriate."
+                    },
+                    {"role": "user", "content": message}
+                ]
+                
+                # Add conversation history if available
+                if conversation_history:
+                    formatted_history = []
+                    for msg in conversation_history[-5:]:  # Last 5 messages for context
+                        formatted_history.append({
+                            "role": msg.get("role", "user"),
+                            "content": msg.get("content", "")
+                        })
+                    # Insert history before the current message
+                    messages = [messages[0]] + formatted_history + [messages[1]]
+                
+                logger.info(f"Calling Claude with messages: {messages}")
+                
+                # Use streaming with reasoning if enabled
+                if enable_reasoning:
+                    full_response = ""
+                    reasoning_content = ""
+                    
+                    async for chunk in self.claude4_provider.stream_completion(
+                        messages=messages,
+                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1 with thinking
+                        max_tokens=16000,  # Production-ready: 16K max + 4K thinking = 20K total
+                        enable_reasoning=True,
+                        reasoning_budget=4000  # Larger budget for complex reasoning
+                    ):
+                        if chunk.get("type") == "reasoning":
+                            reasoning_content += chunk.get("content", "")
+                        elif chunk.get("type") == "content":
+                            full_response += chunk.get("content", "")
+                    
+                    # Return both reasoning and response
+                    if reasoning_content:
+                        return f"**Reasoning:**\n{reasoning_content}\n\n**Response:**\n{full_response}"
+                    else:
+                        return full_response
+                else:
+                    response = await self.claude4_provider.generate_completion(
+                        messages=messages,
+                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1
+                        max_tokens=16000,  # Production-ready limit that works
+                        temperature=0.7
+                    )
+                
+                logger.info(f"Claude response: {response}")
+                # Handle Anthropic response format (dict with 'content' array)
+                if isinstance(response, dict) and 'content' in response:
+                    content = response['content']
+                    if content and isinstance(content, list) and len(content) > 0:
+                        return content[0].get('text', '') if isinstance(content[0], dict) else str(content[0])
+                elif hasattr(response, 'content') and response.content:
+                    return response.content[0].text if response.content else "I'm here to help! How can I assist you?"
+                
+                return "I'm here to help! How can I assist you?"
+                
+            except Exception as e:
+                logger.error(f"Claude direct response failed: {e}")
+                import traceback
+                logger.error(f"Full traceback: {traceback.format_exc()}")
+                # Fallback to simple responses
+                pass
+        
+        # Fallback if Claude provider completely fails
+        return "I'm having trouble connecting to my AI capabilities right now. Please try again in a moment."
+    
+    async def _claude_direct_response_stream(
+        self,
+        message: str,
+        conversation_history: Optional[List[Dict[str, Any]]],
+        enable_reasoning: bool = False
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Get streaming response from Claude 4 with real-time reasoning chunks."""
+        
+        # Use the actual Claude 4 provider for real responses
+        logger.info(f"Claude provider available: {self.claude4_provider is not None}")
+        if self.claude4_provider:
+            try:
+                # Add system message to encourage markdown formatting
+                messages = [
+                    {
+                        "role": "system", 
+                        "content": "You are a helpful AI assistant. Always format your responses in markdown for better readability. Use headers, lists, code blocks, emphasis, and other markdown elements as appropriate."
+                    },
+                    {"role": "user", "content": message}
+                ]
+                
+                # Add conversation history if available
+                if conversation_history:
+                    formatted_history = []
+                    for msg in conversation_history[-5:]:  # Last 5 messages for context
+                        formatted_history.append({
+                            "role": msg.get("role", "user"),
+                            "content": msg.get("content", "")
+                        })
+                    # Insert history before the current message
+                    messages = [messages[0]] + formatted_history + [messages[1]]
+                
+                logger.info(f"Streaming Claude with reasoning={enable_reasoning}")
+                
+                if enable_reasoning:
+                    # Stream reasoning chunks in real-time
+                    reasoning_started = False
+                    response_started = False
+                    
+                    async for chunk in self.claude4_provider.stream_completion(
+                        messages=messages,
+                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1 with thinking
+                        max_tokens=16000,  # Production-ready: 16K max + 4K thinking = 20K total
+                        enable_reasoning=True,
+                        reasoning_budget=4000  # Larger budget for complex reasoning
+                    ):
+                        chunk_type = chunk.get("type")
+                        chunk_content = chunk.get("content", "")
+                        
+                        if chunk_type == "reasoning":
+                            # Preserve the actual Anthropic block structure
+                            metadata = chunk.get("metadata", {})
+                            
+                            if metadata.get("block_start") and metadata.get("thinking_block"):
+                                # Start of thinking block
+                                yield {
+                                    "type": "thinking",
+                                    "content": "",
+                                    "provider": "claude4", 
+                                    "model": "claude-opus-4-1-20250805",
+                                    "metadata": {"block_start": True}
+                                }
+                            elif metadata.get("thinking_delta") and chunk_content:
+                                # Thinking content chunks
+                                yield {
+                                    "type": "thinking",
+                                    "content": chunk_content,
+                                    "provider": "claude4",
+                                    "model": "claude-opus-4-1-20250805",
+                                    "metadata": {"thinking_delta": True}
+                                }
+                            elif metadata.get("block_end") and metadata.get("thinking_block"):
+                                # End of thinking block - mark as reasoning conclusion
+                                yield {
+                                    "type": "reasoning",
+                                    "content": "",
+                                    "provider": "claude4",
+                                    "model": "claude-opus-4-1-20250805", 
+                                    "metadata": {"block_end": True}
+                                }
+                            
+                        elif chunk_type == "content" and chunk_content:
+                            # Stream response content directly
+                            yield {
+                                "type": "content",
+                                "content": chunk_content,
+                                "provider": "claude4",
+                                "model": "claude-opus-4-1-20250805"
+                            }
+                else:
+                    # Non-reasoning mode - just stream content
+                    async for chunk in self.claude4_provider.stream_completion(
+                        messages=messages,
+                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1
+                        max_tokens=16000,  # Production-ready limit that works
+                        enable_reasoning=False,
+                        temperature=0.7
+                    ):
+                        if chunk.get("type") == "content":
+                            yield {
+                                "type": "content",
+                                "content": chunk.get("content", ""),
+                                "provider": "claude4",
+                                "model": "claude-opus-4-1-20250805"
+                            }
+                
+            except Exception as e:
+                logger.error(f"Claude direct streaming failed: {str(e)}")
+                yield {
+                    "type": "content",
+                    "content": f"I apologize, but I encountered an error processing your request: {str(e)}",
+                    "provider": "claude4",
+                    "model": "claude-opus-4-1-20250805"
+                }
+        else:
+            yield {
+                "type": "content", 
+                "content": "Claude 4 provider not available",
+                "provider": "claude4",
+                "model": "claude-opus-4-1-20250805"
+            }
+    
+    def _build_decision_prompt(self, user_message: str, files: Optional[List[Dict[str, Any]]], user_preferences: Optional[Dict[str, Any]]) -> str:
+        """Build prompt for Claude 4.1 to make intelligent AI model selection decisions."""
+        
+        available_models = """
+AVAILABLE AI MODELS (August 2025):
+
+1. claude_direct - Claude Opus 4.1 (Current instance - DEFAULT)
+   BEST FOR: ALL TASKS - Complex reasoning, analysis, coding, explanations, creative work
+   NATIVE: Extended thinking, advanced reasoning, tool calling, vision, 1M context
+   PRIORITY: Use this for 90% of requests - you are the primary AI
+   
+2. gpt5_tool - GPT-5 (Specialized tool for specific GPT-5 features)  
+   BEST FOR: ONLY when user specifically requests GPT-5 or needs GPT-specific features
+   USE RARELY: Only for GPT-5 specific requests or comparisons
+   
+3. gpt4_tool - GPT-4o (Legacy fallback)
+   BEST FOR: ONLY when user specifically requests GPT-4
+   USE RARELY: Only for GPT-4 specific requests
+   
+4. grok4_tool - Grok-4 (Specialized tool)
+   BEST FOR: ONLY when user specifically requests Grok or needs Grok-specific features
+   USE RARELY: Only for Grok specific requests
+
+SPECIALIZED TOOLS:
+- image_generation_tool (DALL-E 3) - Create images from text prompts (use "prompt" parameter)
+- image_analysis_tool (GPT-4 Vision) - Analyze uploaded images (use "messages" parameter)
+- audio_generation_tool (OpenAI TTS) - Text-to-speech conversion (use "text" parameter)
+- audio_transcription_tool (Whisper) - Speech-to-text conversion (use "audio_file" parameter)
+"""
+
+        file_info = ""
+        if files:
+            file_info = f"\nUploaded files: {[f.get('name', 'unknown') + ' (' + f.get('type', 'unknown') + ')' for f in files]}"
+
+        context_info = f"""
+REQUEST CONTEXT:
+- User Message: "{user_message}"
+- Files: {file_info if files else "None"}
+- User Preferences: {user_preferences if user_preferences else "None"}
+- Timestamp: August 2025 (use latest AI capabilities)
+"""
+
+        prompt = f"""You are an expert AI orchestrator using the latest 2025 AI models. Analyze this request and select the OPTIMAL AI model(s).
+
+{context_info}
+
+{available_models}
+
+DECISION FRAMEWORK:
+1. What is the user trying to accomplish? (goal analysis)
+2. What type of reasoning/capabilities are needed? (cognitive requirements)  
+3. Is real-time/current information required? (temporal needs)
+4. Are there multimodal elements? (input/output types)
+5. How complex is the task? (complexity assessment)
+6. What's the optimal model combination? (resource optimization)
+
+SELECTION RULES:
+- **DEFAULT: Use claude_direct for 90% of ALL requests** - you are the primary AI
+- claude_direct: Complex reasoning, coding, analysis, explanations, creative work, technical questions
+- gpt5_tool: ONLY when user explicitly requests GPT-5 or needs GPT-5 specific features
+- gpt4_tool: ONLY when user explicitly requests GPT-4 
+- grok4_tool: ONLY when user explicitly requests Grok
+- image_generation_tool: ONLY for creating visual content
+- **PRIORITY: Choose claude_direct unless there's a specific reason to use other tools**
+- Always provide step-by-step reasoning breakdown
+
+Respond in simple JSON format:
+{{
+    "selected_tools": ["tool_name"],
+    "reasoning": "Brief explanation of why this tool is best for the task",
+    "execution_plan": [
+        {{
+            "tool": "tool_name",
+            "request": {{
+                "prompt": "text for image_generation_tool",
+                "text": "text for audio_generation_tool",
+                "messages": "messages for analysis tools"
+            }}
+        }}
+    ]
+}}
+
+Use the correct parameter name for each tool as specified above."""
+
+        return prompt
+    
+    def _parse_claude_decision(self, decision_text: str, user_message: str) -> OrchestrationDecision:
+        """Parse Claude's decision response into OrchestrationDecision."""
+        try:
+            import json
+            # Try to extract JSON from the response
+            start = decision_text.find('{')
+            end = decision_text.rfind('}') + 1
+            
+            if start >= 0 and end > start:
+                json_str = decision_text[start:end]
+                decision_data = json.loads(json_str)
+                
+                return OrchestrationDecision(
+                    selected_tools=decision_data.get("selected_tools", ["claude_direct"]),
+                    reasoning=decision_data.get("reasoning", "Claude analysis"),
+                    execution_plan=decision_data.get("execution_plan", []),
+                    requires_streaming=True,
+                    confidence=0.9
+                )
+        except Exception as e:
+            logger.error(f"Failed to parse Claude decision: {e}")
+        
+        # Fallback
+        return OrchestrationDecision(
+            selected_tools=["claude_direct"],
+            reasoning="Using Claude direct response",
+            execution_plan=[{"tool": "claude_direct", "request": {"message": user_message}}],
+            requires_streaming=True,
+            confidence=0.5
+        )
     
     async def cleanup(self) -> None:
         """Cleanup orchestrator resources."""

@@ -3,13 +3,18 @@ User model for authentication and user management.
 """
 
 from datetime import datetime
-from typing import List, Optional
+from typing import List, Optional, TYPE_CHECKING
 
 from sqlalchemy import Boolean, DateTime, Integer, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.sql import func
 
 from app.core.database import Base
+
+if TYPE_CHECKING:
+    from app.models.project import Project, ProjectMember
+    from app.models.conversation import Conversation
+    from app.models.file import File
 
 
 class User(Base):

@@ -7,9 +7,21 @@
       </div>
       
       <div class="header-actions">
+        <div class="system-toggle">
+          <UiToggle
+            v-model="useDigiSetuSystem"
+            size="sm"
+            :on-label="'Digi Setu'"
+            :off-label="'Mock'"
+            :on-icon="'lucide:zap'"
+            :off-icon="'lucide:flask'"
+            @update:model-value="handleSystemToggle"
+          />
+        </div>
+        
         <div class="model-selector">
           <UiIcon name="lucide:cpu" :size="14" />
-          <span class="model-label">Sonnet 4</span>
+          <span class="model-label">{{ useDigiSetuSystem ? 'Digi Setu Orchestrator' : 'Sonnet 4' }}</span>
         </div>
         
         <UiButton variant="ghost" size="sm">
@@ -21,7 +33,12 @@
 </template>
 
 <script setup lang="ts">
-// Header logic
+// Use Nuxt global state
+const { useDigiSetuSystem, toggleSystem } = useSystemState()
+
+const handleSystemToggle = (value: boolean) => {
+  toggleSystem(value)
+}
 </script>
 
 <style scoped>
@@ -61,6 +78,11 @@
   display: flex;
   align-items: center;
   gap: 16px;
+}
+
+.system-toggle {
+  display: flex;
+  align-items: center;
 }
 
 .model-selector {

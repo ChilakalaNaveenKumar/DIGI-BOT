@@ -79,9 +79,18 @@ const expandedSteps = ref(new Set<number>())
 // Markdown rendering now handled by StreamingMarkdown component
 
 const getStepPreview = (step: ReasoningStep) => {
-  return step.content.length > 60 
-    ? step.content.substring(0, 60) + '...'
-    : step.content
+  // Strip markdown formatting for preview
+  let preview = step.content
+    .replace(/^##?\s*/, '') // Remove ## or # headers
+    .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold **text**
+    .replace(/\*(.*?)\*/g, '$1') // Remove italic *text*
+    .replace(/- /g, '') // Remove list markers
+    .replace(/\n/g, ' ') // Replace newlines with spaces
+    .trim()
+  
+  return preview.length > 60 
+    ? preview.substring(0, 60) + '...'
+    : preview
 }
 
 const toggleStep = (index: number) => {

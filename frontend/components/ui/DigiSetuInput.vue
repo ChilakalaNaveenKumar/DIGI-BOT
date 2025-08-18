@@ -1,7 +1,7 @@
 <template>
-  <div class="claude-input-wrapper">
+  <div class="digi-setu-input-wrapper">
     <!-- Main Input Field -->
-    <div class="claude-input" :class="{ 'claude-input--focused': isFocused }">
+    <div class="digi-setu-input" :class="{ 'digi-setu-input--focused': isFocused }">
       <textarea
         ref="textareaRef"
         v-model="inputValue"
@@ -30,7 +30,7 @@
         
         <div class="toolbar-right">
           <div class="model-selector" @click="$emit('model-select')">
-            <span>Claude Sonnet 4</span>
+            <span>Digi Setu AI</span>
             <UiIcon name="lucide:chevron-down" :size="16" />
           </div>
           
@@ -151,13 +151,13 @@ defineExpose({ focus })
 </script>
 
 <style scoped>
-.claude-input-wrapper {
+.digi-setu-input-wrapper {
   width: 100%;
   max-width: 800px;
   margin: 0 auto;
 }
 
-.claude-input {
+.digi-setu-input {
   background: var(--bg-secondary);
   border: 1.5px solid var(--border-primary);
   border-radius: 16px;
@@ -166,7 +166,7 @@ defineExpose({ focus })
   overflow: hidden;
 }
 
-.claude-input--focused {
+.digi-setu-input--focused {
   border-color: var(--border-focus);
   box-shadow: 0 0 0 3px rgba(255, 107, 53, 0.1);
 }

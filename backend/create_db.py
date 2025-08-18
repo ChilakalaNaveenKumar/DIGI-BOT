@@ -18,9 +18,9 @@ async def main():
     print("Initializing database...")
     try:
         await init_db()
-        print("✅ Database initialized successfully!")
+        print("Database initialized successfully!")
     except Exception as e:
-        print(f"❌ Database initialization failed: {e}")
+        print(f"Database initialization failed: {e}")
         return 1
     return 0
 

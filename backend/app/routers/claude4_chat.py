@@ -19,6 +19,7 @@ from app.core.database import get_db_session
 from app.models.user import User
 from app.models.conversation import MessageRole
 from app.services.conversation_service import ConversationService
+from app.services.streaming_analysis_wrapper import StreamingAnalysisWrapper
 from app.core.exceptions import DigiSetuException
 
 logger = structlog.get_logger(__name__)
@@ -201,7 +202,7 @@ async def stream_chat_message(
     """
     
     async def generate_response():
-        """Generate streaming response with Claude 4 orchestration."""
+        """Generate streaming response with Claude 4 orchestration and analysis wrapper."""
         try:
             # Get services
             if not hasattr(http_request.app.state, 'claude4_orchestrator'):
@@ -210,6 +211,10 @@ async def stream_chat_message(
             
             orchestrator = http_request.app.state.claude4_orchestrator
             conversation_service = ConversationService(db)
+            
+            # Initialize streaming analysis wrapper
+            wrapper = StreamingAnalysisWrapper()
+            await wrapper.initialize()
             
             # Get or create conversation
             if request.conversation_id:
@@ -232,17 +237,17 @@ async def stream_chat_message(
                 # Send conversation ID to frontend
                 yield f"data: {json.dumps({'type': 'conversation_id', 'content': str(conversation.id)})}\n\n"
             
+            # Get conversation history BEFORE saving current message
+            conversation_history = await conversation_service.get_conversation_history(
+                conversation.id, limit=20
+            )
+            
             # Save user message
             await conversation_service.add_message(
                 conversation_id=conversation.id,
                 role=MessageRole.USER,
                 content=request.message,
                 files=request.files
-            )
-            
-            # Get conversation history
-            conversation_history = await conversation_service.get_conversation_history(
-                conversation.id, limit=20
             )
             
             # Convert to format expected by orchestrator
@@ -255,12 +260,13 @@ async def stream_chat_message(
                 for msg in conversation_history
             ]
             
-            # Stream response from Claude 4 orchestrator
+            # Stream response through analysis wrapper
             response_content = ""
             tools_used = []
             final_metadata = {}
             
-            async for chunk in orchestrator.process_request(
+            # Get original stream from orchestrator
+            original_stream = orchestrator.process_request(
                 user_message=request.message,
                 conversation_history=history,
                 user_preferences=request.user_preferences,
@@ -268,16 +274,25 @@ async def stream_chat_message(
                 user_id=current_user.id,
                 db=db,
                 system_message=request.system_message
-            ):
+            )
+            
+            # Wrap stream with analysis capabilities
+            wrapped_stream = wrapper.wrap_stream(
+                original_stream=original_stream,
+                user_preferences=request.user_preferences
+            )
+            
+            # Process wrapped stream
+            async for chunk in wrapped_stream:
                 chunk_type = chunk.get("type")
                 chunk_content = chunk.get("content", "")
                 chunk_metadata = chunk.get("metadata", {})
                 is_final = chunk.get("final", False)
                 
-                # Forward chunk to frontend
+                # Forward chunk to frontend (includes placeholders and components)
                 yield f"data: {json.dumps(chunk)}\n\n"
                 
-                # Collect content for database storage
+                # Collect content for database storage (only original content)
                 if chunk_type == "content":
                     response_content += chunk_content
                     final_metadata.update(chunk_metadata)
@@ -289,7 +304,11 @@ async def stream_chat_message(
                 elif chunk_type == "error":
                     # Error already sent to frontend, log and break
                     logger.error("Claude 4 orchestration error", error=chunk_content)
+                    await wrapper.cleanup()
                     return
+            
+            # Cleanup wrapper
+            await wrapper.cleanup()
             
             # Save assistant response to database
             if response_content:

@@ -97,24 +97,45 @@ export const useComponentAnalysis = (): UseComponentAnalysisReturn => {
       isAnalyzing.value = true
       error.value = null
 
-      const response = await $fetch<ComponentDecision>('/v1/components/analyze', {
-        method: 'POST',
-        baseURL: config.public.apiBase,
-        body: request,
-        headers: {
-          'Content-Type': 'application/json'
-        }
+      // Ensure we're on the client side for the API call
+      if (process.server) {
+        console.warn('Component analysis should be called on client side only')
+        return null
+      }
+
+      // Use native fetch with explicit URL to avoid any Nuxt $fetch issues
+      const apiBase = config.public.apiBase || 'http://localhost:8000/api'
+      const fullUrl = `${apiBase}/v1/components/analyze`
+      
+      console.log('Making component analysis request:', {
+        url: fullUrl,
+        contentPreview: request.content.substring(0, 100) + '...'
       })
 
-      lastDecision.value = response
+      const response = await fetch(fullUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': 'Bearer dev-token'
+        },
+        body: JSON.stringify(request)
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        throw new Error(`HTTP ${response.status}: ${response.statusText}. ${errorText}`)
+      }
+
+      const data = await response.json() as ComponentDecision
+      lastDecision.value = data
       
       console.log('Component analysis completed:', {
-        decision: response.decision,
-        type: response.component_type,
-        confidence: response.confidence
+        decision: data.decision,
+        type: data.component_type,
+        confidence: data.confidence
       })
 
-      return response
+      return data
 
     } catch (err: unknown) {
       const errorMessage = getErrorMessage(err)
@@ -122,7 +143,7 @@ export const useComponentAnalysis = (): UseComponentAnalysisReturn => {
       
       console.error('Component analysis error:', {
         error: errorMessage,
-        content: request.content.substring(0, 100) + '...'
+        content: request?.content?.substring(0, 100) + '...' || 'No content'
       })
 
       // Return safe fallback

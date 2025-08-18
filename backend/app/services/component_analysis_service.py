@@ -187,10 +187,11 @@ RESPONSE FORMAT (JSON only):
 }}
 
 IMPORTANT: 
-- Only generate components when clear, usable data is present
-- Confidence must be > 0.7 for generation
+- Generate components when data is present that would benefit from visualization
+- Confidence must be > 0.5 for generation (be generous with useful data)
 - Use exact markdown syntax from documentation
 - Extract real data from content, never invent data
+- Prefer generating components over rejecting - users benefit from visual data presentation
 """
         
         return prompt
@@ -203,7 +204,7 @@ IMPORTANT:
             # Use the anthropic provider to get analysis
             response = await self.anthropic_provider.generate_completion(
                 messages=messages,
-                model="claude-3.5-sonnet",
+                model="claude-opus-4-1-20250805",
                 max_tokens=2000,
                 temperature=0.1  # Low temperature for consistent analysis
             )

@@ -25,22 +25,59 @@ class AnthropicProvider:
         self.client = None
         self.name = "anthropic"
         self.models = {
-            "claude-4": {
-                "name": "Claude-4",
-                "context_length": 200000,
-                "max_output": 64000,
+            # Claude 4 Models with Extended Thinking - OFFICIAL API LIMITS
+            "claude-opus-4-1-20250805": {
+                "name": "Claude Opus 4.1 (Latest)",
+                "context_length": 200000,  # 200K context (from API docs)
+                "max_output": 80000,  # Safe limit: 80K + buffer for thinking budget
                 "supports_tools": True,
-                "supports_vision": True
+                "supports_vision": True,
+                "supports_reasoning": True,
+                "supports_thinking": True,
+                "supports_code_execution": True,
+                "released": "2025-08-05",
+                "rpm": 1000,
+                "input_tpm": 450000,
+                "output_tpm": 90000
             },
+            "claude-sonnet-4-20250514": {
+                "name": "Claude Sonnet 4",
+                "context_length": 200000,  # 200K context (from API docs)
+                "max_output": 80000,  # Safe limit: 80K + buffer for thinking budget
+                "supports_tools": True,
+                "supports_vision": True,
+                "supports_reasoning": True,
+                "supports_thinking": True,
+                "supports_code_execution": True,
+                "released": "2025-05-14",
+                "rpm": 1000,
+                "input_tpm": 450000,
+                "output_tpm": 90000
+            },
+            # Claude 3.7 with Extended Thinking - OFFICIAL API LIMITS
+            "claude-3-7-sonnet-20250219": {
+                "name": "Claude 3.7 Sonnet (2025)",
+                "context_length": 200000,  # 200K context
+                "max_output": 16000,  # Official API limit: 16K output tokens
+                "supports_tools": True,
+                "supports_vision": True,
+                "supports_reasoning": True,
+                "supports_thinking": True,
+                "released": "2025-02-19",
+                "rpm": 1000,
+                "input_tpm": 40000,
+                "output_tpm": 16000
+            },
+            # Legacy models for fallback
             "claude-3.5-sonnet": {
-                "name": "Claude-3.5 Sonnet",
+                "name": "Claude 3.5 Sonnet",
                 "context_length": 200000,
                 "max_output": 8000,
                 "supports_tools": True,
                 "supports_vision": True
             },
-            "claude-3.7-sonnet": {
-                "name": "Claude-3.7 Sonnet",
+            "claude-3-5-sonnet-20241022": {
+                "name": "Claude 3.5 Sonnet (Legacy)",
                 "context_length": 200000,
                 "max_output": 8000,
                 "supports_tools": True,
@@ -133,15 +170,24 @@ class AnthropicProvider:
                 if msg["role"] == "system":
                     system_message = msg["content"]
                 else:
+                    # Convert content to proper block format (required by Anthropic)
+                    content = msg["content"]
+                    if isinstance(content, str):
+                        content = [{"type": "text", "text": content}]
+                    
                     anthropic_messages.append({
                         "role": msg["role"],
-                        "content": msg["content"]
+                        "content": content
                     })
             
-            # Prepare request
+            # Prepare request with reasonable token limit
+            model_max = self.models[model]["max_output"]
+            # Use reasonable limit for non-streaming (avoid API issues with very high limits)
+            safe_max_tokens = max_tokens or min(model_max, 8192)  # Cap at 8K for non-streaming
+            
             request_data = {
-                "model": "claude-3-5-sonnet-20241022",  # Use actual model name
-                "max_tokens": max_tokens or self.models[model]["max_output"],
+                "model": model,  # Use actual model parameter
+                "max_tokens": safe_max_tokens,
                 "temperature": temperature,
                 "messages": anthropic_messages
             }
@@ -180,6 +226,8 @@ class AnthropicProvider:
         max_tokens: Optional[int] = None,
         temperature: float = 0.7,
         tools: Optional[List[Dict[str, Any]]] = None,
+        enable_reasoning: bool = False,
+        reasoning_budget: int = 2000,
         **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate a streaming completion."""
@@ -204,19 +252,52 @@ class AnthropicProvider:
                 if msg["role"] == "system":
                     system_message = msg["content"]
                 else:
+                    # Convert content to proper block format (required by Anthropic)
+                    content = msg["content"]
+                    if isinstance(content, str):
+                        content = [{"type": "text", "text": content}]
+                    
                     anthropic_messages.append({
                         "role": msg["role"],
-                        "content": msg["content"]
+                        "content": content
                     })
             
             # Prepare request
             request_data = {
-                "model": "claude-3-5-sonnet-20241022",
+                "model": model,  # Use actual model parameter, not hardcoded!
                 "max_tokens": max_tokens or self.models[model]["max_output"],
-                "temperature": temperature,
                 "messages": anthropic_messages,
                 "stream": True
             }
+            
+            # Add web search tool for Claude 4 models
+            if "claude-opus-4" in model or "claude-sonnet-4" in model or "claude-3-7-sonnet" in model:
+                request_data["tools"] = [
+                    {
+                        "type": "web_search_20250305",
+                        "name": "web_search",
+                        "max_uses": 5
+                    }
+                ]
+            
+            # Add temperature only if NOT using thinking (thinking doesn't like extra params)
+            if not enable_reasoning:
+                request_data["temperature"] = temperature
+            
+            # Add extended thinking/reasoning if enabled (disabled by default)
+            # Note: This is "thinking mode" - different from actual reasoning content
+            if enable_reasoning:
+                # Calculate optimal reasoning budget (your theory confirmed!)
+                total_tokens = max_tokens or self.models.get(model, {}).get("max_output", 2000)
+                
+                # Optimal ratio: 25% thinking, 75% response
+                optimal_thinking_budget = int(total_tokens * 0.25)
+                reasoning_budget_calculated = min(reasoning_budget, optimal_thinking_budget, total_tokens - 1024)  # Leave 1024 for response minimum
+                
+                request_data["thinking"] = {
+                    "type": "enabled",
+                    "budget_tokens": reasoning_budget_calculated  # Correct format
+                }
             
             if system_message:
                 request_data["system"] = system_message
@@ -235,9 +316,74 @@ class AnthropicProvider:
                         try:
                             data = json.loads(line[6:])
                             
-                            if data.get("type") == "content_block_delta":
+                            # Handle thinking/reasoning content blocks (Claude 4 extended thinking)
+                            if data.get("type") == "content_block_start":
+                                block = data.get("content_block", {})
+                                if block.get("type") == "thinking":
+                                    yield {
+                                        "type": "reasoning",
+                                        "content": "",
+                                        "provider": self.name,
+                                        "model": model,
+                                        "metadata": {"block_start": True, "thinking_block": True}
+                                    }
+                                elif block.get("type") == "server_tool_use":
+                                    tool_name = block.get("name", "unknown")
+                                    yield {
+                                        "type": "activity",
+                                        "content": f"Using {tool_name} tool...",
+                                        "provider": self.name,
+                                        "model": model,
+                                        "metadata": {"tool": tool_name, "tool_start": True}
+                                    }
+                            
+                            elif data.get("type") == "content_block_delta":
                                 delta = data.get("delta", {})
-                                if delta.get("text"):
+                                
+                                # Handle thinking_delta events (Claude 4 extended thinking)
+                                if delta.get("type") == "thinking_delta":
+                                    thinking_content = delta.get("thinking", "")
+                                    if thinking_content:
+                                        yield {
+                                            "type": "reasoning",
+                                            "content": thinking_content,
+                                            "provider": self.name,
+                                            "model": model,
+                                            "metadata": {"thinking_delta": True}
+                                        }
+                                
+                                # Handle signature_delta events (thinking encryption)
+                                elif delta.get("type") == "signature_delta":
+                                    # Store signature but don't yield (used for verification)
+                                    pass
+                                
+                                # Handle regular text_delta events
+                                elif delta.get("type") == "text_delta":
+                                    text_content = delta.get("text", "")
+                                    if text_content:
+                                        content_buffer += text_content
+                                        yield {
+                                            "type": "content",
+                                            "content": text_content,
+                                            "provider": self.name,
+                                            "model": model
+                                        }
+                                
+                                # Handle server tool use results
+                                elif delta.get("type") == "server_tool_use_delta":
+                                    if "result" in delta:
+                                        tool_result = delta.get("result", "")
+                                        if tool_result:
+                                            yield {
+                                                "type": "tool_output",
+                                                "content": tool_result,
+                                                "provider": self.name,
+                                                "model": model,
+                                                "metadata": {"tool_result": True}
+                                            }
+                                
+                                # Fallback for legacy delta format
+                                elif delta.get("text"):
                                     content_buffer += delta["text"]
                                     yield {
                                         "type": "content",

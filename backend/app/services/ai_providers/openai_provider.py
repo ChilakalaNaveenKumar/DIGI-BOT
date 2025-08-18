@@ -26,26 +26,64 @@ class OpenAIProvider:
         self.client = None
         self.name = "openai"
         self.models = {
+            # 2025 Latest Models with Reasoning - OFFICIAL API LIMITS
             "gpt-5": {
-                "name": "GPT-5",
-                "context_length": 1000000,
-                "max_output": 64000,
+                "name": "GPT-5 (2025)",
+                "context_length": 400000,  # Official: 400K context window
+                "max_output": 128000,  # Official API limit: 128K output tokens
                 "supports_tools": True,
-                "supports_vision": True
+                "supports_vision": True,
+                "supports_reasoning": True,
+                "multimodal": "text+vision+audio",
+                "best_for": "coding, agentic tasks, complex reasoning",
+                "released": "2025"
             },
+            "o3": {
+                "name": "o3 Reasoning (2025)",
+                "context_length": 200000,  # Official: 200K context window
+                "max_output": 100000,  # Official API limit: 100K output tokens
+                "supports_tools": False,
+                "supports_vision": True,
+                "supports_reasoning": True,
+                "best_for": "complex reasoning, mathematics, coding",
+                "released": "2025-04-16"
+            },
+            "o3-mini": {
+                "name": "o3-mini Reasoning (2025)",
+                "context_length": 128000,
+                "max_output": 65536,  # Use full API limit - let AI decide
+                "supports_tools": False,
+                "supports_vision": False,
+                "supports_reasoning": True,
+                "best_for": "fast reasoning, STEM problems",
+                "released": "2025-01-31"
+            },
+            # Legacy models for fallback
             "gpt-4o": {
                 "name": "GPT-4o",
                 "context_length": 128000,
-                "max_output": 16000,
+                "max_output": 16000,  # Use full API limit - let AI decide
                 "supports_tools": True,
-                "supports_vision": True
+                "supports_vision": True,
+                "best_for": "general multimodal tasks"
             },
-            "gpt-4o-mini": {
-                "name": "GPT-4o Mini",
+            "o1-preview": {
+                "name": "o1-preview Reasoning (Legacy)",
                 "context_length": 128000,
-                "max_output": 16000,
-                "supports_tools": True,
-                "supports_vision": False
+                "max_output": 32768,  # Use actual API limit
+                "supports_tools": False,
+                "supports_vision": False,
+                "supports_reasoning": True,
+                "best_for": "complex reasoning, mathematics, coding"
+            },
+            "o1-mini": {
+                "name": "o1-mini Reasoning (Legacy)",
+                "context_length": 128000,
+                "max_output": 65536,  # Use actual API limit
+                "supports_tools": False,
+                "supports_vision": False,
+                "supports_reasoning": True,
+                "best_for": "fast reasoning, STEM problems"
             }
         }
     
@@ -127,8 +165,8 @@ class OpenAIProvider:
                 **kwargs
             }
             
-            # GPT-5 uses max_completion_tokens instead of max_tokens
-            if model == "gpt-5":
+            # GPT-5 uses max_completion_tokens instead of max_tokens (64K max output)
+            if model in ["gpt-5", "gpt-5-mini", "gpt-5-nano"]:
                 request_params["max_completion_tokens"] = max_tokens or self.models[model]["max_output"]
             else:
                 request_params["max_tokens"] = max_tokens or self.models[model]["max_output"]
@@ -163,6 +201,8 @@ class OpenAIProvider:
         max_tokens: Optional[int] = None,
         temperature: float = 0.7,
         tools: Optional[List[Dict[str, Any]]] = None,
+        reasoning_effort: Optional[str] = None,
+        reasoning_summary: Optional[str] = None,
         **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate a streaming completion."""
@@ -188,11 +228,15 @@ class OpenAIProvider:
                 **kwargs
             }
             
-            # GPT-5 uses max_completion_tokens instead of max_tokens
-            if model == "gpt-5":
+            # GPT-5 uses max_completion_tokens instead of max_tokens (64K max output)
+            if model in ["gpt-5", "gpt-5-mini", "gpt-5-nano"]:
                 request_params["max_completion_tokens"] = max_tokens or self.models[model]["max_output"]
             else:
                 request_params["max_tokens"] = max_tokens or self.models[model]["max_output"]
+            
+            # Add reasoning_effort parameter for 2025 reasoning models
+            if reasoning_effort and model in ["gpt-5", "o3", "o3-mini", "o1-preview", "o1-mini"]:
+                request_params["reasoning_effort"] = reasoning_effort
             
             # Add tools if provided and supported
             if tools and self.models[model]["supports_tools"]:
@@ -211,6 +255,15 @@ class OpenAIProvider:
                 
                 choice = chunk.choices[0]
                 delta = choice.delta
+                
+                # Handle reasoning content (for o1/o3 models)
+                if hasattr(delta, 'reasoning') and delta.reasoning:
+                    yield {
+                        "type": "reasoning",
+                        "content": delta.reasoning,
+                        "provider": self.name,
+                        "model": model
+                    }
                 
                 # Handle content
                 if delta.content:

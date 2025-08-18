@@ -61,7 +61,7 @@
           </div>
           
           <!-- Main Content -->
-          <div v-if="message.content" class="message-text">
+          <div v-if="message.content || message.isStreaming" class="message-text">
             <UiStreamingMarkdown
               :key="`content-${message.id}`"
               :content="message.content"
@@ -76,6 +76,14 @@
             />
           </div>
           
+          <!-- Analysis Indicator -->
+          <div v-if="message.isAnalyzing" class="analysis-indicator">
+            <div class="analysis-dots">
+              <span /><span /><span />
+            </div>
+            <span class="analysis-text">Analyzing for components...</span>
+          </div>
+          
           <!-- Generated Components -->
           <div v-if="message.components && message.components.length > 0" class="components-section">
             <div class="components-header">
@@ -87,22 +95,40 @@
                 v-for="(component, index) in message.components"
                 :key="`component-${index}`"
                 class="generated-component"
+                :class="{ 'placeholder-component': component.type === 'analysis-placeholder' }"
               >
-                <div class="component-info">
-                  <div class="component-meta">
-                    <UiBadge variant="secondary" size="sm">
-                      {{ component.type }}
-                    </UiBadge>
-                    <span class="component-confidence">
-                      {{ (component.confidence * 100).toFixed(1) }}% confidence
-                    </span>
+                <!-- Analysis Placeholder -->
+                <div v-if="component.type === 'analysis-placeholder'" class="analysis-placeholder">
+                  <div class="placeholder-header">
+                    <div class="placeholder-dots">
+                      <span /><span /><span />
+                    </div>
+                    <span class="placeholder-text">{{ component.title }}</span>
+                  </div>
+                  <div class="placeholder-content">
+                    <UiIcon name="lucide:bar-chart-3" :size="16" />
+                    <span>Analyzing content for interactive components...</span>
                   </div>
                 </div>
-                <div class="component-preview">
-                  <EnhancedComponentRenderer
-                    :component-type="component.type"
-                    :markdown="component.markdown"
-                  />
+                
+                <!-- Regular Component -->
+                <div v-else>
+                  <div class="component-info">
+                    <div class="component-meta">
+                      <UiBadge variant="secondary" size="sm">
+                        {{ component.type }}
+                      </UiBadge>
+                      <span class="component-confidence">
+                        {{ (component.confidence * 100).toFixed(1) }}% confidence
+                      </span>
+                    </div>
+                  </div>
+                  <div class="component-preview">
+                    <EnhancedComponentRenderer
+                      :component-type="component.type"
+                      :markdown="component.markdown"
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -455,6 +481,94 @@ const getToolStatus = (status?: string) => {
   font-size: 12px;
   padding: 4px 8px;
   height: auto;
+}
+
+.analysis-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-style: italic;
+}
+
+.analysis-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.analysis-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--primary-500);
+  animation: analysis-pulse 1.4s ease-in-out infinite both;
+}
+
+.analysis-dots span:nth-child(1) { animation-delay: -0.32s; }
+.analysis-dots span:nth-child(2) { animation-delay: -0.16s; }
+.analysis-dots span:nth-child(3) { animation-delay: 0s; }
+
+@keyframes analysis-pulse {
+  0%, 80%, 100% {
+    transform: scale(0.8);
+    opacity: 0.5;
+  }
+  40% {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+/* Analysis Placeholder Styles */
+.placeholder-component {
+  background: var(--bg-secondary);
+  border: 1px dashed var(--border-color);
+  border-radius: 8px;
+  transition: all 0.3s ease;
+}
+
+.analysis-placeholder {
+  padding: 16px;
+  text-align: center;
+}
+
+.placeholder-header {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.placeholder-dots {
+  display: flex;
+  gap: 4px;
+}
+
+.placeholder-dots span {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--primary-500);
+  animation: analysis-pulse 1.4s ease-in-out infinite both;
+}
+
+.placeholder-dots span:nth-child(1) { animation-delay: -0.32s; }
+.placeholder-dots span:nth-child(2) { animation-delay: -0.16s; }
+.placeholder-dots span:nth-child(3) { animation-delay: 0s; }
+
+.placeholder-content {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: var(--text-secondary);
+  font-size: 13px;
+  font-style: italic;
 }
 
 .message--user .message-content {

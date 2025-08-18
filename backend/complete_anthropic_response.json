@@ -1,0 +1,255 @@
+[
+  {
+    "chunk_number": 1,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "block_start": true,
+        "thinking_block": true
+      }
+    }
+  },
+  {
+    "chunk_number": 2,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "The user is",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 3,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " asking me to calculate 5 +",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 4,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 3. This is a simple arithmetic",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 5,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " problem that I can solve without ne",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 6,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "eding to search the web. The answer",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 7,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " is 8. The user also",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 8,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " asks me to \"think about it briefly\"",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 9,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " but this is just a simple addition",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 10,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " problem that doesn't require any web",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 11,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " searching or external tools.\n\n5",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 12,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " + 3 = 8",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 13,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n\nThis is basic mathematical knowledge that I already",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 14,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " have and doesn't require any web",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 15,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " search.",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 16,
+    "chunk_data": {
+      "type": "content",
+      "content": "5 + 3 = 8\n\nThis is a straight",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  },
+  {
+    "chunk_number": 17,
+    "chunk_data": {
+      "type": "content",
+      "content": "forward addition problem. When you add 5",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  },
+  {
+    "chunk_number": 18,
+    "chunk_data": {
+      "type": "content",
+      "content": " and 3 together, you get",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  },
+  {
+    "chunk_number": 19,
+    "chunk_data": {
+      "type": "content",
+      "content": " 8. You can think of it as starting",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  },
+  {
+    "chunk_number": 20,
+    "chunk_data": {
+      "type": "content",
+      "content": " with 5 items and adding 3",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  },
+  {
+    "chunk_number": 21,
+    "chunk_data": {
+      "type": "content",
+      "content": " more items to get a total of",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  },
+  {
+    "chunk_number": 22,
+    "chunk_data": {
+      "type": "content",
+      "content": " 8 items.",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  },
+  {
+    "chunk_number": 23,
+    "chunk_data": {
+      "type": "finish",
+      "reason": "stop",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805"
+    }
+  }
+]

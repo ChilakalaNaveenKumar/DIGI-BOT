@@ -43,57 +43,57 @@ logger = structlog.get_logger(__name__)
 async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     """Application lifespan manager for startup and shutdown events."""
     # Startup
-    logger.info("🚀 Starting Digi Setu AI Backend", version=app.version)
+    logger.info("Starting Digi Setu AI Backend", version=app.version)
     
     try:
         # Initialize database
         await init_db()
-        logger.info("✅ Database initialized successfully")
+        logger.info("Database initialized successfully")
         
         # Initialize Claude 4 Orchestrator
         from app.services.claude4_orchestrator import Claude4Orchestrator
         orchestrator = Claude4Orchestrator()
         await orchestrator.initialize()
         app.state.claude4_orchestrator = orchestrator
-        logger.info("✅ Claude 4 Orchestrator initialized successfully")
+        logger.info("Claude 4 Orchestrator initialized successfully")
         
         # Initialize file storage
         from app.services.file_service import FileService
         file_service = FileService()
         await file_service.initialize()
         app.state.file_service = file_service
-        logger.info("✅ File Service initialized successfully")
+        logger.info("File Service initialized successfully")
         
-        logger.info("🎉 Digi Setu AI Backend started successfully")
+        logger.info("Digi Setu AI Backend started successfully")
         
     except Exception as e:
-        logger.error("❌ Failed to start application", error=str(e))
+        logger.error("Failed to start application", error=str(e))
         sys.exit(1)
     
     yield
     
     # Shutdown
-    logger.info("🛑 Shutting down Digi Setu AI Backend")
+    logger.info("Shutting down Digi Setu AI Backend")
     
     try:
         # Cleanup Claude 4 Orchestrator
         if hasattr(app.state, 'claude4_orchestrator'):
             await app.state.claude4_orchestrator.cleanup()
-            logger.info("✅ Claude 4 Orchestrator cleaned up")
+            logger.info("Claude 4 Orchestrator cleaned up")
         
         # Cleanup file service
         if hasattr(app.state, 'file_service'):
             await app.state.file_service.cleanup()
-            logger.info("✅ File Service cleaned up")
+            logger.info("File Service cleaned up")
         
         # Close database connections
         await close_db()
-        logger.info("✅ Database connections closed")
+        logger.info("Database connections closed")
         
-        logger.info("👋 Digi Setu AI Backend shutdown complete")
+        logger.info("Digi Setu AI Backend shutdown complete")
         
     except Exception as e:
-        logger.error("❌ Error during shutdown", error=str(e))
+        logger.error("Error during shutdown", error=str(e))
 
 
 def create_application() -> FastAPI:

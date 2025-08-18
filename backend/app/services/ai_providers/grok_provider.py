@@ -25,21 +25,42 @@ class GrokProvider:
         self.client = None
         self.name = "grok"
         self.models = {
-            "grok-4": {
-                "name": "Grok-4",
-                "context_length": 256000,
-                "max_output": 32000,
+            # 2025 Latest Grok 3 Model - OFFICIAL API LIMITS
+            "grok-3": {
+                "name": "Grok 3 (2025)",
+                "context_length": 128000,  # Official: 128K context window
+                "max_output": 128000,  # Official API limit: 128K output tokens
                 "supports_tools": True,
                 "supports_vision": True,
-                "supports_search": True
+                "supports_search": True,
+                "supports_reasoning": True,
+                "live_search": True,
+                "platform": "X/Twitter integrated",
+                "capabilities": ["think_mode", "deepsearch", "big_brain_mode"],
+                "best_for": "real-time info, reasoning, academic/technical tasks",
+                "released": "2025-02-17"
             },
-            "grok-4-vision": {
-                "name": "Grok-4 Vision",
+            # Legacy/Future models
+            "grok-4": {
+                "name": "Grok-4 (Future)",
                 "context_length": 256000,
                 "max_output": 32000,
                 "supports_tools": True,
                 "supports_vision": True,
-                "supports_search": True
+                "supports_search": True,
+                "live_search": True,
+                "platform": "X/Twitter integrated",
+                "best_for": "real-time info, academic/technical tasks",
+                "vs_gpt5": "better at academic tasks, weaker at creative/emotional"
+            },
+            "grok-2-1212": {
+                "name": "Grok-2 (Legacy)",
+                "context_length": 256000,
+                "max_output": 32000,
+                "supports_tools": True,
+                "supports_vision": True,
+                "supports_search": True,
+                "best_for": "fallback if newer models unavailable"
             }
         }
     
@@ -167,6 +188,7 @@ class GrokProvider:
         temperature: float = 0.7,
         tools: Optional[List[Dict[str, Any]]] = None,
         enable_search: bool = True,
+        enable_thinking: bool = False,
         **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
         """Generate a streaming completion."""
@@ -192,6 +214,10 @@ class GrokProvider:
                 "stream": True,
                 **kwargs
             }
+            
+            # Add Think mode for Grok 3 (2025 reasoning feature)
+            if enable_thinking and model == "grok-3":
+                request_params["think_mode"] = True
             
             # Add tools if provided and supported
             if tools and self.models[model]["supports_tools"]:

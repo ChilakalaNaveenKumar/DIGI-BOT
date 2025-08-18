@@ -156,9 +156,9 @@ class ImageGenerationTool(MultimodalTool):
         """Execute image generation."""
         try:
             prompt = request.get("prompt")
-            model = request.get("model", "gpt-image-1")
+            model = request.get("model", "dall-e-3")
             size = request.get("size", "1024x1024")
-            quality = request.get("quality", "standard")
+            quality = request.get("quality", "hd")  # Changed from "standard" to "hd"
             n = request.get("n", 1)
             
             if not prompt:

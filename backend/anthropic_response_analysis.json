@@ -1,0 +1,615 @@
+[
+  {
+    "chunk_number": 1,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "block_start": true,
+        "thinking_block": true
+      }
+    }
+  },
+  {
+    "chunk_number": 2,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "The user is",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 3,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " asking me to calculate 27 *",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 4,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 453. This is a simple arithmetic",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 5,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " problem that I can solve without",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 6,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " needing to search the",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 7,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " web. Let me calculate this",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 8,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " step by step.\n\n27 *",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 9,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 453\n\nI can",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 10,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " break this down in different",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 11,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " ways. Let me use the standard multiplication metho",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 12,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "d:\n\n    453\n  ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 13,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\u00d7  27\n  -----",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 14,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n   3171  (453 ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 15,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\u00d7 7)\n  9",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 16,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "060   (453 \u00d7 20)",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 17,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n  -----\n  12231",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 18,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n\nLet me verify this:\n-",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 19,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 453 \u00d7 7 =",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 20,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 3171\n  - 7",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 21,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " \u00d7 3 = 21",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 22,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " (write 1, carry 2",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 23,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": ")\n  - 7 \u00d7",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 24,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 5 = 35, plus",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 25,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 2 = 37 (",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 26,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "write 7, carry 3)",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 27,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n  - 7 \u00d7 ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 28,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "4 = 28, plus ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 29,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "3 = 31 (write",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 30,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 31)\n  - So",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 31,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": ": 3171 \u2713",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 32,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n\n- 453 \u00d7 20 ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 33,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "= 9060\n  - ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 34,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "453 \u00d7 2 = 906",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 35,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n  - 453 \u00d7 20",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 36,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " = 9060 ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 37,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\u2713\n\n- 3171 ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 38,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "+ 9060 = 12231",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 39,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n  - 1 + 0",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 40,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " = 1\n  - ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 41,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "7 + 6 = 13",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 42,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " (write 3, carry 1",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 43,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": ")\n  - 1 + 0",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 44,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " + 1 = 2",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 45,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n  - 3 + ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 46,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "9 = 12 (write",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 47,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " 2, carry 1)",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 48,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "\n  - 0 + 1",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 49,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": " = 1\n  - So: ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 50,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": "12231 \u2713\n\nTherefore",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  },
+  {
+    "chunk_number": 51,
+    "chunk_data": {
+      "type": "reasoning",
+      "content": ", 27 \u00d7 453 ",
+      "provider": "anthropic",
+      "model": "claude-opus-4-1-20250805",
+      "metadata": {
+        "thinking_delta": true
+      }
+    }
+  }
+]
