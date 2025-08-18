@@ -29,7 +29,7 @@ from app.core.middleware import (
     RateLimitMiddleware,
     setup_middleware,
 )
-from app.routers import ai_chat, vision, audio, tools, search, multimodal_chat, advanced_features, component_analysis
+from app.routers import claude4_chat, component_analysis, files
 
 # Initialize settings
 settings = get_settings()
@@ -50,12 +50,12 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await init_db()
         logger.info("✅ Database initialized successfully")
         
-        # Initialize AI services
-        from app.services.ai_orchestrator import AIOrchestrator
-        orchestrator = AIOrchestrator()
+        # Initialize Claude 4 Orchestrator
+        from app.services.claude4_orchestrator import Claude4Orchestrator
+        orchestrator = Claude4Orchestrator()
         await orchestrator.initialize()
-        app.state.ai_orchestrator = orchestrator
-        logger.info("✅ AI Orchestrator initialized successfully")
+        app.state.claude4_orchestrator = orchestrator
+        logger.info("✅ Claude 4 Orchestrator initialized successfully")
         
         # Initialize file storage
         from app.services.file_service import FileService
@@ -76,10 +76,10 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("🛑 Shutting down Digi Setu AI Backend")
     
     try:
-        # Cleanup AI services
-        if hasattr(app.state, 'ai_orchestrator'):
-            await app.state.ai_orchestrator.cleanup()
-            logger.info("✅ AI Orchestrator cleaned up")
+        # Cleanup Claude 4 Orchestrator
+        if hasattr(app.state, 'claude4_orchestrator'):
+            await app.state.claude4_orchestrator.cleanup()
+            logger.info("✅ Claude 4 Orchestrator cleaned up")
         
         # Cleanup file service
         if hasattr(app.state, 'file_service'):
@@ -209,15 +209,9 @@ def create_application() -> FastAPI:
     # app.include_router(users.router, prefix="/api/v1/users", tags=["Users"])
     # app.include_router(projects.router, prefix="/api/v1/projects", tags=["Projects"])
     # app.include_router(conversations.router, prefix="/api/v1/conversations", tags=["Conversations"])
-    app.include_router(ai_chat.router, prefix="/api/v1/chat", tags=["AI Chat"])
-    app.include_router(multimodal_chat.router, prefix="/api/v1", tags=["Multimodal Chat"])
-    app.include_router(advanced_features.router, prefix="/api/v1", tags=["Advanced Features"])
+    app.include_router(claude4_chat.router, prefix="/api/v1", tags=["Claude 4 Chat"])
     app.include_router(component_analysis.router, prefix="/api/v1/components", tags=["Component Analysis"])
-    app.include_router(vision.router, prefix="/api/v1", tags=["Vision"])
-    app.include_router(audio.router, prefix="/api/v1", tags=["Audio"])
-    app.include_router(tools.router, prefix="/api/v1", tags=["Tools"])
-    app.include_router(search.router, prefix="/api/v1", tags=["Search"])
-    # app.include_router(files.router, prefix="/api/v1/files", tags=["Files"])
+    app.include_router(files.router, prefix="/api/v1", tags=["Files"])
     
     # Simple health endpoint
     @app.get("/api/v1/health", tags=["Health"])

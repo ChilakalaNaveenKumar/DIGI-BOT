@@ -124,9 +124,14 @@ class OpenAIProvider:
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
-                "max_tokens": max_tokens or self.models[model]["max_output"],
                 **kwargs
             }
+            
+            # GPT-5 uses max_completion_tokens instead of max_tokens
+            if model == "gpt-5":
+                request_params["max_completion_tokens"] = max_tokens or self.models[model]["max_output"]
+            else:
+                request_params["max_tokens"] = max_tokens or self.models[model]["max_output"]
             
             # Add tools if provided and supported
             if tools and self.models[model]["supports_tools"]:
@@ -179,10 +184,15 @@ class OpenAIProvider:
                 "model": model,
                 "messages": messages,
                 "temperature": temperature,
-                "max_tokens": max_tokens or self.models[model]["max_output"],
                 "stream": True,
                 **kwargs
             }
+            
+            # GPT-5 uses max_completion_tokens instead of max_tokens
+            if model == "gpt-5":
+                request_params["max_completion_tokens"] = max_tokens or self.models[model]["max_output"]
+            else:
+                request_params["max_tokens"] = max_tokens or self.models[model]["max_output"]
             
             # Add tools if provided and supported
             if tools and self.models[model]["supports_tools"]:

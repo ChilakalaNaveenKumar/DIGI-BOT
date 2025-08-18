@@ -8,13 +8,16 @@ import os
 import uuid
 from typing import List, Optional, Dict, Any
 from pathlib import Path
+import base64
 
 import structlog
 from fastapi import UploadFile
 from PIL import Image
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.config import get_settings
 from app.core.exceptions import FileProcessingError
+from app.models.file import File
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
@@ -30,6 +33,8 @@ class FileService:
         # Create subdirectories
         (self.upload_dir / "images").mkdir(exist_ok=True)
         (self.upload_dir / "documents").mkdir(exist_ok=True)
+        (self.upload_dir / "audio").mkdir(exist_ok=True)
+        (self.upload_dir / "generated").mkdir(exist_ok=True)
         (self.upload_dir / "temp").mkdir(exist_ok=True)
     
     async def initialize(self):
@@ -233,3 +238,153 @@ class FileService:
         except Exception as e:
             logger.error("Failed to get file stats", error=str(e))
             return {"error": str(e)}
+    
+    async def save_generated_audio(
+        self,
+        audio_content: bytes,
+        user_id: str,
+        db: AsyncSession,
+        filename: Optional[str] = None,
+        format: str = "mp3",
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> File:
+        """Save generated audio content to file system and database."""
+        
+        try:
+            # Generate unique filename
+            file_id = str(uuid.uuid4())
+            filename = filename or f"generated_audio_{file_id}.{format}"
+            file_path = self.upload_dir / "audio" / filename
+            
+            # Save audio content to file
+            with open(file_path, 'wb') as f:
+                f.write(audio_content)
+            
+            # Create database record
+            file_record = File(
+                file_id=file_id,
+                original_filename=filename,
+                filename=filename,
+                file_path=str(file_path),
+                file_size=len(audio_content),
+                content_type=f"audio/{format}",
+                user_id=user_id,
+                status="ready",
+                extra_data={
+                    "type": "generated_audio",
+                    "format": format,
+                    **(metadata or {})
+                }
+            )
+            
+            db.add(file_record)
+            await db.commit()
+            await db.refresh(file_record)
+            
+            logger.info(
+                "Generated audio saved",
+                file_id=file_id,
+                filename=filename,
+                size=len(audio_content),
+                user_id=user_id
+            )
+            
+            return file_record
+            
+        except Exception as e:
+            logger.error("Failed to save generated audio", error=str(e))
+            await db.rollback()
+            raise FileProcessingError(f"Failed to save generated audio: {str(e)}")
+    
+    async def save_generated_image(
+        self,
+        image_url: str,
+        user_id: str,
+        db: AsyncSession,
+        filename: Optional[str] = None,
+        metadata: Optional[Dict[str, Any]] = None
+    ) -> File:
+        """Save generated image from URL to file system and database."""
+        
+        import httpx
+        
+        try:
+            # Generate unique filename
+            file_id = str(uuid.uuid4())
+            filename = filename or f"generated_image_{file_id}.png"
+            file_path = self.upload_dir / "generated" / filename
+            
+            # Download image from URL
+            async with httpx.AsyncClient() as client:
+                response = await client.get(image_url)
+                response.raise_for_status()
+                image_content = response.content
+            
+            # Save image content to file
+            with open(file_path, 'wb') as f:
+                f.write(image_content)
+            
+            # Create database record
+            file_record = File(
+                file_id=file_id,
+                original_filename=filename,
+                filename=filename,
+                file_path=str(file_path),
+                file_size=len(image_content),
+                content_type="image/png",
+                user_id=user_id,
+                status="ready",
+                extra_data={
+                    "type": "generated_image",
+                    "source_url": image_url,
+                    **(metadata or {})
+                }
+            )
+            
+            db.add(file_record)
+            await db.commit()
+            await db.refresh(file_record)
+            
+            logger.info(
+                "Generated image saved",
+                file_id=file_id,
+                filename=filename,
+                size=len(image_content),
+                user_id=user_id
+            )
+            
+            return file_record
+            
+        except Exception as e:
+            logger.error("Failed to save generated image", error=str(e))
+            await db.rollback()
+            raise FileProcessingError(f"Failed to save generated image: {str(e)}")
+    
+    async def get_user_files(
+        self,
+        user_id: str,
+        db: AsyncSession,
+        file_type: Optional[str] = None,
+        limit: int = 50,
+        offset: int = 0
+    ) -> List[File]:
+        """Get files for a specific user."""
+        
+        try:
+            from sqlalchemy import select
+            
+            query = select(File).where(File.user_id == user_id)
+            
+            if file_type:
+                query = query.where(File.content_type.like(f"{file_type}%"))
+            
+            query = query.order_by(File.created_at.desc()).limit(limit).offset(offset)
+            
+            result = await db.execute(query)
+            files = result.scalars().all()
+            
+            return list(files)
+            
+        except Exception as e:
+            logger.error("Failed to get user files", error=str(e), user_id=user_id)
+            return []

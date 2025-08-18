@@ -17,5 +17,4 @@ __all__ = [
     "Message",
     "MessagePart", 
     "File",
-    "FileProcessingResult",
 ]
