@@ -55,15 +55,7 @@
 
 <script setup lang="ts">
 // Removed markdown-it imports - now using StreamingMarkdown component
-
-interface ReasoningStep {
-  type: 'thinking' | 'tool_call' | 'conclusion'
-  content: string
-  status?: 'active' | 'completed' | 'error'
-  tool_name?: string
-  result?: unknown
-  preview?: string
-}
+import type { ReasoningStep } from '~/types'
 
 interface Props {
   steps: ReasoningStep[]
@@ -80,7 +72,7 @@ const expandedSteps = ref(new Set<number>())
 
 const getStepPreview = (step: ReasoningStep) => {
   // Strip markdown formatting for preview
-  let preview = step.content
+  const preview = step.content
     .replace(/^##?\s*/, '') // Remove ## or # headers
     .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold **text**
     .replace(/\*(.*?)\*/g, '$1') // Remove italic *text*

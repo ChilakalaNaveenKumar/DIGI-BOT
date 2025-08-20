@@ -1,8 +1,9 @@
-// Digi Setu Orchestrator Integration - Preserves existing UI/UX
+// Digi Setu Orchestrator Integration - Enhanced with batch analysis system
 import type { Message, ReasoningStep, GeneratedComponent } from '~/types'
+import { useEnhancedContent, type EnhancedContentPacket } from './useEnhancedContent'
 
 interface DigiSetuStreamResponse {
-  type: 'conversation_id' | 'thinking' | 'reasoning' | 'activity' | 'tool_output' | 'content' | 'error' | 'placeholder' | 'component_replacement' | 'placeholder_removal' | 'complete'
+  type: 'conversation_id' | 'thinking' | 'reasoning' | 'activity' | 'tool_output' | 'content' | 'error' | 'enhanced_content' | 'analysis_status' | 'complete'
   content: string
   metadata?: {
     step?: string
@@ -12,19 +13,26 @@ interface DigiSetuStreamResponse {
     orchestrator?: string
     tools_used?: string[]
     reasoning?: string
+    processed?: boolean
+    segmentation_time?: number
+    analysis_time?: number
+    blocks_found?: number
+    components_generated?: number
+    original_length?: number
+    enhanced_length?: number
+    block_start?: boolean
+    thinking_delta?: boolean
+    error?: string
   }
   final?: boolean
-  // New fields for streaming analysis
-  placeholder_id?: string
-  component?: {
-    type: string
-    markdown: string
-    confidence: number
-    reasoning: string
-    extracted_data?: any
-  }
+  // Enhanced content fields (new batch system)
+  enhanced_content?: string
+  components?: any[]
   reasoning?: string
 }
+
+// Type alias for compatibility
+type Claude4StreamResponse = DigiSetuStreamResponse
 
 export const useDigiSetuChat = () => {
   const messages = ref<Message[]>([])
@@ -32,60 +40,50 @@ export const useDigiSetuChat = () => {
   const input = ref('')
   const isStreaming = ref(false)
   
+  // Enhanced content system
+  const enhancedContent = useEnhancedContent()
+  
   // Get runtime config for API base URL
   const config = useRuntimeConfig()
-  
-  // Component analysis composables (reuse existing)
-  const { analyzeContent, isAnalyzing } = useComponentAnalysis()
 
-  const sendMessage = async (content: string) => {
-    if (!content.trim() || isLoading.value || isStreaming.value) {
-      return
-    }
-    
-    // Add user message (same as existing)
-    const userMessage: Message = {
-      id: Date.now(),
-      content,
-      role: 'user' as const,
-      timestamp: new Date()
-    }
-    messages.value.push(userMessage)
-    
-    input.value = ''
-    isLoading.value = false
+  const sendMessage = async (userMessage: string) => {
+    if (!userMessage.trim() || isLoading.value) return
+
+    isLoading.value = true
     isStreaming.value = true
-    
-    // Prepare assistant message for streaming (same structure as existing)
-    const assistantMessage: Message = {
-      id: Date.now() + 1,
-      content: '',
-      role: 'assistant' as const,
-      timestamp: new Date(),
-      isLoading: false,
-      isStreaming: true,
-      reasoning: '',
-      reasoningSteps: [],
-      components: []
-    }
-    messages.value.push(assistantMessage)
-    
+
     try {
-      await streamDigiSetuResponse(assistantMessage.id, content)
-    } catch (error) {
-      console.error('Digi Setu streaming error:', error)
-      
-      const index = messages.value.findIndex(m => m.id === assistantMessage.id)
-      if (index !== -1) {
-        messages.value[index] = {
-          ...assistantMessage,
-          content: 'Sorry, I encountered an error. Please try again.',
-          isLoading: false,
-          isStreaming: false,
-          error: error instanceof Error ? error.message : String(error)
-        }
+      // Add user message
+      const userMsg: Message = {
+        id: Date.now(),
+        role: 'user',
+        content: userMessage,
+        timestamp: new Date()
       }
-      
+      messages.value.push(userMsg)
+
+      // Add assistant message placeholder
+      const assistantMsg: Message = {
+        id: Date.now() + 1,
+        role: 'assistant',
+        content: '',
+        timestamp: new Date(),
+        isLoading: true,
+        isStreaming: true,
+        reasoningSteps: [],
+        components: []
+      }
+      messages.value.push(assistantMsg)
+
+      // Clear input
+      input.value = ''
+
+      // Stream the response
+      await streamDigiSetuResponse(assistantMsg.id, userMessage)
+
+    } catch (error) {
+      console.error('Send message error:', error)
+    } finally {
       isLoading.value = false
       isStreaming.value = false
     }
@@ -100,8 +98,6 @@ export const useDigiSetuChat = () => {
       console.log('❌ Message not found for streaming:', messageId)
       return
     }
-
-    // Starting Digi Setu orchestrator streaming
 
     try {
       // Call Digi Setu streaming endpoint
@@ -133,8 +129,6 @@ export const useDigiSetuChat = () => {
       let currentReasoning = ''
       let reasoningSteps: ReasoningStep[] = []
       let toolsUsed: string[] = []
-      let lastAnalyzedLength = 0  // Track what we've already analyzed
-      let pendingAnalysis: Map<string, { position: number, content: string }> = new Map() // Track analysis placeholders
 
       while (true) {
         const { done, value } = await reader.read()
@@ -146,7 +140,21 @@ export const useDigiSetuChat = () => {
         for (const line of lines) {
           if (line.startsWith('data: ')) {
             try {
-              const data: Claude4StreamResponse = JSON.parse(line.slice(6))
+              const jsonString = line.slice(6).trim()
+              
+              // Skip empty or malformed JSON
+              if (!jsonString || !jsonString.startsWith('{')) {
+                continue
+              }
+              
+              // Try to parse JSON, skip if malformed
+              let data: Claude4StreamResponse
+              try {
+                data = JSON.parse(jsonString)
+              } catch (jsonError) {
+                console.warn('⚠️ Skipping malformed JSON chunk:', jsonString.substring(0, 100) + '...')
+                continue
+              }
               
               // Handle different stream types
               switch (data.type) {
@@ -185,149 +193,122 @@ export const useDigiSetuChat = () => {
 
                 case 'reasoning':
                   // Handle reasoning conclusion based on metadata
-                  if (data.metadata?.block_end) {
-                    // Mark current thinking step as completed
-                    const lastStep = reasoningSteps[reasoningSteps.length - 1]
-                    if (lastStep && lastStep.type === 'thinking' && lastStep.status === 'active') {
-                      lastStep.status = 'completed'
-                    }
-                    // Set the accumulated reasoning content
-                    currentReasoning = lastStep?.content || ''
-                    updateMessage(messageIndex, { 
-                      reasoning: currentReasoning,
-                      reasoningSteps: [...reasoningSteps]
-                    })
-                  } else if (data.content) {
-                    // Fallback: handle as conclusion step
-                    currentReasoning = data.content
+                  if (data.metadata?.block_start) {
+                    // Start new reasoning step
                     reasoningSteps.push({
-                      type: 'conclusion',
-                      content: data.content,
-                      result: data.content,
+                      type: 'reasoning',
+                      content: '',
+                      result: '',
                       status: 'active'
                     })
-                    updateMessage(messageIndex, { 
-                      reasoning: currentReasoning,
-                      reasoningSteps: [...reasoningSteps]
-                    })
+                  } else if (data.content) {
+                    // Add to current reasoning step or create new one
+                    const currentStep = reasoningSteps[reasoningSteps.length - 1]
+                    if (currentStep && currentStep.type === 'reasoning' && currentStep.status === 'active') {
+                      currentStep.content += data.content
+                      currentStep.result += data.content
+                    } else {
+                      reasoningSteps.push({
+                        type: 'reasoning',
+                        content: data.content,
+                        result: data.content,
+                        status: 'active'
+                      })
+                    }
                   }
+                  updateMessage(messageIndex, { reasoningSteps: [...reasoningSteps] })
                   break
 
                 case 'activity':
-                  // Add activity step
+                  // Handle activity updates
+                  console.log('🔄 Activity:', data.content, data.metadata)
+                  
+                  // Create activity reasoning step
                   reasoningSteps.push({
-                    type: 'tool_call',
+                    type: 'activity',
                     content: data.content,
-                    status: 'active',
-                    tool_name: data.metadata?.tool
+                    result: data.content,
+                    status: 'completed',
+                    metadata: data.metadata
                   })
                   updateMessage(messageIndex, { reasoningSteps: [...reasoningSteps] })
                   break
 
                 case 'tool_output':
-                  // Update tool output
-                  const toolStep = reasoningSteps.find(s => s.type === 'tool_call' && s.status === 'active')
-                  if (toolStep) {
-                    toolStep.result = data.content
-                    if (data.final) {
-                      toolStep.status = 'completed'
+                  // Handle tool output
+                  console.log('🔧 Tool output:', data.content)
+                  
+                  // Mark current reasoning step as completed and add result
+                  if (reasoningSteps.length > 0) {
+                    const lastStep = reasoningSteps[reasoningSteps.length - 1]
+                    if (lastStep && lastStep.status === 'active') {
+                      lastStep.status = 'completed'
+                      lastStep.result = data.content
                     }
                   }
+                  
                   updateMessage(messageIndex, { reasoningSteps: [...reasoningSteps] })
+                  
+                  // Track tools used
+                  if (data.metadata?.tools) {
+                    toolsUsed.push(...data.metadata.tools)
+                  }
                   break
 
                 case 'content':
-                  // Accumulate final content
-                  accumulatedContent += data.content
+                  // Handle main content streaming
+                  // Backend sends FULL accumulated content in each chunk, not deltas
+                  accumulatedContent = data.content  // Use assignment, not addition!
                   
-                  // Mark all reasoning steps as completed
-                  reasoningSteps.forEach(step => {
-                    if (step.status === 'active') step.status = 'completed'
-                  })
-
+                  console.log(`📝 Content update: ${data.content.length} chars (ID: ${data.id})`)
+                  
                   updateMessage(messageIndex, {
                     content: accumulatedContent,
-                    reasoningSteps: [...reasoningSteps],
-                    isStreaming: data.final ? false : true
-                  })
-
-                  // Backend handles all analysis - no need for frontend analysis
-                  break
-
-                case 'complete':
-                  console.log('✅ Stream complete:', {
-                    messageIndex,
-                    accumulatedContentLength: accumulatedContent?.length || 0
-                  })
-                  
-                  // Mark streaming as complete
-                  updateMessage(messageIndex, {
-                    isStreaming: false,
+                    isStreaming: true,
                     isLoading: false
                   })
                   
                   // No need for additional analysis - backend has already handled it
                   break
 
-                case 'placeholder':
-                  // Handle analysis placeholder injection
-                  console.log('🔄 Analysis placeholder injected:', data.placeholder_id)
-                  
-                  // Use a markdown-compatible placeholder that won't break rendering
-                  const placeholderText = `\n\n> 🔄 **${data.content}** *(Placeholder: ${data.placeholder_id})*\n\n`
-                  
-                  accumulatedContent += placeholderText
-                  updateMessage(messageIndex, { content: accumulatedContent })
+                case 'analysis_status':
+                  // Handle analysis keep-alive messages
+                  console.log('🔄 Analysis status:', data.content, data.metadata)
+                  // Don't update message content, just log the status
                   break
 
-                case 'component_replacement':
-                  // Replace placeholder with actual component
-                  console.log('✅ Component ready for placeholder:', data.placeholder_id)
+                case 'enhanced_content':
+                  // Handle enhanced content packet from new batch system
+                  console.log('✨ Enhanced content packet received:', data.metadata)
                   
-                  const componentMarkdown = data.component?.markdown || ''
-                  
-                  // Replace markdown placeholder with component
-                  const placeholderPattern = `> 🔄 \\*\\*.*?\\*\\* \\*\\(Placeholder: ${data.placeholder_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)\\*`
-                  accumulatedContent = accumulatedContent.replace(
-                    new RegExp(placeholderPattern, 's'),
-                    `\n\n${componentMarkdown}\n\n`
-                  )
-                  
-                  // Also add to components array for proper rendering
-                  const currentMessage = messages.value[messageIndex]
-                  if (currentMessage && data.component) {
-                    const existingComponents = currentMessage.components || []
-                    existingComponents.push({
-                      id: data.placeholder_id,
-                      type: data.component.type,
-                      title: `Generated ${data.component.type}`,
-                      content: data.component.extracted_data || {},
-                      reasoning: data.component.reasoning,
-                      markdown: data.component.markdown,
-                      confidence: data.component.confidence
-                    })
+                  if (data.enhanced_content && data.components) {
+                    const enhancedPacket: EnhancedContentPacket = {
+                      enhanced_content: data.enhanced_content,
+                      components: data.components,
+                      metadata: {
+                        processed: data.metadata?.processed || false,
+                        segmentation_time: data.metadata?.segmentation_time,
+                        analysis_time: data.metadata?.analysis_time,
+                        blocks_found: data.metadata?.blocks_found,
+                        components_generated: data.metadata?.components_generated,
+                        original_length: data.metadata?.original_length,
+                        enhanced_length: data.metadata?.enhanced_length,
+                        error: data.metadata?.error
+                      }
+                    }
                     
-                    updateMessage(messageIndex, { 
-                      content: accumulatedContent,
-                      components: existingComponents 
-                    })
-                  } else {
-                    updateMessage(messageIndex, { content: accumulatedContent })
+                    // Process enhanced content packet
+                    const messageId = messages.value[messageIndex]?.id
+                    if (messageId) {
+                      enhancedContent.processEnhancedPacket(
+                        messageId, 
+                        enhancedPacket, 
+                        accumulatedContent
+                      )
+                    }
+                    
+                    console.log(`✅ Enhanced content processed: ${data.components?.length || 0} components generated`)
                   }
-                  break
-
-                case 'placeholder_removal':
-                  // Remove placeholder that didn't generate a component
-                  console.log('⏭️ Removing placeholder (no component):', data.placeholder_id)
-                  
-                  // Remove markdown placeholder completely
-                  const removalPattern = `> 🔄 \\*\\*.*?\\*\\* \\*\\(Placeholder: ${data.placeholder_id.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\)\\*\\n\\n`
-                  accumulatedContent = accumulatedContent.replace(
-                    new RegExp(removalPattern, 's'),
-                    '' // Remove completely
-                  )
-                  
-                  updateMessage(messageIndex, { content: accumulatedContent })
                   break
 
                 case 'error':
@@ -338,10 +319,28 @@ export const useDigiSetuChat = () => {
                     isLoading: false
                   })
                   break
+
+                case 'complete':
+                  // Stream complete
+                  updateMessage(messageIndex, {
+                    isStreaming: false,
+                    isLoading: false
+                  })
+                  
+                  // Mark final reasoning step as completed
+                  if (reasoningSteps.length > 0) {
+                    const lastStep = reasoningSteps[reasoningSteps.length - 1]
+                    if (lastStep && lastStep.status === 'active') {
+                      lastStep.status = 'completed'
+                    }
+                  }
+                  
+                  updateMessage(messageIndex, { reasoningSteps: [...reasoningSteps] })
+                  break
               }
 
             } catch (parseError) {
-              console.warn('Failed to parse SSE data:', line, parseError)
+              console.error('JSON parse error:', parseError, line)
             }
           }
         }
@@ -361,254 +360,28 @@ export const useDigiSetuChat = () => {
    */
   const updateMessage = (index: number, updates: Partial<Message>) => {
     if (index >= 0 && index < messages.value.length) {
-      messages.value[index] = { ...messages.value[index], ...updates }
-    }
-  }
-
-  /**
-   * Check for semantic boundaries and insert placeholders during streaming
-   */
-  const checkForSemanticBoundaryWithPlaceholder = async (
-    messageIndex: number, 
-    content: string, 
-    lastAnalyzedLength: number,
-    pendingAnalysis: Map<string, { position: number, content: string }>
-  ) => {
-    try {
-      // Only analyze if we have new content
-      if (content.length <= lastAnalyzedLength) return
-      
-      const newContent = content.slice(lastAnalyzedLength)
-      
-      // Detect semantic boundaries (paragraph breaks, list items, table rows)
-      const semanticBoundaries = [
-        /\n\n/,           // Paragraph break
-        /\n\s*[-*+]\s/,   // List item
-        /\n\s*\d+\.\s/,   // Numbered list
-        /\|\s*\n/,        // Table row end
-        /```\n/,          // Code block end
-        /\n#{1,6}\s/      // Header
-      ]
-      
-      let foundBoundary = false
-      for (const boundary of semanticBoundaries) {
-        if (boundary.test(newContent)) {
-          foundBoundary = true
-          break
-        }
-      }
-      
-      // If we found a semantic boundary and have enough content, create placeholder
-      if (foundBoundary && content.length > 50) {
-        const analysisId = `analysis_${Date.now()}_${Math.random()}`
-        const boundaryPosition = content.length
-        
-        console.log('🔍 Semantic boundary detected - inserting placeholder:', {
-          analysisId,
-          position: boundaryPosition,
-          contentLength: content.length
+      const currentMessage = messages.value[index]
+      if (currentMessage) {
+        console.log(`🔄 Updating message ${currentMessage.id} at index ${index}:`, {
+          oldContentLength: currentMessage.content.length,
+          newContentLength: updates.content?.length || 0,
+          isStreaming: updates.isStreaming,
+          updateKeys: Object.keys(updates),
+          hasContent: 'content' in updates,
+          contentValue: updates.content
         })
         
-        // Store analysis info
-        pendingAnalysis.set(analysisId, {
-          position: boundaryPosition,
-          content: content
-        })
-        
-        // Insert placeholder component immediately
-        const currentMessage = messages.value[messageIndex]
-        if (currentMessage) {
-          const placeholderComponent = {
-            id: analysisId,
-            type: 'analysis-placeholder',
-            title: 'Analyzing content...',
-            content: { analysisId, position: boundaryPosition },
-            reasoning: 'Analysis in progress',
-            markdown: `<!-- PLACEHOLDER:${analysisId} -->`
-          }
-          
-          const existingComponents = currentMessage.components || []
-          currentMessage.components = [...existingComponents, placeholderComponent]
+        // Don't overwrite content with empty/undefined values
+        const safeUpdates = { ...updates }
+        if ('content' in updates && (!updates.content || updates.content.length === 0)) {
+          console.warn('⚠️ Preventing content clear - removing content from updates')
+          delete safeUpdates.content
         }
         
-        // Start analysis in background (will replace placeholder when done)
-        analyzeAndReplacePlaceholder(messageIndex, content, analysisId, pendingAnalysis)
+        messages.value[index] = { ...currentMessage, ...safeUpdates }
       }
-      
-    } catch (error) {
-      console.error('Semantic boundary placeholder error:', error)
-    }
-  }
-
-  /**
-   * Analyze content and replace placeholder when ready
-   */
-  const analyzeAndReplacePlaceholder = async (
-    messageIndex: number, 
-    content: string, 
-    analysisId: string,
-    pendingAnalysis: Map<string, { position: number, content: string }>
-  ) => {
-    try {
-      console.log(`🔍 Starting analysis for placeholder: ${analysisId}`)
-      
-      // Perform the actual analysis
-      const decision = await analyzeContent({ content })
-      
-      // Get current message
-      const currentMessage = messages.value[messageIndex]
-      if (!currentMessage || !currentMessage.components) return
-      
-      // Find and replace the placeholder
-      const componentIndex = currentMessage.components.findIndex(c => c.id === analysisId)
-      
-      if (componentIndex !== -1) {
-        if (decision && decision.decision === 'GENERATE_NOW') {
-          // Replace placeholder with actual component
-          const realComponent = {
-            id: Date.now() + Math.random(),
-            type: decision.component_type || 'unknown',
-            title: `Generated ${decision.component_type || 'Component'}`,
-            content: decision.extracted_data || {},
-            reasoning: decision.reasoning || 'Auto-generated from content analysis',
-            markdown: decision.markdown
-          }
-          
-          currentMessage.components[componentIndex] = realComponent
-          console.log(`✅ Replaced placeholder ${analysisId} with component: ${decision.component_type}`)
-        } else {
-          // Remove placeholder if no component needed
-          currentMessage.components.splice(componentIndex, 1)
-          console.log(`❌ Removed placeholder ${analysisId} - no component generated`)
-        }
-      }
-      
-      // Clean up pending analysis
-      pendingAnalysis.delete(analysisId)
-      
-    } catch (error) {
-      console.error(`Analysis error for placeholder ${analysisId}:`, error)
-      
-      // Remove placeholder on error
-      const currentMessage = messages.value[messageIndex]
-      if (currentMessage?.components) {
-        const componentIndex = currentMessage.components.findIndex(c => c.id === analysisId)
-        if (componentIndex !== -1) {
-          currentMessage.components.splice(componentIndex, 1)
-        }
-      }
-      
-      pendingAnalysis.delete(analysisId)
-    }
-  }
-
-  /**
-   * Original semantic boundary function (keeping for compatibility)
-   */
-  const checkForSemanticBoundaryAndAnalyze = async (
-    messageIndex: number, 
-    content: string, 
-    lastAnalyzedLength: number
-  ) => {
-    try {
-      // Only analyze if we have new content
-      if (content.length <= lastAnalyzedLength) return
-      
-      const newContent = content.slice(lastAnalyzedLength)
-      
-      // Detect semantic boundaries (paragraph breaks, list items, table rows)
-      const semanticBoundaries = [
-        /\n\n/,           // Paragraph break
-        /\n\s*[-*+]\s/,   // List item
-        /\n\s*\d+\.\s/,   // Numbered list
-        /\|\s*\n/,        // Table row end
-        /```\n/,          // Code block end
-        /\n#{1,6}\s/      // Header
-      ]
-      
-      let foundBoundary = false
-      for (const boundary of semanticBoundaries) {
-        if (boundary.test(newContent)) {
-          foundBoundary = true
-          break
-        }
-      }
-      
-      // If we found a semantic boundary and have enough content, analyze
-      if (foundBoundary && content.length > 50) {
-        console.log('🔍 Semantic boundary detected - analyzing chunk:', {
-          totalLength: content.length,
-          newContentLength: newContent.length,
-          boundary: 'detected'
-        })
-        
-        // Show analysis indicator immediately
-        const currentMessage = messages.value[messageIndex]
-        if (currentMessage) {
-          currentMessage.isAnalyzing = true
-        }
-        
-        // Analyze the accumulated content up to this point (non-blocking)
-        analyzeAndInjectComponents(messageIndex, content, true).finally(() => {
-          // Hide analysis indicator when done
-          const message = messages.value[messageIndex]
-          if (message) {
-            message.isAnalyzing = false
-          }
-        })
-      }
-      
-    } catch (error) {
-      console.error('Semantic boundary analysis error:', error)
-    }
-  }
-
-  /**
-   * Analyze content and inject components (reuses existing component analysis)
-   */
-  const analyzeAndInjectComponents = async (messageIndex: number, content: string, isChunk: boolean = false) => {
-    try {
-      console.log(`🔍 analyzeAndInjectComponents called (${isChunk ? 'CHUNK' : 'FINAL'}):`, {
-        messageIndex,
-        contentLength: content?.length || 0,
-        contentPreview: content?.substring(0, 100) + '...',
-        isChunk
-      })
-      
-      // Skip analysis if content is empty or too short
-      if (!content || content.trim().length < 10) {
-        console.log('⏭️ Skipping analysis: content too short or empty')
-        return
-      }
-      
-      console.log('📊 Starting component analysis...')
-      // Use existing component analysis system
-      const decision = await analyzeContent({ content })
-      
-      if (decision && decision.decision === 'GENERATE_NOW') {
-        // Create component based on the decision
-        const component = {
-          id: Date.now() + Math.random(),
-          type: decision.component_type || 'unknown',
-          title: `Generated ${decision.component_type || 'Component'}`,
-          content: decision.extracted_data || {},
-          reasoning: decision.reasoning || 'Auto-generated from content analysis',
-          markdown: decision.markdown
-        }
-        
-        // For chunk analysis, append to existing components; for final, replace
-        const currentMessage = messages.value[messageIndex]
-        const existingComponents = currentMessage?.components || []
-        
-        updateMessage(messageIndex, {
-          components: isChunk ? [...existingComponents, component] : [component]
-        })
-        
-        console.log(`✅ Generated component (${isChunk ? 'CHUNK' : 'FINAL'}): ${decision.component_type} (confidence: ${decision.confidence})`)
-      }
-
-    } catch (error) {
-      console.error('Component analysis error:', error)
+    } else {
+      console.error(`❌ Invalid message index: ${index} (total: ${messages.value.length})`)
     }
   }
 
@@ -617,6 +390,7 @@ export const useDigiSetuChat = () => {
     isLoading,
     isStreaming,
     input,
-    sendMessage
+    sendMessage,
+    enhancedContent
   }
 }

@@ -76,63 +76,14 @@
             />
           </div>
           
-          <!-- Analysis Indicator -->
-          <div v-if="message.isAnalyzing" class="analysis-indicator">
-            <div class="analysis-dots">
-              <span /><span /><span />
-            </div>
-            <span class="analysis-text">Analyzing for components...</span>
-          </div>
-          
-          <!-- Generated Components -->
-          <div v-if="message.components && message.components.length > 0" class="components-section">
-            <div class="components-header">
-              <UiIcon name="lucide:bar-chart-3" :size="14" />
-              <span>Generated Components ({{ message.components.length }})</span>
-            </div>
-            <div class="components-list">
-              <div
-                v-for="(component, index) in message.components"
-                :key="`component-${index}`"
-                class="generated-component"
-                :class="{ 'placeholder-component': component.type === 'analysis-placeholder' }"
-              >
-                <!-- Analysis Placeholder -->
-                <div v-if="component.type === 'analysis-placeholder'" class="analysis-placeholder">
-                  <div class="placeholder-header">
-                    <div class="placeholder-dots">
-                      <span /><span /><span />
-                    </div>
-                    <span class="placeholder-text">{{ component.title }}</span>
-                  </div>
-                  <div class="placeholder-content">
-                    <UiIcon name="lucide:bar-chart-3" :size="16" />
-                    <span>Analyzing content for interactive components...</span>
-                  </div>
-                </div>
-                
-                <!-- Regular Component -->
-                <div v-else>
-                  <div class="component-info">
-                    <div class="component-meta">
-                      <UiBadge variant="secondary" size="sm">
-                        {{ component.type }}
-                      </UiBadge>
-                      <span class="component-confidence">
-                        {{ (component.confidence * 100).toFixed(1) }}% confidence
-                      </span>
-                    </div>
-                  </div>
-                  <div class="component-preview">
-                    <EnhancedComponentRenderer
-                      :component-type="component.type"
-                      :markdown="component.markdown"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+          <!-- Enhanced Components (New System) -->
+          <EnhancedContentRenderer
+            v-if="enhancedContent.isMessageEnhanced(message.id)"
+            :message-id="message.id"
+            :enhanced-content="enhancedContent.getEnhancedContent(message.id)"
+            :components="enhancedContent.getMessageComponents(message.id)"
+            @component-interaction="handleComponentInteraction"
+          />
 
           <!-- Tool Calls -->
           <div v-if="message.toolCalls && message.toolCalls.length > 0" class="tools-section">
@@ -178,6 +129,7 @@
 
 <script setup lang="ts">
 import type { Message } from '~/types'
+import { useEnhancedContent } from '~/composables/useEnhancedContent'
 
 interface Props {
   message: Message
@@ -197,6 +149,9 @@ const props = withDefaults(defineProps<Props>(), {
 })
 
 const emit = defineEmits<Emits>()
+
+// Enhanced content system
+const enhancedContent = useEnhancedContent()
 
 const reasoningExpanded = ref(false)
 
@@ -244,6 +199,11 @@ const getToolStatus = (status?: string) => {
     case 'running': return 'warning'
     default: return 'secondary'
   }
+}
+
+// Enhanced content interaction handler
+const handleComponentInteraction = (componentId: string, interaction: string, data?: any) => {
+  enhancedContent.handleComponentInteraction(props.message.id, componentId, interaction, data)
 }
 </script>
 

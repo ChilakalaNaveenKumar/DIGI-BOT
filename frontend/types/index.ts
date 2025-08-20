@@ -8,12 +8,13 @@ export interface ToolCall {
 }
 
 export interface ReasoningStep {
-  type: 'thinking' | 'tool_call' | 'conclusion'
+  type: 'thinking' | 'tool_call' | 'conclusion' | 'reasoning' | 'activity'
   content: string
   status?: 'active' | 'completed' | 'error'
   tool_name?: string
   result?: any
   preview?: string
+  metadata?: any
 }
 
 export interface GeneratedComponent {

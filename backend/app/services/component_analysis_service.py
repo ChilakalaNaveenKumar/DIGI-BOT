@@ -1,8 +1,12 @@
 """
 Component Analysis Service
 
-AI-powered service for analyzing content and determining when to generate
-enhanced components like charts and tables.
+Legacy service for backward compatibility.
+New architecture uses BatchAnalysisEngine with two-step pipeline:
+1. GPT-4o Mini for block segmentation  
+2. Claude 4 with thinking for component analysis
+
+This service is now primarily used for individual block analysis.
 """
 
 import json
@@ -197,22 +201,35 @@ IMPORTANT:
         return prompt
     
     async def _get_ai_analysis(self, prompt: str) -> str:
-        """Get AI analysis using Anthropic provider."""
+        """Get AI analysis using Anthropic provider with thinking enabled."""
         try:
-            messages = [{"role": "user", "content": prompt}]
+            messages = [
+                {
+                    "role": "system",
+                    "content": "You are an expert content analysis specialist. Think through each decision carefully before responding."
+                },
+                {
+                    "role": "user", 
+                    "content": prompt
+                }
+            ]
             
-            # Use the anthropic provider to get analysis
-            response = await self.anthropic_provider.generate_completion(
+            # Use Claude with thinking for better analysis quality
+            response_content = ""
+            async for chunk in self.anthropic_provider.stream_completion(
                 messages=messages,
-                model="claude-opus-4-1-20250805",
+                model="claude-3-5-sonnet-20241022",  # Use latest Claude model
                 max_tokens=2000,
-                temperature=0.1  # Low temperature for consistent analysis
-            )
+                temperature=0.2,  # Slightly higher for more creative component suggestions
+                enable_thinking=True  # Enable thinking process for better analysis
+            ):
+                if chunk.get("type") == "content":
+                    response_content += chunk.get("content", "")
+                elif chunk.get("type") == "thinking":
+                    # Log thinking process for debugging
+                    logger.debug(f"Claude thinking: {chunk.get('content', '')}")
             
-            # Extract content from Anthropic response format
-            if "content" in response and len(response["content"]) > 0:
-                return response["content"][0].get("text", "")
-            return ""
+            return response_content
             
         except Exception as e:
             logger.error("AI analysis request failed", error=str(e))

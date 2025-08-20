@@ -6,6 +6,7 @@ to intelligently select and coordinate other AI models as specialized tools.
 """
 
 import json
+import time
 from typing import Dict, Any, Optional, List, AsyncGenerator
 import structlog
 from pydantic import BaseModel
@@ -569,9 +570,11 @@ class Claude4Orchestrator:
                 logger.info(f"Streaming Claude with reasoning={enable_reasoning}")
                 
                 if enable_reasoning:
-                    # Stream reasoning chunks in real-time
+                    # Stream reasoning chunks in real-time, but accumulate content
                     reasoning_started = False
                     response_started = False
+                    accumulated_content = ""  # Track accumulated content
+                    content_id = f"content_{int(time.time() * 1000)}"  # Unique ID for this content stream
                     
                     async for chunk in self.claude4_provider.stream_completion(
                         messages=messages,
@@ -616,15 +619,19 @@ class Claude4Orchestrator:
                                 }
                             
                         elif chunk_type == "content" and chunk_content:
-                            # Stream response content directly
+                            # Accumulate content and stream the full accumulated content with consistent ID
+                            accumulated_content += chunk_content
                             yield {
                                 "type": "content",
-                                "content": chunk_content,
+                                "content": accumulated_content,  # Send full accumulated content
+                                "id": content_id,  # Same ID for all updates to this content
                                 "provider": "claude4",
                                 "model": "claude-opus-4-1-20250805"
                             }
                 else:
-                    # Non-reasoning mode - just stream content
+                    # Non-reasoning mode - accumulate content
+                    accumulated_content = ""
+                    content_id = f"content_{int(time.time() * 1000)}"  # Unique ID for this content stream
                     async for chunk in self.claude4_provider.stream_completion(
                         messages=messages,
                         model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1
@@ -633,9 +640,11 @@ class Claude4Orchestrator:
                         temperature=0.7
                     ):
                         if chunk.get("type") == "content":
+                            accumulated_content += chunk.get("content", "")
                             yield {
                                 "type": "content",
-                                "content": chunk.get("content", ""),
+                                "content": accumulated_content,  # Send full accumulated content
+                                "id": content_id,  # Same ID for all updates to this content
                                 "provider": "claude4",
                                 "model": "claude-opus-4-1-20250805"
                             }

@@ -436,3 +436,100 @@ class OpenAIProvider:
         """Estimate token count for text (rough approximation)."""
         # Rough estimation: ~4 characters per token
         return len(text) // 4
+    
+    async def segment_content_blocks(
+        self,
+        content: str,
+        context: str = "Content analysis"
+    ) -> Optional[List[Dict[str, Any]]]:
+        """
+        Use GPT-4o Mini for fast, cheap content block segmentation.
+        This is Step 1 of the two-step analysis pipeline.
+        """
+        if not self.client:
+            raise DigiSetuException(
+                status_code=500,
+                error_code="OPENAI_NOT_INITIALIZED",
+                message="OpenAI provider not initialized"
+            )
+        
+        try:
+            segmentation_prompt = f"""
+Split this content into logical blocks based on content structure.
+
+CONTENT (length: {len(content)}):
+{content}
+
+Return ONLY a JSON array of [start, end] positions covering the ENTIRE content from 0 to {len(content)}:
+
+{{
+  "blocks": [
+    [0, 300],
+    [300, 600],
+    [600, {len(content)}]
+  ]
+}}
+
+IMPORTANT: Last block must end at {len(content)} to cover all content. Make blocks continuous with no gaps.
+"""
+
+            messages = [
+                {
+                    "role": "system", 
+                    "content": "You are a text segmentation tool. Return only JSON with position arrays."
+                },
+                {
+                    "role": "user", 
+                    "content": segmentation_prompt
+                }
+            ]
+            
+            # Use GPT-4o Mini for fast, cheap segmentation
+            response = await self.generate_completion(
+                messages=messages,
+                model="gpt-4o-mini",
+                max_tokens=1000,  # Enough for any content length
+                temperature=0,  # Deterministic segmentation
+            )
+            
+            if not response.choices or not response.choices[0].message.content:
+                logger.warning("GPT-4o Mini segmentation returned empty response")
+                return None
+            
+            # Parse JSON response
+            content_response = response.choices[0].message.content.strip()
+            
+            # Clean up any markdown formatting
+            if content_response.startswith("```json"):
+                content_response = content_response.replace("```json", "").replace("```", "").strip()
+            
+            import json
+            result = json.loads(content_response)
+            position_blocks = result.get("blocks", [])
+            
+            # Convert [start, end] positions to block objects
+            blocks = []
+            for i, (start, end) in enumerate(position_blocks):
+                if start < len(content) and end <= len(content) and start < end:
+                    block_content = content[start:end]
+                    blocks.append({
+                        "start_position": start,
+                        "end_position": end,
+                        "content": block_content,
+                        "has_enhancement_potential": True  # All blocks are candidates
+                    })
+            
+            logger.info(
+                "GPT-4o Mini segmentation completed",
+                blocks_found=len(blocks),
+                tokens_used=response.usage.total_tokens if response.usage else 0
+            )
+            
+            return blocks
+            
+        except json.JSONDecodeError as e:
+            logger.error("Failed to parse GPT-4o Mini segmentation JSON", error=str(e))
+            return None
+        except Exception as e:
+            logger.error("GPT-4o Mini segmentation failed", error=str(e))
+            return None
