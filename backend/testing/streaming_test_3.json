@@ -1,0 +1,48 @@
+{
+  "test_name": "User Growth with Line Chart",
+  "prompt": "Company user growth: Jan 1000, Feb 1500, Mar 2200, Apr 3100, May 4500 users. Create a trend visualization and analyze the growth acceleration, identify key inflection points, and project future growth.",
+  "initial_text": "I'll create a line chart to visualize your company's user growth trend and then provide a detailed analysis.",
+  "tool_calls": [
+    {
+      "type": "tool_use",
+      "id": "toolu_01Uyyv223satesAgoEctABRF",
+      "name": "data_visualization_tool",
+      "input": {
+        "chart_type": "line",
+        "title": "Company User Growth Trend (Jan-May)",
+        "data": [
+          {
+            "x": "Jan",
+            "y": 1000
+          },
+          {
+            "x": "Feb",
+            "y": 1500
+          },
+          {
+            "x": "Mar",
+            "y": 2200
+          },
+          {
+            "x": "Apr",
+            "y": 3100
+          },
+          {
+            "x": "May",
+            "y": 4500
+          }
+        ]
+      }
+    }
+  ],
+  "tool_results": [
+    {
+      "type": "tool_result",
+      "tool_use_id": "toolu_01Uyyv223satesAgoEctABRF",
+      "content": "\u2705 Chart created successfully!\n\n:::line-chart\ntitle: Company User Growth Trend (Jan-May)\ndata: [{\"x\": \"Jan\", \"y\": 1000}, {\"x\": \"Feb\", \"y\": 1500}, {\"x\": \"Mar\", \"y\": 2200}, {\"x\": \"Apr\", \"y\": 3100}, {\"x\": \"May\", \"y\": 4500}]\n:::\n\n\nThe chart has been generated and will be displayed. You can now continue with your analysis."
+    }
+  ],
+  "continuation_text": "## Growth Analysis & Key Insights\n\n### **Growth Acceleration Analysis**\n\nYour user growth shows **strong positive acceleration** with increasing momentum:\n\n**Monthly Growth Rates:**\n- Jan\u2192Feb: +50% (500 users)\n- Feb\u2192Mar: +47% (700 users)\n- Mar\u2192Apr: +41% (900 users)\n- Apr\u2192May: +45% (1,400 users)\n\n**Monthly Growth Acceleration:**\n- Feb: +500 users\n- Mar: +700 users (+40% increase in growth)\n- Apr: +900 users (+29% increase in growth)\n- May: +1,400 users (+56% increase in growth)\n\n### **Key Inflection Points**\n\n1. **February-March**: First major acceleration point where monthly user additions jumped from 500 to 700\n2. **April-May**: Critical inflection point with the largest single-month gain (1,400 users), suggesting a breakthrough moment\n\n### **Growth Pattern Analysis**\n\n- **Overall Growth**: 350% increase from January to May\n- **Average Monthly Growth**: 42.6%\n- **Compound Monthly Growth Rate**: ~35%\n- **Growth Type**: Exponential rather than linear, indicating strong product-market fit\n\n### **Future Growth Projections**\n\nBased on current trends, here are three scenarios:\n\n**Conservative (30% monthly growth):**\n- June: ~5,850 users\n- July: ~7,600 users\n- August: ~9,900 users\n\n**Current Trend (42% average growth):**\n- June: ~6,400 users\n- July: ~9,100 users\n- August: ~12,900 users\n\n**Optimistic (maintaining May's 45% rate):**\n- June: ~6,500 users\n- July: ~9,400 users\n- August: ~13,600 users\n\n### **Strategic Recommendations**\n\n1. **Investigate May's Success**: Analyze what drove the exceptional May growth to replicate those factors\n2. **Capacity Planning**: Prepare infrastructure for 10,000+ users by August\n3. **Monitor Leading Indicators**: Track user engagement and retention to ensure sustainable growth\n4. **Resource Allocation**: Scale customer support and onboarding processes for increased volume\n\nThe trend suggests your company has achieved strong momentum with accelerating growth - a very positive indicator for business health and market traction.",
+  "complete_response": "I'll create a line chart to visualize your company's user growth trend and then provide a detailed analysis.\n\n\u2705 Chart created successfully!\n\n:::line-chart\ntitle: Company User Growth Trend (Jan-May)\ndata: [{\"x\": \"Jan\", \"y\": 1000}, {\"x\": \"Feb\", \"y\": 1500}, {\"x\": \"Mar\", \"y\": 2200}, {\"x\": \"Apr\", \"y\": 3100}, {\"x\": \"May\", \"y\": 4500}]\n:::\n\n\nThe chart has been generated and will be displayed. You can now continue with your analysis.\n\n## Growth Analysis & Key Insights\n\n### **Growth Acceleration Analysis**\n\nYour user growth shows **strong positive acceleration** with increasing momentum:\n\n**Monthly Growth Rates:**\n- Jan\u2192Feb: +50% (500 users)\n- Feb\u2192Mar: +47% (700 users)\n- Mar\u2192Apr: +41% (900 users)\n- Apr\u2192May: +45% (1,400 users)\n\n**Monthly Growth Acceleration:**\n- Feb: +500 users\n- Mar: +700 users (+40% increase in growth)\n- Apr: +900 users (+29% increase in growth)\n- May: +1,400 users (+56% increase in growth)\n\n### **Key Inflection Points**\n\n1. **February-March**: First major acceleration point where monthly user additions jumped from 500 to 700\n2. **April-May**: Critical inflection point with the largest single-month gain (1,400 users), suggesting a breakthrough moment\n\n### **Growth Pattern Analysis**\n\n- **Overall Growth**: 350% increase from January to May\n- **Average Monthly Growth**: 42.6%\n- **Compound Monthly Growth Rate**: ~35%\n- **Growth Type**: Exponential rather than linear, indicating strong product-market fit\n\n### **Future Growth Projections**\n\nBased on current trends, here are three scenarios:\n\n**Conservative (30% monthly growth):**\n- June: ~5,850 users\n- July: ~7,600 users\n- August: ~9,900 users\n\n**Current Trend (42% average growth):**\n- June: ~6,400 users\n- July: ~9,100 users\n- August: ~12,900 users\n\n**Optimistic (maintaining May's 45% rate):**\n- June: ~6,500 users\n- July: ~9,400 users\n- August: ~13,600 users\n\n### **Strategic Recommendations**\n\n1. **Investigate May's Success**: Analyze what drove the exceptional May growth to replicate those factors\n2. **Capacity Planning**: Prepare infrastructure for 10,000+ users by August\n3. **Monitor Leading Indicators**: Track user engagement and retention to ensure sustainable growth\n4. **Resource Allocation**: Scale customer support and onboarding processes for increased volume\n\nThe trend suggests your company has achieved strong momentum with accelerating growth - a very positive indicator for business health and market traction.",
+  "chart_components": 1
+}

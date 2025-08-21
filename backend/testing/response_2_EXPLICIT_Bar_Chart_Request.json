@@ -1,0 +1,83 @@
+{
+  "test_name": "EXPLICIT Bar Chart Request",
+  "prompt": "Here's our quarterly sales: Q1=$120k, Q2=$150k, Q3=$180k, Q4=$200k. Create a bar chart to compare these quarterly results and then analyze the trends in detail - discuss growth patterns, seasonal factors, and business implications.",
+  "full_response": {
+    "id": "msg_01KKn8iEmWjuLeDXRe9YZdPN",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-20250514",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll create a bar chart to visualize your quarterly sales data and then provide a detailed analysis of the trends."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01ANo5We2vccQjfsDrAyDtZD",
+        "name": "bar_chart_tool",
+        "input": {
+          "title": "Quarterly Sales Performance",
+          "data": [
+            {
+              "label": "Q1",
+              "value": 120000
+            },
+            {
+              "label": "Q2",
+              "value": 150000
+            },
+            {
+              "label": "Q3",
+              "value": 180000
+            },
+            {
+              "label": "Q4",
+              "value": 200000
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 932,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 165,
+      "service_tier": "standard"
+    }
+  },
+  "text_content": "I'll create a bar chart to visualize your quarterly sales data and then provide a detailed analysis of the trends.",
+  "tool_calls": [
+    {
+      "name": "bar_chart_tool",
+      "input": {
+        "title": "Quarterly Sales Performance",
+        "data": [
+          {
+            "label": "Q1",
+            "value": 120000
+          },
+          {
+            "label": "Q2",
+            "value": 150000
+          },
+          {
+            "label": "Q3",
+            "value": 180000
+          },
+          {
+            "label": "Q4",
+            "value": 200000
+          }
+        ]
+      }
+    }
+  ],
+  "response_time_ms": 3132.3208808898926
+}

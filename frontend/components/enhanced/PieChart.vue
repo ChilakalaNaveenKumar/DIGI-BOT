@@ -230,8 +230,13 @@ onMounted(() => {
 }
 
 .chart-legend {
-  border-top: 1px solid #e5e7eb;
+  @apply border-gray-200 dark:border-gray-700;
+  border-top: 1px solid;
   padding-top: 1rem;
+}
+
+.chart-legend span {
+  @apply text-gray-700 dark:text-gray-300;
 }
 
 .apex-chart {
@@ -254,6 +259,19 @@ onMounted(() => {
   font-family: 'Inter', system-ui, sans-serif !important;
   font-weight: 700 !important;
   text-shadow: 1px 1px 2px rgba(0,0,0,0.5) !important;
+}
+
+/* Dark mode specific fixes */
+@media (prefers-color-scheme: dark) {
+  :deep(.apexcharts-datalabel-label),
+  :deep(.apexcharts-datalabel-value) {
+    fill: #ffffff !important;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.8) !important;
+  }
+  
+  :deep(.apexcharts-legend-text) {
+    fill: #e5e7eb !important;
+  }
 }
 
 :deep(.apexcharts-pie-slice) {

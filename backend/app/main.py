@@ -23,6 +23,7 @@ from app.core.config import get_settings
 from app.core.database import init_db, close_db
 from app.core.exceptions import DigiSetuException
 from app.core.logging import setup_logging
+from app.core.logging_config import configure_logging
 from app.core.middleware import (
     SecurityHeadersMiddleware,
     TimingMiddleware,
@@ -36,6 +37,10 @@ settings = get_settings()
 
 # Setup structured logging
 setup_logging()
+
+# Configure logging to reduce terminal noise
+configure_logging()
+
 logger = structlog.get_logger(__name__)
 
 
@@ -212,6 +217,10 @@ def create_application() -> FastAPI:
     app.include_router(claude4_chat.router, prefix="/api/v1", tags=["Claude 4 Chat"])
     app.include_router(component_analysis.router, prefix="/api/v1/components", tags=["Component Analysis"])
     app.include_router(files.router, prefix="/api/v1", tags=["Files"])
+    
+    # Direct chat router (simplified, no orchestrator overhead)
+    from app.routers import direct_chat
+    app.include_router(direct_chat.router, prefix="/api/v1", tags=["Direct Chat"])
     
     # Simple health endpoint
     @app.get("/api/v1/health", tags=["Health"])

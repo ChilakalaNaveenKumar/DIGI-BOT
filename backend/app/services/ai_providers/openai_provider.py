@@ -446,6 +446,8 @@ class OpenAIProvider:
         Use GPT-4o Mini for fast, cheap content block segmentation.
         This is Step 1 of the two-step analysis pipeline.
         """
+        import json  # Import at function start to avoid scope issues
+        
         if not self.client:
             raise DigiSetuException(
                 status_code=500,
@@ -455,22 +457,28 @@ class OpenAIProvider:
         
         try:
             segmentation_prompt = f"""
-Split this content into logical blocks based on content structure.
+Segment this content into logical blocks for data visualization analysis.
 
 CONTENT (length: {len(content)}):
 {content}
 
-Return ONLY a JSON array of [start, end] positions covering the ENTIRE content from 0 to {len(content)}:
+RULES:
+- Create blocks that contain complete thoughts/data sections
+- Each block should be 200-800 characters
+- Don't split data tables, lists, or paragraphs
+- Look for natural boundaries (double newlines, section headers, data blocks)
+- Last block must end at position {len(content)}
 
+Return ONLY JSON with position arrays:
 {{
   "blocks": [
     [0, 300],
-    [300, 600],
+    [300, 600], 
     [600, {len(content)}]
   ]
 }}
 
-IMPORTANT: Last block must end at {len(content)} to cover all content. Make blocks continuous with no gaps.
+IMPORTANT: Blocks must be continuous with no gaps. Focus on keeping data together.
 """
 
             messages = [
@@ -503,7 +511,6 @@ IMPORTANT: Last block must end at {len(content)} to cover all content. Make bloc
             if content_response.startswith("```json"):
                 content_response = content_response.replace("```json", "").replace("```", "").strip()
             
-            import json
             result = json.loads(content_response)
             position_blocks = result.get("blocks", [])
             

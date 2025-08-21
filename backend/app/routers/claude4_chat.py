@@ -19,7 +19,7 @@ from app.core.database import get_db_session
 from app.models.user import User
 from app.models.conversation import MessageRole
 from app.services.conversation_service import ConversationService
-from app.services.streaming_analysis_wrapper import StreamingAnalysisWrapper
+from app.services.single_call_analyzer import CostEffectiveStreamingStack
 from app.core.exceptions import DigiSetuException
 
 logger = structlog.get_logger(__name__)
@@ -36,6 +36,18 @@ class ChatRequest(BaseModel):
     ai_settings: Optional[dict] = None
     user_preferences: Optional[dict] = None
     system_message: Optional[str] = None
+
+
+class FrontendChatRequest(BaseModel):
+    """Request model for frontend AI SDK 5 format."""
+    messages: List[dict]
+    provider: Optional[str] = "claude"
+    model: Optional[str] = None
+    files: Optional[List[dict]] = None
+    tools: Optional[List[dict]] = None
+    enableReasoning: Optional[bool] = True
+    enableToolCalling: Optional[bool] = False
+    streamMode: Optional[str] = "enhanced"
 
 
 class ChatResponse(BaseModel):
@@ -55,6 +67,102 @@ async def test_endpoint():
         "service": "claude4-chat",
         "orchestrator": "claude-4"
     }
+
+
+@router.post("", response_class=StreamingResponse)
+async def main_chat_endpoint(
+    request: FrontendChatRequest,
+    http_request: Request = None,
+):
+    """
+    Main chat endpoint called by frontend - uses cost-effective streaming.
+    
+    This replaces the expensive BatchAnalysisEngine with single AI calls.
+    """
+    
+    async def generate_response():
+        """Generate streaming response with cost-effective analysis."""
+        try:
+            # Get services
+            if not hasattr(http_request.app.state, 'claude4_orchestrator'):
+                yield f"data: {json.dumps({'type': 'error', 'content': 'Claude 4 orchestrator not initialized'})}\n\n"
+                return
+            
+            orchestrator = http_request.app.state.claude4_orchestrator
+            
+            # Initialize cost-effective streaming stack - ONE AI call per 2000 tokens
+            analysis_stack = CostEffectiveStreamingStack(
+                token_threshold=2000  # Trigger analysis every 2000 tokens
+            )
+            await analysis_stack.initialize()
+            
+            # Convert frontend messages to internal format
+            if not request.messages:
+                yield f"data: {json.dumps({'type': 'error', 'content': 'No messages provided'})}\n\n"
+                return
+            
+            # Get the last user message
+            last_message = request.messages[-1] if request.messages else {}
+            user_message = last_message.get('content', '')
+            
+            if not user_message:
+                yield f"data: {json.dumps({'type': 'error', 'content': 'No user message found'})}\n\n"
+                return
+            
+            # Convert message history
+            history = []
+            for msg in request.messages[:-1]:  # Exclude last message
+                history.append({
+                    "role": msg.get('role', 'user'),
+                    "content": msg.get('content', ''),
+                    "timestamp": time.time()
+                })
+            
+            # Get original stream from orchestrator
+            original_stream = orchestrator.process_request(
+                user_message=user_message,
+                conversation_history=history,
+                user_preferences=None,
+                files=request.files,
+                user_id="dev-user",  # TODO: Get from auth
+                db=None,  # TODO: Add DB support
+                system_message=None
+            )
+            
+            # Wrap stream with cost-effective single-call analysis stack
+            wrapped_stream = analysis_stack.wrap_stream(
+                original_stream=original_stream,
+                user_preferences=None
+            )
+            
+            # Process wrapped stream
+            async for chunk in wrapped_stream:
+                chunk_type = chunk.get("type")
+                chunk_content = chunk.get("content", "")
+                
+                # Forward chunk to frontend
+                yield f"data: {json.dumps(chunk)}\n\n"
+                
+                if chunk_type == "error":
+                    logger.error("Claude 4 orchestration error", error=chunk_content)
+                    return
+            
+            # Send final completion signal
+            yield f"data: {json.dumps({'type': 'complete', 'content': 'Response completed'})}\n\n"
+            
+        except Exception as e:
+            logger.error("Cost-effective streaming error", error=str(e))
+            yield f"data: {json.dumps({'type': 'error', 'content': f'Streaming error: {str(e)}'})}\n\n"
+    
+    return StreamingResponse(
+        generate_response(),
+        media_type="text/plain",
+        headers={
+            "Cache-Control": "no-cache",
+            "Connection": "keep-alive",
+            "Content-Type": "text/event-stream",
+        }
+    )
 
 
 @router.post("/send", response_model=ChatResponse)
@@ -212,9 +320,11 @@ async def stream_chat_message(
             orchestrator = http_request.app.state.claude4_orchestrator
             conversation_service = ConversationService(db)
             
-            # Initialize streaming analysis wrapper
-            wrapper = StreamingAnalysisWrapper()
-            await wrapper.initialize()
+            # Initialize cost-effective streaming stack - ONE AI call per 2000 tokens
+            analysis_stack = CostEffectiveStreamingStack(
+                token_threshold=2000  # Trigger analysis every 2000 tokens
+            )
+            await analysis_stack.initialize()
             
             # Get or create conversation
             if request.conversation_id:
@@ -276,8 +386,8 @@ async def stream_chat_message(
                 system_message=request.system_message
             )
             
-            # Wrap stream with analysis capabilities
-            wrapped_stream = wrapper.wrap_stream(
+            # Wrap stream with cost-effective single-call analysis stack
+            wrapped_stream = analysis_stack.wrap_stream(
                 original_stream=original_stream,
                 user_preferences=request.user_preferences
             )
@@ -304,11 +414,10 @@ async def stream_chat_message(
                 elif chunk_type == "error":
                     # Error already sent to frontend, log and break
                     logger.error("Claude 4 orchestration error", error=chunk_content)
-                    await wrapper.cleanup()
+                    # No cleanup needed
                     return
             
-            # Cleanup wrapper
-            await wrapper.cleanup()
+            # No cleanup needed for cost-effective stack
             
             # Save assistant response to database
             if response_content:

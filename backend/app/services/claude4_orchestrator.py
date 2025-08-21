@@ -277,29 +277,63 @@ class Claude4Orchestrator:
         logger.info(f"Making orchestration decision for: {user_message}")
         if self.claude4_provider:
             try:
-                decision_prompt = self._build_decision_prompt(user_message, files, user_preferences)
-                logger.info(f"Decision prompt built, calling Claude...")
+                # Build simplified prompt without tool descriptions (tools are passed as parameter)
+                simple_prompt = f"""Analyze this user request and decide which tools to use (if any).
+
+User request: "{user_message}"
+{f"Files uploaded: {[f.get('name', 'unknown') for f in files]}" if files else ""}
+
+You have access to AI models (GPT-5, GPT-4, Grok) and specialized tools (image, audio, etc).
+Use tools only when necessary - you can handle most requests directly.
+
+Respond with tool calls if needed, or answer directly."""
+                
+                logger.info(f"Simplified prompt built, calling Claude with tools...")
                 
                 response = await self.claude4_provider.generate_completion(
-                    messages=[{"role": "user", "content": decision_prompt}],
-                    model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1 for decisions
-                    max_tokens=4096,  # Reasonable limit for decision making
-                    temperature=self.decision_temperature
+                    messages=[{"role": "user", "content": simple_prompt}],
+                    model="claude-sonnet-4-20250514",
+                    max_tokens=16000,  # Higher limit as requested
+                    temperature=self.decision_temperature,
+                    tools=self._get_available_tools()  # Pass tools as parameter instead of describing in prompt
                 )
                 
-                logger.info(f"Claude decision response: {response}")
+                logger.info(f"Claude response received")
                 
-                # Parse Claude's decision - handle Anthropic response format
-                decision_text = ""
-                if isinstance(response, dict) and 'content' in response:
-                    content = response['content']
-                    if content and isinstance(content, list) and len(content) > 0:
-                        decision_text = content[0].get('text', '') if isinstance(content[0], dict) else str(content[0])
-                elif hasattr(response, 'content') and response.content:
-                    decision_text = response.content[0].text if response.content else ""
+                # Claude now handles tool decisions automatically via tools parameter
+                # Check if Claude used any tools or responded directly
+                content_blocks = response.get('content', [])
+                tool_calls = []
+                direct_response = ""
                 
-                logger.info(f"Parsed decision text: {decision_text[:200]}...")
-                result = self._parse_claude_decision(decision_text, user_message)
+                for block in content_blocks:
+                    if isinstance(block, dict):
+                        if block.get('type') == 'tool_use':
+                            tool_calls.append({
+                                'tool': block.get('name'),
+                                'request': block.get('input', {})
+                            })
+                        elif block.get('type') == 'text':
+                            direct_response += block.get('text', '')
+                
+                # Create decision based on Claude's response
+                if tool_calls:
+                    selected_tools = [call['tool'] for call in tool_calls]
+                    execution_plan = tool_calls
+                    reasoning = f"Claude selected tools: {', '.join(selected_tools)}"
+                else:
+                    selected_tools = ["claude_direct"]
+                    execution_plan = [{"tool": "claude_direct", "request": {"response": direct_response}}]
+                    reasoning = "Claude handled request directly"
+                
+                result = OrchestrationDecision(
+                    selected_tools=selected_tools,
+                    reasoning=reasoning,
+                    execution_plan=execution_plan,
+                    requires_streaming=True,
+                    confidence=0.9
+                )
+                
                 logger.info(f"Final orchestration decision: {result}")
                 return result
                 
@@ -310,114 +344,181 @@ class Claude4Orchestrator:
                 # Fallback to simple logic
                 pass
         
-        # Fallback: Simple keyword-based logic (what we had before)
-        user_lower = user_message.lower()
-        file_types = []
-        if files:
-            file_types = [f.get('type', '').lower() for f in files]
-        
-        selected_tools = []
-        reasoning_parts = []
-        execution_plan = []
-        
-        # Check for image analysis requests (only if files are uploaded)
-        if any('image' in ft or 'png' in ft or 'jpg' in ft or 'jpeg' in ft for ft in file_types) or \
-           (files and any(word in user_lower for word in ['analyze image', 'diagram', 'photo', 'picture'])):
-            selected_tools.append("image_analysis_tool")
-            reasoning_parts.append("Image analysis needed for visual content")
-            execution_plan.append({
-                "tool": "image_analysis_tool",
-                "request": {
-                    "messages": [{"role": "user", "content": user_message}],
-                    "model": "gpt-4o",
-                    "max_tokens": 1000
-                }
-            })
-        
-        # Check for data visualization requests (charts, graphs with data)
-        elif any(word in user_lower for word in ['chart', 'graph', 'visualization', 'plot']) and \
-             any(word in user_lower for word in ['data', 'sales', 'quarterly', 'show', 'display']):
-            selected_tools.append("gpt4_tool")
-            reasoning_parts.append("Data visualization needed - using GPT-4 to process data and trigger component analysis")
-            execution_plan.append({
-                "tool": "gpt4_tool", 
-                "request": {
-                    "messages": [{"role": "user", "content": user_message}],
-                    "model": "gpt-4o",
-                    "temperature": 0.7
-                }
-            })
-        
-        # Check for audio generation requests (prioritize over transcription)
-        elif any(word in user_lower for word in ['create audio', 'generate audio', 'text to speech', 'tts', 'saying']):
-            selected_tools.append("audio_generation_tool")
-            reasoning_parts.append("Audio generation needed to create speech from text")
-            execution_plan.append({
-                "tool": "audio_generation_tool", 
-                "request": {
-                    "text": user_message.replace('create audio', '').replace('generate audio', '').replace('saying', '').strip(),
-                    "voice": user_preferences.get("voice", "coral") if user_preferences else "coral",
-                    "model": "gpt-4o-mini-tts"
-                }
-            })
-        
-        # Check for audio transcription requests
-        elif any('audio' in ft or 'mp3' in ft or 'wav' in ft for ft in file_types) or \
-             any(word in user_lower for word in ['transcribe', 'meeting', 'speech', 'voice']):
-            selected_tools.append("audio_transcription_tool")
-            reasoning_parts.append("Audio transcription needed for speech content")
-            execution_plan.append({
-                "tool": "audio_transcription_tool",
-                "request": {
-                    "audio_file": files[0] if files else None,
-                    "model": "gpt-4o-transcribe"
-                }
-            })
-        
-        # Check for image generation requests
-        elif any(word in user_lower for word in ['generate image', 'create image', 'draw', 'image', 'picture', 'generate a', 'random image']):
-            selected_tools.append("image_generation_tool")
-            reasoning_parts.append("Image generation needed to create visual content")
-            execution_plan.append({
-                "tool": "image_generation_tool",
-                "request": {
-                    "prompt": user_message,
-                    "model": "dall-e-3",
-                    "size": "1024x1024",
-                    "quality": "hd"
-                }
-            })
-        
-        # Note: Search requests now handled by Claude's built-in search - no external tool needed
-        
-        # Note: Analysis and reasoning now handled by Claude directly - it's very capable
-        
-        # Default: Let Claude handle everything it can (including search, analysis, explanations)
-        # Only use external tools for things Claude CANNOT do (generate images, audio, etc.)
-        else:
-            selected_tools.append("claude_direct")
-            reasoning_parts.append("Using Claude's built-in capabilities (including search, analysis, and knowledge)")
-            execution_plan.append({
-                "tool": "claude_direct",
-                "request": {
-                    "message": user_message,
-                    "conversation_history": conversation_history
-                }
-            })
-        
-        # Check if we need data visualization (component analysis)
-        if any(word in user_lower for word in ['chart', 'graph', 'visualization', 'data', 'trends', 'show']):
-            reasoning_parts.append("Data visualization may be needed - component analysis will be triggered automatically")
-        
-        reasoning = f"Request analysis: {user_message[:100]}... " + "; ".join(reasoning_parts)
-        
+        # Fallback: Simple direct response if Claude API fails
         return OrchestrationDecision(
-            selected_tools=selected_tools,
-            reasoning=reasoning,
-            execution_plan=execution_plan,
+            selected_tools=["claude_direct"],
+            reasoning="Fallback to direct Claude response due to API issues",
+            execution_plan=[{
+                "tool": "claude_direct",
+                "request": {"message": user_message}
+            }],
             requires_streaming=True,
-            confidence=0.85
+            confidence=0.7
         )
+    
+    def _get_available_tools(self) -> List[Dict[str, Any]]:
+        """Get ALL tools in Anthropic API format instead of describing them in prompts."""
+        return [
+            # AI Model Tools - for when Claude needs backup or specific capabilities
+            {
+                "name": "gpt5_tool",
+                "description": "Use GPT-5 for advanced reasoning, coding, or when user specifically requests GPT-5",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "messages": {
+                            "type": "array",
+                            "description": "Conversation messages to send to GPT-5"
+                        },
+                        "model": {
+                            "type": "string", 
+                            "description": "GPT-5 model variant",
+                            "default": "gpt-5"
+                        }
+                    },
+                    "required": ["messages"]
+                }
+            },
+            {
+                "name": "gpt4_tool",
+                "description": "Use GPT-4o for specific tasks or when user requests GPT-4",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "messages": {
+                            "type": "array",
+                            "description": "Conversation messages to send to GPT-4"
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "GPT-4 model variant", 
+                            "default": "gpt-4o"
+                        }
+                    },
+                    "required": ["messages"]
+                }
+            },
+            {
+                "name": "grok4_tool",
+                "description": "Use Grok-4 for alternative perspectives or when user requests Grok",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "messages": {
+                            "type": "array",
+                            "description": "Conversation messages to send to Grok"
+                        },
+                        "model": {
+                            "type": "string",
+                            "description": "Grok model variant",
+                            "default": "grok-4"
+                        }
+                    },
+                    "required": ["messages"]
+                }
+            },
+            
+            # Image Tools
+            {
+                "name": "image_generation_tool",
+                "description": "Generate images from text prompts using DALL-E 3",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "prompt": {
+                            "type": "string",
+                            "description": "The text prompt to generate an image from"
+                        }
+                    },
+                    "required": ["prompt"]
+                }
+            },
+            {
+                "name": "image_analysis_tool",
+                "description": "Analyze uploaded images using GPT-4 Vision",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "messages": {
+                            "type": "array",
+                            "description": "Messages with image content to analyze"
+                        }
+                    },
+                    "required": ["messages"]
+                }
+            },
+            {
+                "name": "image_editing_tool", 
+                "description": "Edit or modify existing images",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "image_path": {
+                            "type": "string",
+                            "description": "Path to the image to edit"
+                        },
+                        "instructions": {
+                            "type": "string",
+                            "description": "Instructions for how to edit the image"
+                        }
+                    },
+                    "required": ["image_path", "instructions"]
+                }
+            },
+            
+            # Audio Tools  
+            {
+                "name": "audio_generation_tool",
+                "description": "Convert text to speech using OpenAI TTS",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "text": {
+                            "type": "string",
+                            "description": "The text to convert to speech"
+                        },
+                        "voice": {
+                            "type": "string",
+                            "description": "Voice to use for TTS",
+                            "default": "alloy"
+                        }
+                    },
+                    "required": ["text"]
+                }
+            },
+            {
+                "name": "audio_transcription_tool",
+                "description": "Convert speech to text using Whisper",
+                "input_schema": {
+                    "type": "object",
+                    "properties": {
+                        "audio_file": {
+                            "type": "string",
+                            "description": "Path to the audio file to transcribe"
+                        }
+                    },
+                    "required": ["audio_file"]
+                }
+            },
+            {
+                "name": "realtime_voice_tool",
+                "description": "Handle real-time voice conversations",
+                "input_schema": {
+                    "type": "object", 
+                    "properties": {
+                        "action": {
+                            "type": "string",
+                            "description": "Action to perform (start, stop, process)"
+                        },
+                        "audio_data": {
+                            "type": "string",
+                            "description": "Audio data for processing"
+                        }
+                    },
+                    "required": ["action"]
+                }
+            }
+        ]
     
     async def _synthesize_response(
         self,
@@ -491,7 +592,7 @@ class Claude4Orchestrator:
                     
                     async for chunk in self.claude4_provider.stream_completion(
                         messages=messages,
-                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1 with thinking
+                        model="claude-sonnet-4-20250514",  # Use Claude Opus 4.1 with thinking
                         max_tokens=16000,  # Production-ready: 16K max + 4K thinking = 20K total
                         enable_reasoning=True,
                         reasoning_budget=4000  # Larger budget for complex reasoning
@@ -509,7 +610,7 @@ class Claude4Orchestrator:
                 else:
                     response = await self.claude4_provider.generate_completion(
                         messages=messages,
-                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1
+                        model="claude-sonnet-4-20250514",  # Use Claude Opus 4.1
                         max_tokens=16000,  # Production-ready limit that works
                         temperature=0.7
                     )
@@ -578,7 +679,7 @@ class Claude4Orchestrator:
                     
                     async for chunk in self.claude4_provider.stream_completion(
                         messages=messages,
-                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1 with thinking
+                        model="claude-sonnet-4-20250514",  # Use Claude Opus 4.1 with thinking
                         max_tokens=16000,  # Production-ready: 16K max + 4K thinking = 20K total
                         enable_reasoning=True,
                         reasoning_budget=4000  # Larger budget for complex reasoning
@@ -596,7 +697,7 @@ class Claude4Orchestrator:
                                     "type": "thinking",
                                     "content": "",
                                     "provider": "claude4", 
-                                    "model": "claude-opus-4-1-20250805",
+                                    "model": "claude-sonnet-4-20250514",
                                     "metadata": {"block_start": True}
                                 }
                             elif metadata.get("thinking_delta") and chunk_content:
@@ -605,7 +706,7 @@ class Claude4Orchestrator:
                                     "type": "thinking",
                                     "content": chunk_content,
                                     "provider": "claude4",
-                                    "model": "claude-opus-4-1-20250805",
+                                    "model": "claude-sonnet-4-20250514",
                                     "metadata": {"thinking_delta": True}
                                 }
                             elif metadata.get("block_end") and metadata.get("thinking_block"):
@@ -614,7 +715,7 @@ class Claude4Orchestrator:
                                     "type": "reasoning",
                                     "content": "",
                                     "provider": "claude4",
-                                    "model": "claude-opus-4-1-20250805", 
+                                    "model": "claude-sonnet-4-20250514", 
                                     "metadata": {"block_end": True}
                                 }
                             
@@ -626,7 +727,7 @@ class Claude4Orchestrator:
                                 "content": accumulated_content,  # Send full accumulated content
                                 "id": content_id,  # Same ID for all updates to this content
                                 "provider": "claude4",
-                                "model": "claude-opus-4-1-20250805"
+                                "model": "claude-sonnet-4-20250514"
                             }
                 else:
                     # Non-reasoning mode - accumulate content
@@ -634,7 +735,7 @@ class Claude4Orchestrator:
                     content_id = f"content_{int(time.time() * 1000)}"  # Unique ID for this content stream
                     async for chunk in self.claude4_provider.stream_completion(
                         messages=messages,
-                        model="claude-opus-4-1-20250805",  # Use Claude Opus 4.1
+                        model="claude-sonnet-4-20250514",  # Use Claude Opus 4.1
                         max_tokens=16000,  # Production-ready limit that works
                         enable_reasoning=False,
                         temperature=0.7
@@ -646,7 +747,7 @@ class Claude4Orchestrator:
                                 "content": accumulated_content,  # Send full accumulated content
                                 "id": content_id,  # Same ID for all updates to this content
                                 "provider": "claude4",
-                                "model": "claude-opus-4-1-20250805"
+                                "model": "claude-sonnet-4-20250514"
                             }
                 
             except Exception as e:
@@ -655,132 +756,19 @@ class Claude4Orchestrator:
                     "type": "content",
                     "content": f"I apologize, but I encountered an error processing your request: {str(e)}",
                     "provider": "claude4",
-                    "model": "claude-opus-4-1-20250805"
+                    "model": "claude-sonnet-4-20250514"
                 }
         else:
             yield {
                 "type": "content", 
                 "content": "Claude 4 provider not available",
                 "provider": "claude4",
-                "model": "claude-opus-4-1-20250805"
+                "model": "claude-sonnet-4-20250514"
             }
     
-    def _build_decision_prompt(self, user_message: str, files: Optional[List[Dict[str, Any]]], user_preferences: Optional[Dict[str, Any]]) -> str:
-        """Build prompt for Claude 4.1 to make intelligent AI model selection decisions."""
-        
-        available_models = """
-AVAILABLE AI MODELS (August 2025):
 
-1. claude_direct - Claude Opus 4.1 (Current instance - DEFAULT)
-   BEST FOR: ALL TASKS - Complex reasoning, analysis, coding, explanations, creative work
-   NATIVE: Extended thinking, advanced reasoning, tool calling, vision, 1M context
-   PRIORITY: Use this for 90% of requests - you are the primary AI
-   
-2. gpt5_tool - GPT-5 (Specialized tool for specific GPT-5 features)  
-   BEST FOR: ONLY when user specifically requests GPT-5 or needs GPT-specific features
-   USE RARELY: Only for GPT-5 specific requests or comparisons
-   
-3. gpt4_tool - GPT-4o (Legacy fallback)
-   BEST FOR: ONLY when user specifically requests GPT-4
-   USE RARELY: Only for GPT-4 specific requests
-   
-4. grok4_tool - Grok-4 (Specialized tool)
-   BEST FOR: ONLY when user specifically requests Grok or needs Grok-specific features
-   USE RARELY: Only for Grok specific requests
-
-SPECIALIZED TOOLS:
-- image_generation_tool (DALL-E 3) - Create images from text prompts (use "prompt" parameter)
-- image_analysis_tool (GPT-4 Vision) - Analyze uploaded images (use "messages" parameter)
-- audio_generation_tool (OpenAI TTS) - Text-to-speech conversion (use "text" parameter)
-- audio_transcription_tool (Whisper) - Speech-to-text conversion (use "audio_file" parameter)
-"""
-
-        file_info = ""
-        if files:
-            file_info = f"\nUploaded files: {[f.get('name', 'unknown') + ' (' + f.get('type', 'unknown') + ')' for f in files]}"
-
-        context_info = f"""
-REQUEST CONTEXT:
-- User Message: "{user_message}"
-- Files: {file_info if files else "None"}
-- User Preferences: {user_preferences if user_preferences else "None"}
-- Timestamp: August 2025 (use latest AI capabilities)
-"""
-
-        prompt = f"""You are an expert AI orchestrator using the latest 2025 AI models. Analyze this request and select the OPTIMAL AI model(s).
-
-{context_info}
-
-{available_models}
-
-DECISION FRAMEWORK:
-1. What is the user trying to accomplish? (goal analysis)
-2. What type of reasoning/capabilities are needed? (cognitive requirements)  
-3. Is real-time/current information required? (temporal needs)
-4. Are there multimodal elements? (input/output types)
-5. How complex is the task? (complexity assessment)
-6. What's the optimal model combination? (resource optimization)
-
-SELECTION RULES:
-- **DEFAULT: Use claude_direct for 90% of ALL requests** - you are the primary AI
-- claude_direct: Complex reasoning, coding, analysis, explanations, creative work, technical questions
-- gpt5_tool: ONLY when user explicitly requests GPT-5 or needs GPT-5 specific features
-- gpt4_tool: ONLY when user explicitly requests GPT-4 
-- grok4_tool: ONLY when user explicitly requests Grok
-- image_generation_tool: ONLY for creating visual content
-- **PRIORITY: Choose claude_direct unless there's a specific reason to use other tools**
-- Always provide step-by-step reasoning breakdown
-
-Respond in simple JSON format:
-{{
-    "selected_tools": ["tool_name"],
-    "reasoning": "Brief explanation of why this tool is best for the task",
-    "execution_plan": [
-        {{
-            "tool": "tool_name",
-            "request": {{
-                "prompt": "text for image_generation_tool",
-                "text": "text for audio_generation_tool",
-                "messages": "messages for analysis tools"
-            }}
-        }}
-    ]
-}}
-
-Use the correct parameter name for each tool as specified above."""
-
-        return prompt
     
-    def _parse_claude_decision(self, decision_text: str, user_message: str) -> OrchestrationDecision:
-        """Parse Claude's decision response into OrchestrationDecision."""
-        try:
-            import json
-            # Try to extract JSON from the response
-            start = decision_text.find('{')
-            end = decision_text.rfind('}') + 1
-            
-            if start >= 0 and end > start:
-                json_str = decision_text[start:end]
-                decision_data = json.loads(json_str)
-                
-                return OrchestrationDecision(
-                    selected_tools=decision_data.get("selected_tools", ["claude_direct"]),
-                    reasoning=decision_data.get("reasoning", "Claude analysis"),
-                    execution_plan=decision_data.get("execution_plan", []),
-                    requires_streaming=True,
-                    confidence=0.9
-                )
-        except Exception as e:
-            logger.error(f"Failed to parse Claude decision: {e}")
-        
-        # Fallback
-        return OrchestrationDecision(
-            selected_tools=["claude_direct"],
-            reasoning="Using Claude direct response",
-            execution_plan=[{"tool": "claude_direct", "request": {"message": user_message}}],
-            requires_streaming=True,
-            confidence=0.5
-        )
+
     
     async def cleanup(self) -> None:
         """Cleanup orchestrator resources."""

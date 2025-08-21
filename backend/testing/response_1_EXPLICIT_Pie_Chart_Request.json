@@ -1,0 +1,91 @@
+{
+  "test_name": "EXPLICIT Pie Chart Request",
+  "prompt": "I have market share data: Instagram 45%, TikTok 30%, Facebook 15%, Twitter 10%. Create a pie chart to visualize this percentage distribution and then provide a detailed analysis of what the data reveals about market dominance, competitive landscape, and strategic implications for each platform.",
+  "full_response": {
+    "id": "msg_01HHFvCSAh19AWY35BpxrG7e",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-20250514",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll create a pie chart to visualize your market share data and then provide a comprehensive analysis."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01MMFXqpHvNKKrw75o2rwiSs",
+        "name": "pie_chart_tool",
+        "input": {
+          "title": "Social Media Platform Market Share Distribution",
+          "data": [
+            {
+              "label": "Instagram",
+              "value": 45,
+              "percentage": 45
+            },
+            {
+              "label": "TikTok",
+              "value": 30,
+              "percentage": 30
+            },
+            {
+              "label": "Facebook",
+              "value": 15,
+              "percentage": 15
+            },
+            {
+              "label": "Twitter",
+              "value": 10,
+              "percentage": 10
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 935,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 183,
+      "service_tier": "standard"
+    }
+  },
+  "text_content": "I'll create a pie chart to visualize your market share data and then provide a comprehensive analysis.",
+  "tool_calls": [
+    {
+      "name": "pie_chart_tool",
+      "input": {
+        "title": "Social Media Platform Market Share Distribution",
+        "data": [
+          {
+            "label": "Instagram",
+            "value": 45,
+            "percentage": 45
+          },
+          {
+            "label": "TikTok",
+            "value": 30,
+            "percentage": 30
+          },
+          {
+            "label": "Facebook",
+            "value": 15,
+            "percentage": 15
+          },
+          {
+            "label": "Twitter",
+            "value": 10,
+            "percentage": 10
+          }
+        ]
+      }
+    }
+  ],
+  "response_time_ms": 3813.983201980591
+}

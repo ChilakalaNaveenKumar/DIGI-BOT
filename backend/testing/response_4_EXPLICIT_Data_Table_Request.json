@@ -1,0 +1,99 @@
+{
+  "test_name": "EXPLICIT Data Table Request",
+  "prompt": "Product comparison data: Basic ($10/month, 5GB, email support), Pro ($25/month, 50GB, priority support), Enterprise ($100/month, unlimited, dedicated support). Create a data table to organize this information and then analyze the pricing strategy, value propositions, and target customer segments for each tier.",
+  "full_response": {
+    "id": "msg_01PrMvKu6gD7Ef9sNNUz1ksw",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-20250514",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll create a data table to organize your product comparison data and then provide a comprehensive analysis."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01TtE99wULYad7oB9b2Y7BU7",
+        "name": "data_table_tool",
+        "input": {
+          "title": "Product Tier Comparison",
+          "headers": [
+            "Tier",
+            "Price/Month",
+            "Storage",
+            "Support Type"
+          ],
+          "rows": [
+            [
+              "Basic",
+              "$10",
+              "5GB",
+              "Email Support"
+            ],
+            [
+              "Pro",
+              "$25",
+              "50GB",
+              "Priority Support"
+            ],
+            [
+              "Enterprise",
+              "$100",
+              "Unlimited",
+              "Dedicated Support"
+            ]
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 942,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 172,
+      "service_tier": "standard"
+    }
+  },
+  "text_content": "I'll create a data table to organize your product comparison data and then provide a comprehensive analysis.",
+  "tool_calls": [
+    {
+      "name": "data_table_tool",
+      "input": {
+        "title": "Product Tier Comparison",
+        "headers": [
+          "Tier",
+          "Price/Month",
+          "Storage",
+          "Support Type"
+        ],
+        "rows": [
+          [
+            "Basic",
+            "$10",
+            "5GB",
+            "Email Support"
+          ],
+          [
+            "Pro",
+            "$25",
+            "50GB",
+            "Priority Support"
+          ],
+          [
+            "Enterprise",
+            "$100",
+            "Unlimited",
+            "Dedicated Support"
+          ]
+        ]
+      }
+    }
+  ],
+  "response_time_ms": 3583.3940505981445
+}

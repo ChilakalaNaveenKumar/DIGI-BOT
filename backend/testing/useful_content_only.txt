@@ -1,0 +1,43 @@
+USEFUL CONTENT ONLY (What we actually need)
+==================================================
+
+```json
+{
+    "selected_tools": ["claude_direct"],
+    "reasoning": "This is a straightforward educational question asking for an explanation of Python. As the primary AI (Claude Opus 4.1), I can directly provide a comprehensive explanation covering Python as both a programming language and potentially the animal, without needing specialized tools. This falls under my core capabilities for explanations and technical knowledge.",
+    "execution_plan": [
+        {
+            "tool": "claude_direct",
+            "request": {
+                "response": "Direct response explaining what Python is"
+            }
+        }
+    ]
+}
+```
+
+Python refers most commonly to a high-level, interpreted programming language created by Guido van Rossum and first released in 1991. Here's what makes Python notable:
+
+**Key Characteristics:**
+- **Easy to learn and read**: Python emphasizes code readability with its clean, simple syntax
+- **Interpreted language**: Code is executed line-by-line rather than compiled beforehand
+- **Versatile**: Used for web development, data science, artificial intelligence, automation, scientific computing, and more
+- **Large ecosystem**: Extensive libraries and frameworks (like Django, NumPy, pandas, TensorFlow)
+- **Cross-platform**: Runs on Windows, macOS, Linux, and other operating systems
+
+**Common Uses:**
+- Web development (Django, Flask)
+- Data analysis and visualization
+- Machine learning and AI
+- Automation and scripting
+- Scientific computing
+- Game development
+
+**Example of Python syntax:**
+```python
+print("Hello, World!")
+name = "Python"
+print(f"I'm learning {name}!")
+```
+
+Python is named after the British comedy series "Monty Python's Flying Circus," not the snake, though the snake has become an unofficial mascot for the language.

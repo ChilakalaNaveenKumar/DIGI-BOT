@@ -1,0 +1,101 @@
+{
+  "test_name": "EXPLICIT Line Chart Request",
+  "prompt": "User growth data: Jan=1000, Feb=1500, Mar=2200, Apr=3100, May=4500. Generate a line chart to show this growth trend over time and then provide comprehensive analysis of the growth pattern, acceleration points, and future projections.",
+  "full_response": {
+    "id": "msg_0145UwXX2o4LwXgpbHqqcWpY",
+    "type": "message",
+    "role": "assistant",
+    "model": "claude-sonnet-4-20250514",
+    "content": [
+      {
+        "type": "text",
+        "text": "I'll create a line chart to visualize your user growth data and then provide a comprehensive analysis."
+      },
+      {
+        "type": "tool_use",
+        "id": "toolu_01H6f7doRfrLTvL1WLjjhT21",
+        "name": "line_chart_tool",
+        "input": {
+          "title": "User Growth Trend Over Time",
+          "data": [
+            {
+              "name": "User Growth",
+              "data": [
+                {
+                  "x": "Jan",
+                  "y": 1000
+                },
+                {
+                  "x": "Feb",
+                  "y": 1500
+                },
+                {
+                  "x": "Mar",
+                  "y": 2200
+                },
+                {
+                  "x": "Apr",
+                  "y": 3100
+                },
+                {
+                  "x": "May",
+                  "y": 4500
+                }
+              ]
+            }
+          ]
+        }
+      }
+    ],
+    "stop_reason": "tool_use",
+    "stop_sequence": null,
+    "usage": {
+      "input_tokens": 932,
+      "cache_creation_input_tokens": 0,
+      "cache_read_input_tokens": 0,
+      "cache_creation": {
+        "ephemeral_5m_input_tokens": 0,
+        "ephemeral_1h_input_tokens": 0
+      },
+      "output_tokens": 199,
+      "service_tier": "standard"
+    }
+  },
+  "text_content": "I'll create a line chart to visualize your user growth data and then provide a comprehensive analysis.",
+  "tool_calls": [
+    {
+      "name": "line_chart_tool",
+      "input": {
+        "title": "User Growth Trend Over Time",
+        "data": [
+          {
+            "name": "User Growth",
+            "data": [
+              {
+                "x": "Jan",
+                "y": 1000
+              },
+              {
+                "x": "Feb",
+                "y": 1500
+              },
+              {
+                "x": "Mar",
+                "y": 2200
+              },
+              {
+                "x": "Apr",
+                "y": 3100
+              },
+              {
+                "x": "May",
+                "y": 4500
+              }
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "response_time_ms": 4853.034973144531
+}

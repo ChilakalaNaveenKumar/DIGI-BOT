@@ -1,24 +1,9 @@
 <template>
   <div class="component-renderer">
-    <!-- Pie Chart -->
-    <EnhancedPieChart
-      v-if="componentType === 'pie-chart' && parsedData"
-      :data="parsedData"
-      :title="componentTitle"
-      :height="300"
-    />
-    
-    <!-- Bar Chart -->
-    <EnhancedBarChart
-      v-else-if="componentType === 'bar-chart' && parsedData"
-      :data="parsedData"
-      :title="componentTitle"
-      :height="300"
-    />
-    
-    <!-- Line Chart -->
-    <EnhancedLineChart
-      v-else-if="componentType === 'line-chart' && parsedData"
+    <!-- Chart.js Charts -->
+    <EnhancedChartJSRenderer
+      v-if="(componentType === 'pie-chart' || componentType === 'bar-chart' || componentType === 'line-chart') && parsedData"
+      :type="componentType.replace('-chart', '')"
       :data="parsedData"
       :title="componentTitle"
       :height="300"
@@ -60,6 +45,9 @@ const parsedData = computed(() => {
   try {
     if (!props.markdown) return null
     
+    console.log('ComponentRenderer - Parsing markdown:', props.markdown)
+    console.log('ComponentRenderer - Component type:', props.componentType)
+    
     // Extract content between :::component-type and :::
     
     // Try multiple regex patterns to handle different markdown formats
@@ -81,38 +69,73 @@ const parsedData = computed(() => {
     }
     
     const content = contentMatch[1]?.trim() || ''
+    console.log('ComponentRenderer - Extracted content:', content)
     
-    // Try to parse as JSON first, then YAML
+    // Try to parse as YAML first, but handle special case of long JSON arrays
     let data
-    try {
-      data = JSON.parse(content)
-    } catch {
-      // Try to fix common JSON issues
-      let fixedContent = content
-      
-      // If content starts with a property like "data": [...], wrap it in braces
-      if (content.match(/^\s*"[^"]+"\s*:/)) {
-        fixedContent = `{${content}}`
+    
+    // Special handling for YAML with inline JSON arrays (common AI output)
+    if (content.includes('data: [') && content.includes('}]')) {
+      try {
+        // Extract title and data separately
+        const lines = content.split('\n')
+        let title = ''
+        let dataLine = ''
         
-        try {
-          data = JSON.parse(fixedContent)
-        } catch {
-          // Try parsing as YAML
-          try {
-            data = yaml.load(content) as Record<string, unknown>
-          } catch (yamlError) {
-            console.warn('Could not parse component data as JSON or YAML:', content, yamlError)
-            return null
+        for (const line of lines) {
+          if (line.startsWith('title:')) {
+            title = line.replace('title:', '').trim()
+          } else if (line.startsWith('data:')) {
+            dataLine = line.replace('data:', '').trim()
           }
         }
-      } else {
-        // Try parsing as YAML
+        
+        if (dataLine) {
+          const parsedData = JSON.parse(dataLine)
+          data = { title, data: parsedData }
+          console.log('ComponentRenderer - Parsed as manual YAML+JSON:', data)
+        }
+      } catch (manualError) {
+        console.log('ComponentRenderer - Manual parsing failed, trying standard YAML:', manualError)
+        // Fall back to standard YAML parsing
         try {
           data = yaml.load(content) as Record<string, unknown>
+          console.log('ComponentRenderer - Parsed as YAML:', data)
         } catch (yamlError) {
-          console.warn('Could not parse component data as JSON or YAML:', content, yamlError)
-          return null
+          console.log('ComponentRenderer - YAML parsing failed, trying JSON:', yamlError)
+          try {
+            data = JSON.parse(content)
+            console.log('ComponentRenderer - Parsed as JSON:', data)
+          } catch {
+            // Try to fix common JSON issues
+            let fixedContent = content
+            
+            // If content starts with a property like "data": [...], wrap it in braces
+            if (content.match(/^\s*"[^"]+"\s*:/)) {
+              fixedContent = `{${content}}`
+              
+              try {
+                data = JSON.parse(fixedContent)
+                console.log('ComponentRenderer - Parsed as fixed JSON:', data)
+              } catch {
+                console.warn('Could not parse component data as JSON or YAML:', content)
+                return null
+              }
+            } else {
+              console.warn('Could not parse component data:', content)
+              return null
+            }
+          }
         }
+      }
+    } else {
+      // Standard YAML parsing for simple cases
+      try {
+        data = yaml.load(content) as Record<string, unknown>
+        console.log('ComponentRenderer - Parsed as standard YAML:', data)
+      } catch (yamlError) {
+        console.log('ComponentRenderer - Standard YAML parsing failed:', yamlError)
+        return null
       }
     }
     
@@ -121,10 +144,13 @@ const parsedData = computed(() => {
       case 'pie-chart':
         // AI can return either array directly or object with data property
         if (Array.isArray(data)) {
+          console.log('ComponentRenderer - Returning direct array:', data)
           return data
         } else if (data.data && Array.isArray(data.data)) {
+          console.log('ComponentRenderer - Returning data.data array:', data.data)
           return data.data
         }
+        console.log('ComponentRenderer - No valid data found for pie-chart:', data)
         return null
         
       case 'bar-chart':
@@ -174,7 +200,7 @@ const parsedData = computed(() => {
         return data
     }
   } catch (error) {
-    console.error('Error parsing component data:', error)
+    console.error('Error parsing component data:', error, 'for markdown:', props.markdown)
     return null
   }
 })
