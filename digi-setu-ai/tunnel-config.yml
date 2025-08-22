@@ -1,0 +1,7 @@
+tunnel: ec1b7c17-f194-4548-bb25-3766dfcd7656
+credentials-file: /Users/chilakalanaveenkumar/.cloudflared/ec1b7c17-f194-4548-bb25-3766dfcd7656.json
+
+ingress:
+  - hostname: testing.digi-setu.com
+    service: http://127.0.0.1:3000
+  - service: http_status:404

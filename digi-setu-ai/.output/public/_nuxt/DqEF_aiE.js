@@ -1,0 +1,1 @@
+import{e as s,c as a,a as t,o,_ as c}from"./AFjJH2Wa.js";const n={class:"simple-chat"},p=s({__name:"chat-simple",setup(l){return(r,e)=>(o(),a("div",n,[...e[0]||(e[0]=[t("h1",null,"Simple Chat Page",-1),t("p",null,"This is a test to see if the route works",-1)])]))}}),i=c(p,[["__scopeId","data-v-b723ee7d"]]);export{i as default};
