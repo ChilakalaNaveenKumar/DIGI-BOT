@@ -23,13 +23,11 @@ export ENVIRONMENT="development"
 export DEBUG="true"
 export HOST="0.0.0.0"
 export PORT="8000"
-export DATABASE_URL="sqlite+aiosqlite:///./digi_bot_services.db"
+export DATABASE_URL="postgresql+asyncpg://digi_setu_user:secure_password_2024!@localhost/digi_setu_ai"
 
-# Initialize database if it doesn't exist
-if [ ! -f "digi_bot_services.db" ]; then
-    echo "🔧 Initializing database..."
-    python create_db.py
-fi
+# Initialize database (PostgreSQL)
+echo "🔧 Ensuring PostgreSQL database is ready..."
+python create_db.py
 
 # Start the server
 echo "🌟 Starting Digi Bot Services on http://localhost:8000"
@@ -40,4 +38,6 @@ echo ""
 echo "Press Ctrl+C to stop the server"
 
 python main.py
+
+
 

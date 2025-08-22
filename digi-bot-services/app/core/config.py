@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="sqlite+aiosqlite:///./digi_setu_ai.db",
+        default="postgresql+asyncpg://digi_setu_user:secure_password_2024!@localhost/digi_setu_ai",
         env="DATABASE_URL"
     )
     DATABASE_ECHO: bool = Field(default=False, env="DATABASE_ECHO")
@@ -192,7 +192,7 @@ class ProductionSettings(Settings):
 class TestingSettings(Settings):
     """Testing environment settings."""
     DEBUG: bool = True
-    DATABASE_URL: str = "sqlite:///./test.db"
+    DATABASE_URL: str = "postgresql+asyncpg://test_user:test_pass@localhost/test_db"
     REDIS_URL: str = "redis://localhost:6379/1"
     LOG_LEVEL: str = "WARNING"
 

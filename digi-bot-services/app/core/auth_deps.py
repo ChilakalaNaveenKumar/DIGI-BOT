@@ -39,3 +39,5 @@ async def get_current_user(authorization: Optional[str] = Header(None)) -> dict:
         raise HTTPException(status_code=401, detail="Authentication required")
     return user
 
+
+

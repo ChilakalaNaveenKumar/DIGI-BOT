@@ -14,7 +14,7 @@ Features:
 import logging
 import sys
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, List, Optional
 
 import structlog
@@ -113,23 +113,32 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""
     to_encode = data.copy()
     if expires_delta:
-        expire = datetime.utcnow() + expires_delta
+        expire = datetime.now(timezone.utc) + expires_delta
     else:
-        expire = datetime.utcnow() + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
     
     to_encode.update({"exp": expire})
     encoded_jwt = jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
     return encoded_jwt
 
 
-def verify_google_token(credential: str) -> dict:
+async def verify_google_token(credential: str) -> dict:
     """Verify Google ID token and extract user info"""
     try:
-        # Verify the token with Google
-        idinfo = id_token.verify_oauth2_token(
-            credential, 
-            google_requests.Request(), 
-            settings.GOOGLE_CLIENT_ID
+        # Use a thread pool to run the sync Google verification in async context
+        import asyncio
+        import functools
+        
+        # Run the sync operation in a thread pool
+        loop = asyncio.get_event_loop()
+        idinfo = await loop.run_in_executor(
+            None,
+            functools.partial(
+                id_token.verify_oauth2_token,
+                credential,
+                google_requests.Request(),
+                settings.GOOGLE_CLIENT_ID
+            )
         )
         
         # Verify the issuer
@@ -146,36 +155,49 @@ async def get_or_create_user(google_user: dict, db: AsyncSession) -> User:
     """Get or create user from Google OAuth data"""
     google_id = google_user.get('sub')
     
-    # Try to find existing user
-    stmt = select(User).where(User.google_id == google_id)
-    result = await db.execute(stmt)
-    user = result.scalar_one_or_none()
-    
-    if user:
-        # Update last login
-        user.last_login_at = datetime.utcnow()
-        user.email = google_user.get('email', user.email)
-        user.name = google_user.get('name', user.name)
-        user.picture = google_user.get('picture', user.picture)
-        user.verified_email = google_user.get('email_verified', user.verified_email)
+    try:
+        # Try to find existing user
+        stmt = select(User).where(User.google_id == google_id)
+        result = await db.execute(stmt)
+        user = result.scalar_one_or_none()
+        
+        if user:
+            # Update last login
+            user.last_login_at = datetime.now(timezone.utc)
+            user.email = google_user.get('email', user.email)
+            user.name = google_user.get('name', user.name)
+            user.picture = google_user.get('picture', user.picture)
+            user.verified_email = google_user.get('email_verified', user.verified_email)
+            logger.info(f"User login: {user.email}")
+        else:
+            # Create new user
+            user = User(
+                google_id=google_id,
+                email=google_user.get('email'),
+                name=google_user.get('name'),
+                picture=google_user.get('picture'),
+                verified_email=google_user.get('email_verified', False),
+                last_login_at=datetime.now(timezone.utc)
+            )
+            db.add(user)
+            logger.info(f"New user created: {user.email}")
+        
+        # Flush to get the ID, then commit
+        await db.flush()
         await db.commit()
-        logger.info(f"User login: {user.email}")
-    else:
-        # Create new user
-        user = User(
-            google_id=google_id,
-            email=google_user.get('email'),
-            name=google_user.get('name'),
-            picture=google_user.get('picture'),
-            verified_email=google_user.get('email_verified', False),
-            last_login_at=datetime.utcnow()
-        )
-        db.add(user)
-        await db.commit()
+        
+        # Refresh the user object to get the latest data and ensure it's loaded
         await db.refresh(user)
-        logger.info(f"New user created: {user.email}")
-    
-    return user
+        
+        return user
+        
+    except Exception as e:
+        logger.error("Error in get_or_create_user", error=str(e), google_id=google_id)
+        try:
+            await db.rollback()
+        except Exception as rollback_error:
+            logger.error("Error during rollback", error=str(rollback_error))
+        raise
 
 
 # Create FastAPI app
@@ -257,14 +279,18 @@ async def verify_google_credential(
     
     # Verify Google token
     try:
-        google_user = verify_google_token(auth_request.credential)
+        google_user = await verify_google_token(auth_request.credential)
         logger.info("Google authentication successful", user_id=google_user.get('sub'))
     except Exception as e:
         logger.error("Google authentication failed", error=str(e))
         raise HTTPException(status_code=401, detail="Authentication failed")
     
     # Get or create user in database
-    user = await get_or_create_user(google_user, db)
+    try:
+        user = await get_or_create_user(google_user, db)
+    except Exception as db_error:
+        logger.error("Database error in OAuth verification", error=str(db_error))
+        raise HTTPException(status_code=500, detail="Database error during authentication")
     
     # Create JWT token
     token_data = {
@@ -280,10 +306,13 @@ async def verify_google_credential(
         expires_delta=access_token_expires
     )
     
+    # Serialize user data while session is active
+    user_dict = user.to_dict()
+    
     return AuthResponse(
         access_token=access_token,
         expires_in=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
-        user=user.to_dict()
+        user=user_dict
     )
 
 
@@ -329,10 +358,14 @@ async def google_callback(
                 raise HTTPException(status_code=400, detail="No ID token received")
             
             # Verify the ID token and extract user info
-            google_user = verify_google_token(id_token_str)
+            google_user = await verify_google_token(id_token_str)
             
             # Get or create user in database
-            user = await get_or_create_user(google_user, db)
+            try:
+                user = await get_or_create_user(google_user, db)
+            except Exception as db_error:
+                logger.error("Database error in OAuth callback", error=str(db_error))
+                raise HTTPException(status_code=500, detail="Database error during authentication")
             
             # Create JWT token
             token_data = {
@@ -348,7 +381,7 @@ async def google_callback(
                 expires_delta=access_token_expires
             )
             
-            # Return success page that closes popup
+            # Serialize user data while session is active
             import json
             user_info_json = json.dumps(user.to_dict())
             

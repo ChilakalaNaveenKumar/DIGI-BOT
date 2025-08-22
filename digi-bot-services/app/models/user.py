@@ -74,19 +74,20 @@ class User(Base):
     
     def to_dict(self) -> dict:
         """Convert user to dictionary (excluding sensitive data)."""
+        # Use getattr with defaults to avoid lazy loading issues
         return {
-            "id": self.id,
-            "google_id": self.google_id,
-            "email": self.email,
-            "name": self.name,
-            "display_name": self.display_name,
-            "picture": self.picture,
-            "is_active": self.is_active,
-            "verified_email": self.verified_email,
-            "preferred_ai_provider": self.preferred_ai_provider,
-            "theme_preference": self.theme_preference,
-            "conversation_history_limit": self.conversation_history_limit,
-            "created_at": self.created_at.isoformat() if self.created_at else None,
-            "updated_at": self.updated_at.isoformat() if self.updated_at else None,
-            "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
+            "id": getattr(self, 'id', None),
+            "google_id": getattr(self, 'google_id', ''),
+            "email": getattr(self, 'email', ''),
+            "name": getattr(self, 'name', ''),
+            "display_name": getattr(self, 'name', ''),  # display_name is a property
+            "picture": getattr(self, 'picture', None),
+            "is_active": getattr(self, 'is_active', True),
+            "verified_email": getattr(self, 'verified_email', False),
+            "preferred_ai_provider": getattr(self, 'preferred_ai_provider', 'anthropic'),
+            "theme_preference": getattr(self, 'theme_preference', 'system'),
+            "conversation_history_limit": getattr(self, 'conversation_history_limit', 20),
+            "created_at": self.created_at.isoformat() if getattr(self, 'created_at', None) else None,
+            "updated_at": self.updated_at.isoformat() if getattr(self, 'updated_at', None) else None,
+            "last_login_at": self.last_login_at.isoformat() if getattr(self, 'last_login_at', None) else None,
         }

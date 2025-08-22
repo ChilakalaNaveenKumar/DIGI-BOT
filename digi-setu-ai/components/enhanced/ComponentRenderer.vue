@@ -17,8 +17,8 @@
     />
     
     <!-- Fallback -->
-    <div v-else class="bg-gray-100 dark:bg-gray-800 rounded p-2">
-      <pre class="text-xs text-gray-500">{{ markdown }}</pre>
+    <div v-else class="fallback-container">
+      <pre class="fallback-text">{{ markdown }}</pre>
     </div>
   </div>
 </template>
@@ -79,4 +79,19 @@ function extractTitle(markdown: string): string {
 }
 </script>
 
+<style scoped>
+.fallback-container {
+  background: var(--bg-tertiary);
+  border-radius: 0.375rem;
+  padding: 0.5rem;
+}
+
+.fallback-text {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  font-family: monospace;
+  margin: 0;
+  white-space: pre-wrap;
+}
+</style>
 

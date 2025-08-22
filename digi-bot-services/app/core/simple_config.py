@@ -33,7 +33,7 @@ class Settings(BaseSettings):
     
     # Database
     DATABASE_URL: str = Field(
-        default="sqlite+aiosqlite:///./digi_bot_services.db"
+        default="postgresql+asyncpg://digi_setu_user:secure_password_2024!@localhost/digi_setu_ai"
     )
     DATABASE_ECHO: bool = Field(default=False)
     
@@ -59,6 +59,14 @@ class Settings(BaseSettings):
     
     # Logging
     LOG_LEVEL: str = Field(default="INFO")
+    
+    # Privacy & Security Settings
+    DATA_RETENTION_DAYS: int = Field(default=30)  # Auto-delete conversations after X days
+    ENABLE_AUDIT_LOGGING: bool = Field(default=True)  # Track data access
+    HASH_USER_IDENTIFIERS: bool = Field(default=True)  # Hash sensitive IDs
+    STORE_CONVERSATION_CONTENT: bool = Field(default=False)  # Don't store full chat content
+    ENABLE_DATA_ENCRYPTION: bool = Field(default=True)  # Encrypt sensitive fields
+    ANONYMIZE_LOGS: bool = Field(default=True)  # Remove PII from logs
     
     class Config:
         env_file = ".env"

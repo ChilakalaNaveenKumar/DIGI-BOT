@@ -1,5 +1,5 @@
 <template>
-  <div class="auth-layout" :data-theme="theme">
+  <div class="auth-layout" :data-theme="currentTheme">
     <Head>
       <Link 
         rel="stylesheet" 
@@ -14,10 +14,10 @@
       <button 
         @click="toggleTheme" 
         class="theme-toggle"
-        :title="theme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
+        :title="currentTheme === 'light' ? 'Switch to dark mode' : 'Switch to light mode'"
       >
         <Icon 
-          :name="theme === 'light' ? 'lucide:moon' : 'lucide:sun'" 
+          :name="currentTheme === 'light' ? 'lucide:moon' : 'lucide:sun'" 
           class="theme-icon"
         />
       </button>
@@ -47,10 +47,10 @@
 
 <script setup lang="ts">
 // Initialize theme system
-const { theme, toggleTheme } = useTheme()
+const { theme, currentTheme, toggleTheme } = useTheme()
 
 // Apply theme to document
-watch(theme, (newTheme) => {
+watch(currentTheme, (newTheme) => {
   if (import.meta.client) {
     document.documentElement.setAttribute('data-theme', newTheme)
   }

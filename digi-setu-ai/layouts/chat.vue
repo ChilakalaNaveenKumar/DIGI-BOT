@@ -1,10 +1,13 @@
 <template>
-  <div class="app-root" :data-theme="theme">
+  <div class="app-root" :data-theme="currentTheme">
     <div class="app-container">
       <LayoutSidebar />
       <main class="main-content">
         <LayoutHeader />
-        <slot />
+        <div class="page-content">
+          <slot />
+        </div>
+        <LayoutFooter />
       </main>
     </div>
   </div>
@@ -12,11 +15,11 @@
 
 <script setup lang="ts">
 // Initialize theme system
-const { theme } = useTheme()
+const { theme, currentTheme } = useTheme()
 
 // Apply theme to document  
-watch(theme, (newTheme) => {
-  if (process.client) {
+watch(currentTheme, (newTheme) => {
+  if (import.meta.client) {
     document.documentElement.setAttribute('data-theme', newTheme)
   }
 }, { immediate: true })
@@ -42,5 +45,12 @@ watch(theme, (newTheme) => {
   flex-direction: column;
   overflow: visible;
   margin-left: 260px; /* Account for fixed sidebar */
+  min-height: 100vh;
+}
+
+.page-content {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 </style>

@@ -4,9 +4,25 @@ export const useStreamingChat = () => {
   const messages = ref<Message[]>([])
   const isLoading = ref(false)
   const isStreaming = ref(false)
+  
+  // Add request deduplication and cancellation
+  const lastRequestContent = ref<string>('')
+  const lastRequestTime = ref<number>(0)
+  const currentAbortController = ref<AbortController | null>(null)
 
   const sendStreamingMessage = async (content: string) => {
     if (!content.trim() || isLoading.value || isStreaming.value) return
+    
+    // Prevent duplicate requests within 1 second
+    const now = Date.now()
+    if (content === lastRequestContent.value && now - lastRequestTime.value < 1000) {
+      console.log('Duplicate request prevented:', content)
+      return
+    }
+    
+    lastRequestContent.value = content
+    lastRequestTime.value = now
+    console.log('Sending message:', content) // Debug log
 
     // Add user message
     const userMessage: Message = {
@@ -31,8 +47,17 @@ export const useStreamingChat = () => {
     try {
       isLoading.value = true
 
-      // Prepare conversation history for the API
+      // Cancel any existing request
+      if (currentAbortController.value) {
+        currentAbortController.value.abort()
+      }
+      
+      // Create new AbortController for this request
+      currentAbortController.value = new AbortController()
+
+      // Prepare conversation history for the API (excluding the message we just added)
       const conversationMessages = messages.value
+        .slice(0, -2) // Exclude the last user message and assistant placeholder we just added
         .filter(msg => msg.content.trim()) // Only include messages with content
         .map(msg => ({
           role: msg.role,
@@ -45,6 +70,8 @@ export const useStreamingChat = () => {
         content: content
       })
 
+      console.log('Conversation history being sent:', conversationMessages) // Debug log
+
       // Call the backend's direct_chat API endpoint
       const response = await fetch('http://localhost:8000/api/direct-chat', {
         method: 'POST',
@@ -53,7 +80,8 @@ export const useStreamingChat = () => {
         },
         body: JSON.stringify({
           messages: conversationMessages
-        })
+        }),
+        signal: currentAbortController.value.signal
       })
 
       if (!response.ok) {
@@ -181,6 +209,12 @@ export const useStreamingChat = () => {
       }
 
     } catch (error) {
+      // Handle aborted requests silently
+      if (error instanceof Error && error.name === 'AbortError') {
+        console.log('Request was cancelled')
+        return
+      }
+      
       console.error('Streaming chat error:', error)
       
       // Update message with error
@@ -200,6 +234,7 @@ export const useStreamingChat = () => {
     } finally {
       isLoading.value = false
       isStreaming.value = false
+      currentAbortController.value = null
     }
   }
 

@@ -43,37 +43,30 @@ async def init_db() -> None:
     global async_engine, async_session_factory
     
     try:
-        # Create async engine with appropriate settings for database type
-        if "sqlite" in settings.DATABASE_URL:
-            # SQLite configuration
-            async_engine = create_async_engine(
-                settings.DATABASE_URL,
-                echo=settings.DATABASE_ECHO,
-                future=True,
-                connect_args={"check_same_thread": False}
-            )
-        else:
-            # PostgreSQL configuration
-            async_engine = create_async_engine(
-                settings.DATABASE_URL,
-                echo=settings.DATABASE_ECHO,
-                future=True,
-                pool_size=10,
-                max_overflow=20,
-                pool_pre_ping=True,
-                pool_recycle=3600,  # 1 hour
-                connect_args={
-                    "server_settings": {
-                        "application_name": "digi_setu_ai_backend",
-                    }
-                }
-            )
+        # Create async engine for PostgreSQL
+        async_engine = create_async_engine(
+            settings.DATABASE_URL,
+            echo=settings.DATABASE_ECHO,
+            future=True,
+            pool_size=10,
+            max_overflow=20,
+            pool_pre_ping=True,
+            pool_recycle=3600,  # 1 hour
+            connect_args={
+                "server_settings": {
+                    "application_name": "digi_setu_ai_backend",
+                },
+                "command_timeout": 60,
+            }
+        )
         
-        # Create session factory
+        # Create session factory with proper async configuration
         async_session_factory = async_sessionmaker(
             bind=async_engine,
             class_=AsyncSession,
             expire_on_commit=False,
+            autoflush=False,  # Disable autoflush to prevent sync operations
+            autocommit=False
         )
         
         # Test connection
@@ -153,12 +146,17 @@ async def get_db_session() -> AsyncGenerator[AsyncSession, None]:
     
     async with async_session_factory() as session:
         try:
+            # Ensure the session is properly bound to the async context
             yield session
-        except Exception:
+        except Exception as e:
+            logger.error("Database session error", error=str(e))
             await session.rollback()
             raise
         finally:
-            await session.close()
+            try:
+                await session.close()
+            except Exception as close_error:
+                logger.warning("Error closing database session", error=str(close_error))
 
 
 class DatabaseHealthCheck:
@@ -199,7 +197,7 @@ class DatabaseHealthCheck:
             return {"status": "error", "error": str(e)}
 
 
-# SQLite pragmas are set via connection arguments in the engine configuration
+# PostgreSQL connection configuration is handled in the engine setup
 
 
 # Query logging is handled by SQLAlchemy's echo parameter

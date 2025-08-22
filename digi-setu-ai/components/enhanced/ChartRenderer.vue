@@ -1,6 +1,6 @@
 <template>
-  <div class="w-full p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-    <h3 v-if="title" class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{{ title }}</h3>
+  <div class="chart-container">
+    <h3 v-if="title" class="chart-title">{{ title }}</h3>
     <div class="relative h-80">
       <canvas 
         :ref="canvasId"
@@ -108,4 +108,36 @@ onMounted(createChart)
 onBeforeUnmount(() => chartInstance?.destroy())
 </script>
 
+<style scoped>
+.chart-container {
+  width: 100%;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-primary);
+}
 
+.chart-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.relative {
+  position: relative;
+}
+
+.h-80 {
+  height: 20rem;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.h-full {
+  height: 100%;
+}
+</style>

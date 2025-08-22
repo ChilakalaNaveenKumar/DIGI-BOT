@@ -1,18 +1,18 @@
 <template>
-  <div class="w-full p-4 bg-white dark:bg-gray-800 rounded-lg shadow-sm border border-gray-200 dark:border-gray-700">
-    <h3 v-if="title" class="text-lg font-semibold text-gray-900 dark:text-gray-100 mb-4">{{ title }}</h3>
+  <div class="data-table-container">
+    <h3 v-if="title" class="data-table-title">{{ title }}</h3>
     <div class="overflow-x-auto">
       <table class="w-full text-sm">
         <thead>
           <tr>
-            <th v-for="header in headers" :key="header" class="px-3 py-2 text-left font-medium text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+            <th v-for="header in headers" :key="header" class="table-header">
               {{ header }}
             </th>
           </tr>
         </thead>
         <tbody>
-          <tr v-for="(row, index) in paginatedData" :key="index" class="border-b border-gray-100 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700">
-            <td v-for="(value, key) in row" :key="key" class="px-3 py-2 text-gray-900 dark:text-gray-100">
+          <tr v-for="(row, index) in paginatedData" :key="index" class="table-row">
+            <td v-for="(value, key) in row" :key="key" class="table-cell">
               {{ formatValue(value) }}
             </td>
           </tr>
@@ -21,19 +21,19 @@
     </div>
     
     <!-- Pagination -->
-    <div v-if="totalPages > 1" class="flex items-center justify-center gap-4 mt-4">
+    <div v-if="totalPages > 1" class="pagination">
       <button 
         @click="currentPage--" 
         :disabled="currentPage === 1"
-        class="px-3 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600"
+        class="pagination-btn"
       >
         ←
       </button>
-      <span class="text-sm text-gray-600 dark:text-gray-400">{{ currentPage }} / {{ totalPages }}</span>
+      <span class="pagination-info">{{ currentPage }} / {{ totalPages }}</span>
       <button 
         @click="currentPage++" 
         :disabled="currentPage === totalPages"
-        class="px-3 py-1 bg-blue-500 text-white rounded disabled:bg-gray-300 disabled:cursor-not-allowed hover:bg-blue-600"
+        class="pagination-btn"
       >
         →
       </button>
@@ -78,4 +78,89 @@ function formatValue(value: any): string {
 }
 </script>
 
+<style scoped>
+.data-table-container {
+  width: 100%;
+  padding: 1rem;
+  background: var(--bg-primary);
+  border-radius: 0.5rem;
+  box-shadow: var(--shadow-sm);
+  border: 1px solid var(--border-primary);
+}
+
+.data-table-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 1rem;
+}
+
+.overflow-x-auto {
+  overflow-x: auto;
+}
+
+.w-full {
+  width: 100%;
+}
+
+.text-sm {
+  font-size: 0.875rem;
+}
+
+.table-header {
+  padding: 0.5rem 0.75rem;
+  text-align: left;
+  font-weight: 500;
+  color: var(--text-secondary);
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-primary);
+}
+
+.table-row {
+  border-bottom: 1px solid var(--border-primary);
+  transition: background-color 0.2s ease;
+}
+
+.table-row:hover {
+  background: var(--bg-hover);
+}
+
+.table-cell {
+  padding: 0.5rem 0.75rem;
+  color: var(--text-primary);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.pagination-btn {
+  padding: 0.25rem 0.75rem;
+  background: var(--accent-primary);
+  color: white;
+  border: none;
+  border-radius: 0.375rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.pagination-btn:hover:not(:disabled) {
+  background: var(--accent-hover);
+}
+
+.pagination-btn:disabled {
+  background: var(--bg-tertiary);
+  color: var(--text-muted);
+  cursor: not-allowed;
+}
+
+.pagination-info {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+}
+</style>
 

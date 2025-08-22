@@ -18,7 +18,7 @@
 <script setup lang="ts">
 // Set page meta
 definePageMeta({
-  layout: false,
+  layout: 'chat',
   ssr: false,
   middleware: 'auth'
 })

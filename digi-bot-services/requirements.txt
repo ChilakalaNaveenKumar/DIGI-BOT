@@ -10,7 +10,7 @@ pydantic-settings==2.1.0
 # Database
 sqlalchemy[asyncio]==2.0.23
 asyncpg==0.29.0
-aiosqlite==0.19.0
+# aiosqlite removed - using PostgreSQL only
 alembic==1.13.1
 
 # Authentication & Security

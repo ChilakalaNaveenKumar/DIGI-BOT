@@ -116,6 +116,8 @@ const examplePrompts: ExamplePrompt[] = [
 const handleSend = async (content: string) => {
   if (!content.trim()) return
   
+  console.log('ChatContainer: handleSend called with:', content) // Debug log
+  
   // Use the streaming composable
   await sendMessage(content.trim())
 }

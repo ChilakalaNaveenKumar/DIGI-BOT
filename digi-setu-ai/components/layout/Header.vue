@@ -10,23 +10,6 @@
       </div>
       
       <div class="header-actions">
-        <div class="system-toggle">
-          <UiToggle
-            v-model="isDemoMode"
-            size="sm"
-            :on-label="'Demo'"
-            :off-label="'Live'"
-            :on-icon="'lucide:flask'"
-            :off-icon="'lucide:zap'"
-            @update:model-value="handleSystemToggle"
-          />
-        </div>
-        
-        <div class="model-selector">
-          <Icon name="lucide:cpu" :size="14" />
-          <span class="model-label">{{ isDemoMode ? 'Demo Mode' : 'Digi Setu Orchestrator' }}</span>
-        </div>
-        
         <button class="settings-btn">
           <Icon name="lucide:settings" :size="16" />
         </button>
@@ -36,12 +19,7 @@
 </template>
 
 <script setup lang="ts">
-const isDemoMode = ref(false)
-
-const handleSystemToggle = (value: boolean) => {
-  isDemoMode.value = value
-  console.log('System mode:', value ? 'Demo' : 'Live')
-}
+// Clean header - no demo/development toggles needed for live system
 </script>
 
 <style scoped>
@@ -100,32 +78,6 @@ const handleSystemToggle = (value: boolean) => {
   display: flex;
   align-items: center;
   gap: 16px;
-}
-
-.system-toggle {
-  display: flex;
-  align-items: center;
-}
-
-.model-selector {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 6px 12px;
-  background: var(--bg-secondary);
-  border: 1px solid var(--border-primary);
-  border-radius: 8px;
-  transition: all 0.2s ease;
-}
-
-.model-selector:hover {
-  background: var(--bg-tertiary);
-}
-
-.model-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text-primary);
 }
 
 .settings-btn {

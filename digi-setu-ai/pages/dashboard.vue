@@ -121,7 +121,8 @@
 <script setup lang="ts">
 // Set page meta
 definePageMeta({
-  layout: 'default'
+  layout: 'chat',
+  middleware: 'auth'
 })
 
 // SEO
