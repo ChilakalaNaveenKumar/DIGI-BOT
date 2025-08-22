@@ -2,8 +2,8 @@
   <header class="header">
     <div class="header-content">
       <div class="header-left">
-        <h1 class="header-title">Digi Setu AI</h1>
-        <div class="status-badge">
+        <h1 class="header-title">{{ displayTitle }}</h1>
+        <div v-if="!currentConversation" class="status-badge">
           <div class="status-dot" />
           <span>Ready</span>
         </div>
@@ -19,7 +19,19 @@
 </template>
 
 <script setup lang="ts">
-// Clean header - no demo/development toggles needed for live system
+import { computed } from 'vue'
+import { useConversations } from '~/composables/useConversations'
+
+// Get current conversation
+const { currentConversation } = useConversations()
+
+// Compute display title
+const displayTitle = computed(() => {
+  if (currentConversation.value) {
+    return currentConversation.value.title
+  }
+  return 'Digi Setu AI'
+})
 </script>
 
 <style scoped>

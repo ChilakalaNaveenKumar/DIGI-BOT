@@ -33,8 +33,8 @@ const errorMessage = ref('')
 // Auth service configuration
 const AUTH_SERVICE_URL = 'http://localhost:8000'
 
-// Use auth composable
-const { login } = useAuth()
+// Use enhanced auth composable (get it at component setup time)
+const { loginWithGoogle, checkAuthStatus } = useEnhancedAuth()
 
 interface AuthResponse {
   access_token: string
@@ -84,16 +84,44 @@ const handleGoogleSignIn = async () => {
     console.log('Waiting for auth callback...')
     const result = await waitForAuthCallback(popup)
     
-    if (result.success && result.access_token && result.user) {
-      console.log('Received auth data from popup...')
+    if (result.success && result.auth_code && result.user) {
+      console.log('Received auth code from popup...')
       
-      // Step 4: Store the token and user info using auth composable
-      login(result.access_token, result.user)
-      
-      // Step 5: Emit success event
-      emit('auth-success', result.user)
-      
-      console.log('Authentication successful!', result.user)
+      // Step 4: Exchange auth code for secure cookies in parent window
+      try {
+        console.log('Exchanging auth code for cookies...')
+        
+        const response = await fetch('http://localhost:8000/api/auth/exchange-auth-code', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            auth_code: result.auth_code
+          })
+        })
+        
+        if (response.ok) {
+          console.log('Auth code exchanged successfully, cookies set')
+          
+          // Verify auth status
+          const isNowAuthenticated = await checkAuthStatus()
+          if (isNowAuthenticated) {
+            console.log('Parent window authentication confirmed')
+            emit('auth-success', result.user)
+          } else {
+            console.log('Auth status check failed, but proceeding...')
+            emit('auth-success', result.user)
+          }
+        } else {
+          console.error('Failed to exchange auth code:', response.status)
+          throw new Error('Authentication exchange failed')
+        }
+      } catch (error) {
+        console.error('Error exchanging auth code:', error)
+        throw new Error('Authentication failed')
+      }
     } else {
       throw new Error('Authentication was cancelled or failed')
     }
@@ -118,7 +146,7 @@ const waitForAuthCallback = (_popup: Window): Promise<{success: boolean, access_
         return
       }
       
-      console.log('Received message from popup:', event.data)
+      console.log('Received message from popup:', event.data.type)
       
       if (event.data.type === 'GOOGLE_AUTH_SUCCESS' && !resolved) {
         resolved = true
@@ -126,7 +154,7 @@ const waitForAuthCallback = (_popup: Window): Promise<{success: boolean, access_
         console.log('Auth success received, resolving...')
         resolve({ 
           success: true, 
-          access_token: event.data.access_token,
+          auth_code: event.data.auth_code,
           user: event.data.user
         })
       } else if (event.data.type === 'GOOGLE_AUTH_ERROR' && !resolved) {

@@ -21,9 +21,9 @@ import structlog
 import uvicorn
 import httpx
 import jwt
-from fastapi import FastAPI, HTTPException, Request, Depends
+from fastapi import FastAPI, HTTPException, Request, Depends, Header
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse
+from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, Response
 from pydantic import BaseModel
 from pydantic_settings import BaseSettings
 from google.oauth2 import id_token
@@ -35,7 +35,8 @@ from app.core.simple_config import get_settings
 from app.core.database import init_db, close_db, get_db_session
 from app.models.user import User
 from app.models.conversation import Conversation
-from app.routers import direct_chat, files
+from app.routers import direct_chat, files, conversations
+from app.routers.enhanced_auth import router as enhanced_auth_router
 
 # Configure clean logging (no spam)
 logging.basicConfig(
@@ -318,6 +319,7 @@ async def verify_google_credential(
 
 @app.get("/auth/callback")
 async def google_callback(
+    response: Response,
     code: str = None, 
     error: str = None,
     db: AsyncSession = Depends(get_db_session)
@@ -367,21 +369,55 @@ async def google_callback(
                 logger.error("Database error in OAuth callback", error=str(db_error))
                 raise HTTPException(status_code=500, detail="Database error during authentication")
             
-            # Create JWT token
-            token_data = {
-                "sub": str(user.id),
+            # Use enhanced security system to generate tokens and set cookies
+            from app.core.security import security_manager
+            
+            user_data = {
+                "id": user.id,
                 "google_id": user.google_id,
                 "email": user.email,
-                "name": user.name
+                "name": user.name,
+                "verified_email": user.verified_email
             }
             
-            access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)
-            access_token = create_access_token(
-                data=token_data, 
-                expires_delta=access_token_expires
+            # Generate secure tokens
+            access_token, refresh_token = security_manager.generate_tokens(user_data)
+            
+            # Debug: Log token generation
+            logger.info("Google callback token generation", 
+                       access_token_length=len(access_token) if access_token else 0,
+                       refresh_token_length=len(refresh_token) if refresh_token else 0,
+                       user_id=user.id)
+            
+            # Generate a one-time auth code for secure parent window exchange
+            import secrets
+            auth_code = secrets.token_urlsafe(32)
+            
+            # Store the tokens temporarily with the auth code (5 minutes expiry)
+            from datetime import datetime, timedelta
+            auth_code_data = {
+                "access_token": access_token,
+                "refresh_token": refresh_token,
+                "user_data": user.to_dict(),
+                "expires": datetime.now() + timedelta(minutes=5)
+            }
+            
+            # Store in security manager (we'll add this method)
+            security_manager.store_auth_code(auth_code, auth_code_data)
+            
+            # Log successful authentication
+            security_manager.log_security_event(
+                "google_oauth_callback_success",
+                # We don't have request object here, so create a minimal one
+                type('Request', (), {
+                    'client': type('Client', (), {'host': 'unknown'})(),
+                    'headers': {},
+                    'url': type('URL', (), {'path': '/auth/callback'})()
+                })(),
+                user_id=str(user.id)
             )
             
-            # Serialize user data while session is active
+            # Serialize user data for response
             import json
             user_info_json = json.dumps(user.to_dict())
             
@@ -398,12 +434,12 @@ async def google_callback(
                     if (window.opener) {{
                         const message = {{
                             type: 'GOOGLE_AUTH_SUCCESS',
-                            access_token: '{access_token}',
+                            auth_code: '{auth_code}',
                             user: {user_info_json}
                         }};
                         
-                        console.log('Sending message to parent:', message);
-                        window.opener.postMessage(message, '*');
+                        console.log('Sending auth success message to parent window');
+                        window.opener.postMessage(message, 'http://localhost:3000');
                         
                         setTimeout(() => {{
                             window.close();
@@ -458,9 +494,21 @@ async def logout():
     return {"message": "Logged out successfully"}
 
 
+@app.get("/auth/debug")
+async def debug_auth(authorization: Optional[str] = Header(None)):
+    """Debug endpoint to check authentication state"""
+    return {
+        "has_authorization_header": authorization is not None,
+        "authorization_preview": authorization[:50] + "..." if authorization and len(authorization) > 50 else authorization,
+        "timestamp": datetime.now(timezone.utc).isoformat()
+    }
+
+
 # Include routers
+app.include_router(enhanced_auth_router)  # Enhanced secure authentication
 app.include_router(direct_chat.router)
 app.include_router(files.router, prefix="/api")
+app.include_router(conversations.router)
 
 
 if __name__ == "__main__":

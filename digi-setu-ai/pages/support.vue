@@ -3,7 +3,7 @@
     <div class="support-content">
       <!-- Header -->
       <div class="support-header">
-        <NuxtLink to="/auth/signin" class="back-link">
+        <NuxtLink to="/signin" class="back-link">
           <Icon name="lucide:arrow-left" class="back-icon" />
           Back to Sign In
         </NuxtLink>

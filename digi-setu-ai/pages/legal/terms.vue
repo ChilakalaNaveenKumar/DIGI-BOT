@@ -2,7 +2,7 @@
   <div class="legal-page">
     <div class="legal-container">
       <div class="legal-header">
-        <NuxtLink to="/auth/signin" class="back-link">
+        <NuxtLink to="/signin" class="back-link">
           <Icon name="lucide:arrow-left" />
           Back to Sign In
         </NuxtLink>
@@ -141,7 +141,7 @@
           By using Digi Setu AI, you acknowledge that you have read, understood, and agree to be bound by these Terms of Service.
         </p>
         <div class="legal-actions">
-          <NuxtLink to="/auth/signin" class="btn-primary">
+          <NuxtLink to="/signin" class="btn-primary">
             I Agree - Continue to Sign In
           </NuxtLink>
         </div>

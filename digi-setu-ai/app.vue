@@ -38,7 +38,7 @@
 const { theme, currentTheme } = useTheme()
 
 // Initialize auth system
-const { isAuthenticated } = useAuth()
+const { isAuthenticated } = useEnhancedAuth()
 
 // Get current route to determine layout
 const route = useRoute()

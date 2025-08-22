@@ -56,21 +56,45 @@ onMounted(async () => {
   }
   
   try {
-    // For the server-side OAuth flow, we would exchange the code for tokens here
-    // But for now, we'll use the Google Identity Services approach
-    // The code from Google will be used as the credential
+    // Exchange authorization code for tokens using our backend
+    console.log('Exchanging authorization code for tokens...')
     
-    console.log('Notifying parent window of successful auth')
+    const response = await fetch(`http://localhost:8000/auth/callback?code=${encodeURIComponent(code)}&state=${encodeURIComponent(state || '')}`, {
+      method: 'GET',
+      credentials: 'include', // Important: include cookies
+      headers: {
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+      }
+    })
     
-    // Notify the parent window that authentication was successful
-    notifyParent('GOOGLE_AUTH_SUCCESS', { credential: code })
-    
-    isProcessing.value = false
-    
-    // Auto-close after 2 seconds
-    setTimeout(() => {
-      closeWindow()
-    }, 2000)
+    if (response.ok) {
+      // The backend should have set secure cookies
+      console.log('Authentication successful, cookies should be set')
+      
+      // Try to get user info from the response if it's JSON
+      let userData = null
+      const contentType = response.headers.get('content-type')
+      if (contentType && contentType.includes('application/json')) {
+        userData = await response.json()
+      }
+      
+      // Notify parent window of success
+      notifyParent('GOOGLE_AUTH_SUCCESS', { 
+        success: true,
+        user: userData?.user || null,
+        access_token: 'cookie-based', // Indicate we're using cookies
+        reload_parent: true // Signal parent to reload/refresh auth state
+      })
+      
+      isProcessing.value = false
+      
+      // Auto-close after 2 seconds
+      setTimeout(() => {
+        closeWindow()
+      }, 2000)
+    } else {
+      throw new Error(`Authentication failed: ${response.status} ${response.statusText}`)
+    }
     
   } catch (err: any) {
     console.error('Error processing auth callback:', err)

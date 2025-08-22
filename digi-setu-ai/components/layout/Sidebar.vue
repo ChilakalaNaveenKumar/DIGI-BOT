@@ -8,7 +8,7 @@
         <h1 class="logo-text">Digi Setu</h1>
       </div>
       
-      <button class="new-chat-btn">
+      <button class="new-chat-btn" @click="handleNewChat">
         <Icon name="lucide:plus" :size="16" />
         New chat
       </button>
@@ -16,36 +16,109 @@
     
     <nav class="sidebar-nav">
       <div class="nav-section">
-        <h2 class="nav-title">Recents</h2>
-        <div class="nav-items">
-          <a href="#" class="nav-item active">
+        <h2 class="nav-title">Conversations</h2>
+        
+        <!-- Loading state -->
+        <div v-if="isLoading" class="loading-conversations">
+          <div class="loading-item" v-for="i in 3" :key="i">
+            <div class="loading-icon"></div>
+            <div class="loading-text"></div>
+          </div>
+        </div>
+        
+        <!-- Conversations list -->
+        <div v-else-if="conversations.length > 0" class="nav-items">
+          <button
+            v-for="conversation in conversations"
+            :key="conversation.id"
+            @click="handleSelectConversation(conversation)"
+            :class="['nav-item', { active: currentConversation?.id === conversation.id }]"
+          >
             <Icon name="lucide:message-circle" class="nav-icon" :size="16" />
-            Ready to create with Digi Setu?
-          </a>
-          <a href="#" class="nav-item">
-            <Icon name="lucide:message-circle" class="nav-icon" :size="16" />
-            AI Learning Experience
-          </a>
-          <a href="#" class="nav-item">
-            <Icon name="lucide:message-circle" class="nav-icon" :size="16" />
-            Interactive Components
-          </a>
+            <span class="conversation-title">{{ conversation.title }}</span>
+            <button
+              v-if="conversation.id === currentConversation?.id"
+              @click.stop="handleDeleteConversation(conversation.id)"
+              class="delete-btn"
+            >
+              <Icon name="lucide:trash-2" :size="12" />
+            </button>
+          </button>
+        </div>
+        
+        <!-- Empty state -->
+        <div v-else class="empty-conversations">
+          <Icon name="lucide:message-circle" :size="24" class="empty-icon" />
+          <p class="empty-text">No conversations yet</p>
+          <p class="empty-subtext">Start a new chat to begin</p>
         </div>
       </div>
     </nav>
     
     <div class="sidebar-footer">
       <LayoutThemeToggle />
-      <div class="user-section">
-        <UiAvatar initials="NK" variant="primary" size="sm" />
-        <span class="user-name">Naveen Kumar</span>
-      </div>
+      <LayoutUserMenu />
     </div>
   </aside>
 </template>
 
 <script setup lang="ts">
-// Sidebar logic
+import { onMounted } from 'vue'
+import { useConversations } from '~/composables/useConversations'
+import { useEnhancedAuth } from '~/composables/useEnhancedAuth'
+
+// Use enhanced auth
+const { isAuthenticated } = useEnhancedAuth()
+
+// Use conversations composable
+const {
+  conversations,
+  currentConversation,
+  isLoading,
+  fetchConversations,
+  createConversation,
+  deleteConversation,
+  setCurrentConversation
+} = useConversations()
+
+// Event handlers
+const handleNewChat = async () => {
+  try {
+    const newConversation = await createConversation('Untitled')
+    console.log('New conversation created:', newConversation.id)
+    
+    // Navigate to chat page if not already there
+    await navigateTo('/chat')
+  } catch (error) {
+    console.error('Failed to create new conversation:', error)
+  }
+}
+
+const handleSelectConversation = (conversation: any) => {
+  setCurrentConversation(conversation)
+  console.log('Selected conversation:', conversation.id)
+  
+  // Navigate to chat page
+  navigateTo('/chat')
+}
+
+const handleDeleteConversation = async (conversationId: number) => {
+  if (confirm('Are you sure you want to delete this conversation?')) {
+    try {
+      await deleteConversation(conversationId)
+      console.log('Conversation deleted:', conversationId)
+    } catch (error) {
+      console.error('Failed to delete conversation:', error)
+    }
+  }
+}
+
+// Load conversations on mount (only if authenticated)
+onMounted(() => {
+  if (isAuthenticated.value) {
+    fetchConversations()
+  }
+})
 </script>
 
 <style scoped>
@@ -144,12 +217,18 @@
   padding: 8px 12px;
   color: var(--text-secondary);
   text-decoration: none;
+  border: none;
+  background: transparent;
   border-radius: 6px;
   font-size: 14px;
   transition: all 0.2s ease;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  position: relative;
 }
 
 .nav-item:hover {
@@ -175,14 +254,93 @@
   gap: 12px;
 }
 
-.user-section {
+/* User section styles moved to UserMenu component */
+
+/* New conversation-related styles */
+.conversation-title {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.delete-btn {
+  opacity: 0;
+  padding: 4px;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.nav-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.loading-conversations {
   display: flex;
-  align-items: center;
+  flex-direction: column;
   gap: 8px;
 }
 
-.user-name {
+.loading-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+}
+
+.loading-icon {
+  width: 16px;
+  height: 16px;
+  background: var(--bg-tertiary);
+  border-radius: 50%;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.loading-text {
+  flex: 1;
+  height: 12px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+.empty-conversations {
+  text-align: center;
+  padding: 24px 12px;
+}
+
+.empty-icon {
+  color: var(--text-muted);
+  margin-bottom: 8px;
+}
+
+.empty-text {
   font-size: 14px;
   color: var(--text-secondary);
+  margin: 0 0 4px 0;
+}
+
+.empty-subtext {
+  font-size: 12px;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 </style>

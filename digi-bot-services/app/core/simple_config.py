@@ -29,7 +29,20 @@ class Settings(BaseSettings):
         default="dev-secret-key-change-this-in-production-please-make-it-very-long-and-secure"
     )
     ALGORITHM: str = Field(default="HS256")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30)
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15)  # Short-lived access tokens
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7)  # Long-lived refresh tokens
+    
+    # Cookie Security (HIPAA Compliance)
+    COOKIE_SECURE: bool = Field(default=False)  # Set to True in production with HTTPS
+    COOKIE_DOMAIN: Optional[str] = Field(default=None)  # Set to your domain in production
+    COOKIE_HTTPONLY: bool = Field(default=True)  # Prevent XSS attacks
+    
+    # CSRF Protection
+    CSRF_PROTECTION_ENABLED: bool = Field(default=True)
+    
+    # Session Security
+    SESSION_TIMEOUT_MINUTES: int = Field(default=60)  # Auto-logout after inactivity
+    MAX_CONCURRENT_SESSIONS: int = Field(default=3)  # Limit concurrent sessions per user
     
     # Database
     DATABASE_URL: str = Field(
