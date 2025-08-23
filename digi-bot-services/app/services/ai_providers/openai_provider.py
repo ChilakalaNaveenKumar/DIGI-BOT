@@ -12,7 +12,7 @@ import structlog
 from openai import AsyncOpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 from app.core.exceptions import DigiSetuException
 
 logger = structlog.get_logger(__name__)

@@ -32,20 +32,18 @@ class ConversationUpdate(BaseModel):
     """Request model for updating a conversation."""
     title: Optional[str] = None
     status: Optional[ConversationStatus] = None
-    is_pinned: Optional[bool] = None
 
 
 class ConversationResponse(BaseModel):
-    """Response model for conversation."""
+    """Response model for conversation - CLEAN VERSION."""
     id: int
     title: str
-    summary: Optional[str]
     status: str
-    is_pinned: bool
     message_count: int
     created_at: str
     updated_at: str
     last_message_at: Optional[str]
+    storage_type: str = "active"
 
 
 @router.get("/", response_model=List[ConversationResponse])
@@ -74,13 +72,12 @@ async def get_conversations(
             ConversationResponse(
                 id=conv.id,
                 title=conv.title,
-                summary=conv.summary,
                 status=conv.status.value,
-                is_pinned=conv.is_pinned,
                 message_count=conv.message_count,
                 created_at=conv.created_at.isoformat(),
                 updated_at=conv.updated_at.isoformat(),
-                last_message_at=conv.last_message_at.isoformat() if conv.last_message_at else None
+                last_message_at=conv.last_message_at.isoformat() if conv.last_message_at else None,
+                storage_type="active"
             )
             for conv in conversations
         ]
@@ -114,13 +111,12 @@ async def create_conversation(
         return ConversationResponse(
             id=conversation.id,
             title=conversation.title,
-            summary=conversation.summary,
             status=conversation.status.value,
-            is_pinned=conversation.is_pinned,
             message_count=conversation.message_count,
             created_at=conversation.created_at.isoformat(),
             updated_at=conversation.updated_at.isoformat(),
-            last_message_at=conversation.last_message_at.isoformat() if conversation.last_message_at else None
+            last_message_at=conversation.last_message_at.isoformat() if conversation.last_message_at else None,
+            storage_type="active"
         )
     
     except Exception as e:
@@ -152,13 +148,12 @@ async def get_conversation(
         return ConversationResponse(
             id=conversation.id,
             title=conversation.title,
-            summary=conversation.summary,
             status=conversation.status.value,
-            is_pinned=conversation.is_pinned,
             message_count=conversation.message_count,
             created_at=conversation.created_at.isoformat(),
             updated_at=conversation.updated_at.isoformat(),
-            last_message_at=conversation.last_message_at.isoformat() if conversation.last_message_at else None
+            last_message_at=conversation.last_message_at.isoformat() if conversation.last_message_at else None,
+            storage_type="active"
         )
     
     except HTTPException:
@@ -195,8 +190,6 @@ async def update_conversation(
             conversation.title = update_data.title
         if update_data.status is not None:
             conversation.status = update_data.status
-        if update_data.is_pinned is not None:
-            conversation.is_pinned = update_data.is_pinned
         
         await db.commit()
         await db.refresh(conversation)
@@ -206,13 +199,12 @@ async def update_conversation(
         return ConversationResponse(
             id=conversation.id,
             title=conversation.title,
-            summary=conversation.summary,
             status=conversation.status.value,
-            is_pinned=conversation.is_pinned,
             message_count=conversation.message_count,
             created_at=conversation.created_at.isoformat(),
             updated_at=conversation.updated_at.isoformat(),
-            last_message_at=conversation.last_message_at.isoformat() if conversation.last_message_at else None
+            last_message_at=conversation.last_message_at.isoformat() if conversation.last_message_at else None,
+            storage_type="active"
         )
     
     except HTTPException:

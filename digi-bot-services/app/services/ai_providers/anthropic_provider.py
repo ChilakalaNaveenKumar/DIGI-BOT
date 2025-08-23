@@ -11,8 +11,38 @@ from typing import AsyncGenerator, Dict, List, Optional, Any
 import structlog
 import httpx
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 from app.core.exceptions import DigiSetuException
+from app.services.comprehensive_tools import process_comprehensive_tool_calls
+
+# Anthropic API Event Types - Constants to avoid hardcoding
+class AnthropicEvents:
+    MESSAGE_START = "message_start"
+    CONTENT_BLOCK_START = "content_block_start"
+    CONTENT_BLOCK_DELTA = "content_block_delta"
+    CONTENT_BLOCK_STOP = "content_block_stop"
+    MESSAGE_DELTA = "message_delta"
+    MESSAGE_STOP = "message_stop"
+
+# Content Block Types
+class ContentBlockTypes:
+    TEXT = "text"
+    TOOL_USE = "tool_use"
+    THINKING = "thinking"
+
+# Delta Types
+class DeltaTypes:
+    TEXT_DELTA = "text_delta"
+    INPUT_JSON_DELTA = "input_json_delta"
+    THINKING_DELTA = "thinking_delta"
+    SIGNATURE_DELTA = "signature_delta"
+
+# Stop Reasons
+class StopReasons:
+    END_TURN = "end_turn"
+    MAX_TOKENS = "max_tokens"
+    TOOL_USE = "tool_use"
+    PAUSE_TURN = "pause_turn"
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()
@@ -98,8 +128,8 @@ class AnthropicProvider:
                 timeout=60.0
             )
             
-            # Test the connection
-            await self.health_check()
+            # Skip health check - it's unnecessary and causes delays
+            # Health will be verified on first actual API call
             
             logger.info("Anthropic provider initialized successfully")
             
@@ -123,11 +153,11 @@ class AnthropicProvider:
             if not self.client:
                 return False
             
-            # Simple test request
+            # Simple test request - use default model from config
             response = await self.client.post(
                 "/messages",
                 json={
-                    "model": "claude-sonnet-4-20250514",
+                    "model": settings.DEFAULT_AI_MODEL,  # Use config default
                     "max_tokens": 5,
                     "messages": [{"role": "user", "content": "Hello"}]
                 }
@@ -142,9 +172,6 @@ class AnthropicProvider:
     async def generate_completion(
         self,
         messages: List[Dict[str, str]],
-        model: str = "claude-3.5-sonnet",
-        max_tokens: Optional[int] = None,
-        temperature: float = 0.7,
         tools: Optional[List[Dict[str, Any]]] = None,
         **kwargs
     ) -> Dict[str, Any]:
@@ -158,40 +185,37 @@ class AnthropicProvider:
             )
         
         try:
+            # Use config values directly
+            model = settings.DEFAULT_AI_MODEL
+            max_tokens = settings.MAX_TOKENS
+            temperature = settings.TEMPERATURE
+            
             # Validate model
             if model not in self.models:
-                model = "claude-3.5-sonnet"  # Fallback
+                model = settings.DEFAULT_AI_MODEL
             
-            # Convert to Anthropic format
-            anthropic_messages = []
+            # Extract system message and prepare messages in one pass
             system_message = None
+            anthropic_messages = []
             
             for msg in messages:
                 if msg["role"] == "system":
                     system_message = msg["content"]
                 else:
-                    # Convert content to proper block format (required by Anthropic)
-                    content = msg["content"]
-                    if isinstance(content, str):
-                        content = [{"type": "text", "text": content}]
-                    
-                    anthropic_messages.append({
-                        "role": msg["role"],
-                        "content": content
-                    })
+                    anthropic_messages.append(msg)
             
             # Prepare request with full token limit
             model_max = self.models[model]["max_output"]
-            # Use full max_tokens limit (removed artificial 8K cap)
             safe_max_tokens = max_tokens or model_max
             
             request_data = {
-                "model": model,  # Use actual model parameter
+                "model": model,
                 "max_tokens": safe_max_tokens,
                 "temperature": temperature,
                 "messages": anthropic_messages
             }
             
+            # Add system message if present
             if system_message:
                 request_data["system"] = system_message
             
@@ -219,18 +243,20 @@ class AnthropicProvider:
                 message=f"Anthropic completion failed: {str(e)}"
             )
     
-    async def stream_completion(
+    async def stream_stepper(
         self,
         messages: List[Dict[str, str]],
-        model: str = "claude-3.5-sonnet",
-        max_tokens: Optional[int] = None,
-        temperature: float = 0.7,
         tools: Optional[List[Dict[str, Any]]] = None,
-        enable_reasoning: bool = False,
-        reasoning_budget: int = 2000,
+        enable_thinking: bool = False,
+        complex_reasoning: bool = False,
         **kwargs
     ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Generate a streaming completion."""
+        """
+        3-Step Stepper for efficient token usage:
+        Step 1: Planning + Built-in Research (full history)
+        Step 2: Custom Tool Execution (minimal tokens)
+        Step 3: Final Analysis (distilled context)
+        """
         
         if not self.client:
             raise DigiSetuException(
@@ -240,339 +266,351 @@ class AnthropicProvider:
             )
         
         try:
-            # Validate model
-            if model not in self.models:
-                model = "claude-3.5-sonnet"  # Fallback
+            # STEP 1: Planning + Built-in Research
+            logger.info("🔄 Step 1: Planning + Built-in Research")
             
-            # Convert to Anthropic format
-            anthropic_messages = []
-            system_message = None
-            
-            for msg in messages:
+            # Modify system message for planning mode (no custom tool info to avoid confusion)
+            planning_messages = messages.copy()
+            for i, msg in enumerate(planning_messages):
                 if msg["role"] == "system":
-                    system_message = msg["content"]
-                else:
-                    # Convert content to proper block format (required by Anthropic)
-                    content = msg["content"]
-                    if isinstance(content, str):
-                        content = [{"type": "text", "text": content}]
+                    planning_messages[i] = {
+                        "role": "system",
+                        "content": msg["content"] + "\n\nYou are in planning mode. Think, analyze, and use web_search as needed. If you think charts or tables would be helpful for your analysis, mention this in your response."
+                    }
+                    break
+            
+            step1_assistant_message = None
+            custom_tools_needed = []
+            
+            # Only include web_search as built-in tool
+            builtin_tools = [{"type": "web_search_20250305", "name": "web_search", "max_uses": 3}]
+            
+            async for chunk in self._stream_anthropic_request(
+                messages=planning_messages,
+                tools=builtin_tools,  # Only built-in tools
+                enable_thinking=enable_thinking,
+                complex_reasoning=complex_reasoning
+            ):
+                # Pass through all chunks to frontend
+                yield chunk
+                
+                # Look for completion to parse text for custom tool mentions
+                if chunk.get("type") == "completion_finished":
+                    step1_assistant_message = chunk.get("assistant_message")
                     
-                    anthropic_messages.append({
-                        "role": msg["role"],
-                        "content": content
+                    # Extract text content to check if custom tools are mentioned
+                    step1_text = ""
+                    for content_block in step1_assistant_message.get("content", []):
+                        if content_block.get("type") == "text":
+                            step1_text += content_block.get("text", "")
+                    
+                    # Parse text for custom tool mentions
+                    if "chartjs_tool" in step1_text.lower() or "chart" in step1_text.lower():
+                        logger.info("🎯 Chart tool mentioned in Step 1 text")
+                        custom_tools_needed.append({
+                            "name": "chartjs_tool",
+                            "id": "text_chart_001",
+                            "input": {"chart_type": "bar", "title": "AI Analysis Chart", "data": []}
+                        })
+                    
+                    if "data_table_tool" in step1_text.lower() or "table" in step1_text.lower():
+                        logger.info("🎯 Table tool mentioned in Step 1 text")
+                        custom_tools_needed.append({
+                            "name": "data_table_tool", 
+                            "id": "text_table_001",
+                            "input": {"title": "AI Analysis Table", "data": []}
+                        })
+                    
+                    if not custom_tools_needed:
+                        logger.info("✅ Step 1 completed - no custom tools needed")
+                        # No custom tools needed - return final result
+                        return
+                    break
+            
+            # STEP 2: Custom Tool Execution
+            if custom_tools_needed:
+                logger.info(f"🔄 Step 2: Executing {len(custom_tools_needed)} custom tools")
+                
+                # Execute all custom tools
+                tool_results = await process_comprehensive_tool_calls(custom_tools_needed)
+                
+                # Build tool result content for Step 3
+                tool_result_content = []
+                for i, tool_result in enumerate(tool_results):
+                    tool_id = custom_tools_needed[i]["id"]
+                    result_content = tool_result.get("content", "No result")
+                    
+                    tool_result_content.append({
+                        "type": "tool_result",
+                        "tool_use_id": tool_id,
+                        "content": str(result_content)
                     })
-            
-            # Prepare request
-            request_data = {
-                "model": model,  # Use actual model parameter, not hardcoded!
-                "max_tokens": max_tokens or self.models[model]["max_output"],
-                "messages": anthropic_messages,
-                "stream": True
-            }
-            
-            # Add web search tool for Claude 4 models
-            if "claude-opus-4" in model or "claude-sonnet-4" in model or "claude-3-7-sonnet" in model:
-                request_data["tools"] = [
+                    
+                    # Yield tool output to frontend
+                    yield {
+                        "type": "tool_output", 
+                        "content": str(result_content),
+                        "tool_name": custom_tools_needed[i]["name"]
+                    }
+                
+                # STEP 3: Final Analysis (no tools, distilled context)
+                logger.info("🔄 Step 3: Final Analysis")
+                
+                # Create distilled context for Step 3
+                original_user_message = messages[-1] if messages else {"role": "user", "content": ""}
+                
+                # Clean the assistant message for Step 3 (include thinking blocks for context)
+                clean_content = []
+                for block in step1_assistant_message.get("content", []):
+                    # Include thinking, text and tool_use blocks for full context
+                    if block.get("type") in ["thinking", "text", "tool_use"]:
+                        clean_content.append(block)
+                
+                clean_assistant_message = {
+                    "role": "assistant",
+                    "content": clean_content
+                }
+                
+                distilled_messages = [
                     {
-                        "type": "web_search_20250305",
-                        "name": "web_search",
-                        "max_uses": 5
+                        "role": "system",
+                        "content": "You are completing a comprehensive analysis. You have research results and tool outputs (charts, tables). Write your final analysis integrating all information. Think deeply about the insights and provide comprehensive analysis."
+                    },
+                    original_user_message,
+                    clean_assistant_message,
+                    {
+                        "role": "user",
+                        "content": tool_result_content
                     }
                 ]
-            
-            # Add temperature only if NOT using thinking (thinking doesn't like extra params)
-            if not enable_reasoning:
-                request_data["temperature"] = temperature
-            
-            # Add extended thinking/reasoning if enabled (disabled by default)
-            # Note: This is "thinking mode" - different from actual reasoning content
-            if enable_reasoning:
-                # Calculate optimal reasoning budget (your theory confirmed!)
-                total_tokens = max_tokens or self.models.get(model, {}).get("max_output", 2000)
                 
-                # Use the reasoning budget directly without complex calculations
-                # The API handles the token allocation internally
-                reasoning_budget_calculated = min(reasoning_budget, total_tokens // 4)  # Max 25% for thinking
-                
-                logger.info(f"Token allocation - Total: {total_tokens}, Reasoning: {reasoning_budget_calculated}")
-                
-                request_data["thinking"] = {
-                    "type": "enabled",
-                    "budget_tokens": reasoning_budget_calculated  # Correct format
-                }
-            
-            if system_message:
-                request_data["system"] = system_message
-            
-            if tools and self.models[model]["supports_tools"]:
-                # Merge with existing tools (like web search) instead of overriding
-                existing_tools = request_data.get("tools", [])
-                request_data["tools"] = existing_tools + tools
-            
-            # Log the actual request for debugging
-            logger.info(f"Anthropic request - Model: {model}, Max tokens: {request_data.get('max_tokens')}, Thinking: {request_data.get('thinking', {}).get('budget_tokens', 'disabled')}")
-            
-            # Start streaming
-            async with self.client.stream("POST", "/messages", json=request_data) as response:
-                response.raise_for_status()
-                
-                content_buffer = ""
-                tool_calls_detected = []
-                assistant_content_blocks = []
-                
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        try:
-                            data = json.loads(line[6:])
-                            
-                            # Handle thinking/reasoning content blocks (Claude 4 extended thinking)
-                            if data.get("type") == "content_block_start":
-                                block = data.get("content_block", {})
-                                if block.get("type") == "thinking":
-                                    yield {
-                                        "type": "reasoning",
-                                        "content": "",
-                                        "provider": self.name,
-                                        "model": model,
-                                        "metadata": {"block_start": True, "thinking_block": True}
-                                    }
-                                elif block.get("type") == "server_tool_use":
-                                    tool_name = block.get("name", "unknown")
-                                    yield {
-                                        "type": "activity",
-                                        "content": f"Using {tool_name} tool...",
-                                        "provider": self.name,
-                                        "model": model,
-                                        "metadata": {"tool": tool_name, "tool_start": True}
-                                    }
-                                elif block.get("type") == "tool_use":
-                                    # Client-side tool call (like chart tools) - just store for now
-                                    tool_name = block.get("name", "unknown")
-                                    tool_id = block.get("id", "unknown")
-                                    tool_input = block.get("input", {})
-                                    
-                                    # Store partial tool call - input might be completed later
-                                    tool_calls_detected.append({
-                                        "name": tool_name,
-                                        "id": tool_id,
-                                        "input": tool_input
-                                    })
-                                    
-                                    logger.info(f"Tool call started: {tool_name} (ID: {tool_id}) with input: {tool_input}")
-                                    
-                                    # Yield tool call info but don't trigger workflow yet
-                                    yield {
-                                        "type": "tool_call",
-                                        "tool_name": tool_name,
-                                        "tool_id": tool_id,
-                                        "tool_input": tool_input,
-                                        "provider": self.name,
-                                        "model": model,
-                                        "metadata": {"tool_call_start": True}
-                                    }
-                            
-                            elif data.get("type") == "content_block_stop":
-                                # Content block finished - check if it was a tool_use block
-                                block = data.get("content_block", {})
-                                if block.get("type") == "tool_use" and tool_calls_detected:
-                                    # Update the tool call with final input
-                                    final_input = block.get("input", {})
-                                    if tool_calls_detected:
-                                        tool_calls_detected[-1]["input"] = final_input
-                                        logger.info(f"Tool call completed with final input: {final_input}")
-                                    
-                                    # Now trigger the tool use workflow
-                                    # Add text content if any exists
-                                    if content_buffer.strip():
-                                        assistant_content_blocks.append({
-                                            "type": "text",
-                                            "text": content_buffer
-                                        })
-                                    
-                                    # Add tool calls to content blocks
-                                    for tc in tool_calls_detected:
-                                        assistant_content_blocks.append({
-                                            "type": "tool_use",
-                                            "id": tc["id"],
-                                            "name": tc["name"],
-                                            "input": tc["input"]
-                                        })
-                                    
-                                    # Trigger tool use workflow
-                                    yield {
-                                        "type": "tool_use_required",
-                                        "reason": "tool_use",
-                                        "provider": self.name,
-                                        "model": model,
-                                        "tool_calls": tool_calls_detected,
-                                        "assistant_content": assistant_content_blocks
-                                    }
-                                    return  # Exit streaming loop to let router handle tool processing
-                            
-                            elif data.get("type") == "content_block_delta":
-                                delta = data.get("delta", {})
-                                
-                                # Handle thinking_delta events (Claude 4 extended thinking)
-                                if delta.get("type") == "thinking_delta":
-                                    thinking_content = delta.get("thinking", "")
-                                    if thinking_content:
-                                        yield {
-                                            "type": "reasoning",
-                                            "content": thinking_content,
-                                            "provider": self.name,
-                                            "model": model,
-                                            "metadata": {"thinking_delta": True}
-                                        }
-                                
-                                # Handle signature_delta events (thinking encryption)
-                                elif delta.get("type") == "signature_delta":
-                                    # Store signature but don't yield (used for verification)
-                                    pass
-                                
-                                # Handle tool input delta events
-                                elif delta.get("type") == "input_json_delta":
-                                    # Tool input is being streamed - we need to wait for content_block_stop
-                                    logger.info(f"Tool input delta received: {delta}")
-                                    pass
-                                
-                                # Handle regular text_delta events
-                                elif delta.get("type") == "text_delta":
-                                    text_content = delta.get("text", "")
-                                    if text_content:
-                                        content_buffer += text_content
-                                        yield {
-                                            "type": "content",
-                                            "content": text_content,
-                                            "provider": self.name,
-                                            "model": model
-                                        }
-                                
-                                # Handle server tool use results
-                                elif delta.get("type") == "server_tool_use_delta":
-                                    if "result" in delta:
-                                        tool_result = delta.get("result", "")
-                                        if tool_result:
-                                            yield {
-                                                "type": "tool_output",
-                                                "content": tool_result,
-                                                "provider": self.name,
-                                                "model": model,
-                                                "metadata": {"tool_result": True}
-                                            }
-                                
-                                # Fallback for legacy delta format
-                                elif delta.get("text"):
-                                    content_buffer += delta["text"]
-                                    yield {
-                                        "type": "content",
-                                        "content": delta["text"],
-                                        "provider": self.name,
-                                        "model": model
-                                    }
-                            
-                            elif data.get("type") == "message_stop":
-                                # Log why the message stopped
-                                stop_reason = data.get("stop_reason", "unknown")
-                                usage = data.get("usage", {})
-                                logger.info(f"Message stopped - Reason: {stop_reason}, Content length: {len(content_buffer)}, Usage: {usage}, Full data: {json.dumps(data)}")
-                                
-                                # Handle different stop reasons according to 2025 Anthropic docs
-                                # If we detected tool calls during streaming, treat as tool_use regardless of stop_reason
-                                if stop_reason == "tool_use" or len(content_buffer) == 0:
-                                    logger.info("AI made tool call - need to process and continue")
-                                    yield {
-                                        "type": "tool_use_required",
-                                        "reason": "tool_use",
-                                        "provider": self.name,
-                                        "model": model,
-                                        "usage": usage
-                                    }
-                                elif stop_reason == "max_tokens":
-                                    logger.warning("Response truncated due to token limit")
-                                    yield {
-                                        "type": "truncated",
-                                        "reason": stop_reason,
-                                        "provider": self.name,
-                                        "model": model,
-                                        "usage": usage
-                                    }
-                                else:
-                                    # end_turn, pause_turn, etc.
-                                    yield {
-                                        "type": "finish",
-                                        "reason": stop_reason,
-                                        "provider": self.name,
-                                        "model": model,
-                                        "usage": usage
-                                    }
-                                
-                        except json.JSONDecodeError:
-                            continue
-            
-            logger.info(
-                "Anthropic streaming completion finished",
-                model=model,
-                content_length=len(content_buffer)
-            )
-            
-        except Exception as e:
-            logger.error("Anthropic streaming failed", model=model, error=str(e))
-            yield {
-                "type": "error",
-                "error": str(e),
-                "provider": self.name,
-                "model": model
-            }
-    
-    async def generate_reasoning(
-        self,
-        messages: List[Dict[str, str]],
-        model: str = "claude-3.5-sonnet",
-        **kwargs
-    ) -> AsyncGenerator[Dict[str, Any], None]:
-        """Generate reasoning process for a request."""
-        
-        # Add reasoning instruction to messages
-        reasoning_messages = messages + [{
-            "role": "user",
-            "content": (
-                "Before providing your main response, please think through this step by step. "
-                "Show your reasoning process clearly. Use <thinking> tags to wrap your "
-                "step-by-step analysis before giving your final answer."
-            )
-        }]
-        
-        try:
-            async for chunk in self.stream_completion(
-                messages=reasoning_messages,
-                model=model,
-                max_tokens=reasoning_budget,  # Use the actual reasoning budget
-                temperature=0.3,  # Lower temperature for more consistent reasoning
-                **kwargs
-            ):
-                if chunk.get("type") == "content":
-                    content = chunk.get("content", "")
-                    
-                    # Check if this is reasoning content (inside thinking tags)
-                    if "<thinking>" in content or "</thinking>" in content:
-                        yield {
-                            "type": "reasoning",
-                            "content": content.replace("<thinking>", "").replace("</thinking>", "").strip(),
-                            "provider": self.name,
-                            "model": model
-                        }
-                    else:
-                        yield chunk
-                else:
+                # Stream final analysis (no tools, but enable thinking for deep analysis)
+                async for chunk in self._stream_anthropic_request(
+                    messages=distilled_messages,
+                    tools=None,  # No tools in Step 3
+                    enable_thinking=True,  # Enable thinking for comprehensive analysis
+                    complex_reasoning=True  # Enable complex reasoning for final step
+                ):
                     yield chunk
-                    
+            
         except Exception as e:
-            logger.error("Anthropic reasoning generation failed", error=str(e))
+            logger.error("Stepper streaming failed", error=str(e))
             yield {
                 "type": "error",
                 "error": str(e),
                 "provider": self.name
             }
+    
+    async def _stream_anthropic_request(
+        self,
+        messages: List[Dict[str, str]],
+        tools: Optional[List[Dict[str, Any]]] = None,
+        enable_thinking: bool = False,
+        complex_reasoning: bool = False
+    ) -> AsyncGenerator[Dict[str, Any], None]:
+        """Internal method to handle single Anthropic streaming request."""
+        
+        # Use config values directly
+        model = settings.DEFAULT_AI_MODEL
+        temperature = settings.TEMPERATURE
+        
+        # Token allocation
+        model_max_output = self.models[model]["max_output"]
+        
+        if complex_reasoning:
+            reasoning_budget = 32000
+            max_output_tokens = min(32000, model_max_output - reasoning_budget)
+            total_max_tokens = reasoning_budget + max_output_tokens
+        else:
+            reasoning_budget = settings.REASONING_BUDGET or 16000
+            max_output_tokens = settings.MAX_TOKENS or 8000
+            if enable_thinking:
+                total_max_tokens = min(reasoning_budget + max_output_tokens, model_max_output)
+            else:
+                total_max_tokens = min(max_output_tokens, model_max_output)
+        
+        # Validate model
+        if model not in self.models:
+            model = settings.DEFAULT_AI_MODEL
+        
+        # Extract system message and prepare messages
+        system_message = None
+        anthropic_messages = []
+        
+        for msg in messages:
+            if msg["role"] == "system":
+                system_message = msg["content"]
+            else:
+                anthropic_messages.append(msg)
+        
+        # Prepare request
+        request_data = {
+            "model": model,
+            "max_tokens": total_max_tokens,
+            "messages": anthropic_messages,
+            "stream": True
+        }
+        
+        # Add system message if present
+        if system_message:
+            request_data["system"] = system_message
+        
+        # Configure thinking mode
+        if enable_thinking:
+            request_data["thinking"] = {
+                "type": "enabled",
+                "budget_tokens": reasoning_budget
+            }
+            request_data["top_p"] = 0.98
+            
+            # Add interleaved thinking for complex reasoning
+            if complex_reasoning and settings.ENABLE_INTERLEAVED_THINKING:
+                if not hasattr(self.client, '_interleaved_thinking_enabled'):
+                    self.client.headers["anthropic-beta"] = "interleaved-thinking-2025-05-14"
+                    self.client._interleaved_thinking_enabled = True
+        else:
+            request_data["temperature"] = temperature
+        
+        if tools and self.models[model]["supports_tools"]:
+            request_data["tools"] = tools
+        
+        # Start streaming
+        async with self.client.stream("POST", "/messages", json=request_data) as response:
+            if response.status_code != 200:
+                try:
+                    error_body = await response.aread()
+                    logger.error(
+                        "Anthropic API error",
+                        status=response.status_code,
+                        body=error_body.decode('utf-8') if error_body else "No body"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to read error response: {e}")
+                response.raise_for_status()
+            
+            # Build complete assistant message as we stream
+            assistant_message = {"role": "assistant", "content": []}
+            current_block = None
+            custom_tools_detected = []
+            has_custom_tool_use = False
+            
+            async for line in response.aiter_lines():
+                if line.startswith("data: "):
+                    try:
+                        data = json.loads(line[6:])
+                        
+                        # Pass through raw data for frontend
+                        yield data
+                        
+                        # Build complete message according to Anthropic format
+                        if data.get("type") == AnthropicEvents.MESSAGE_START:
+                            message = data.get("message", {})
+                            assistant_message.update({
+                                "id": message.get("id"),
+                                "role": message.get("role", "assistant"),
+                                "model": message.get("model"),
+                                "content": []
+                            })
+                        
+                        elif data.get("type") == AnthropicEvents.CONTENT_BLOCK_START:
+                            block = data.get("content_block", {})
+                            
+                            if block.get("type") == ContentBlockTypes.TEXT:
+                                current_block = {"type": "text", "text": ""}
+                            elif block.get("type") == ContentBlockTypes.THINKING:
+                                current_block = {"type": "thinking", "thinking": "", "signature": ""}
+                            elif block.get("type") == ContentBlockTypes.TOOL_USE:
+                                tool_name = block.get("name")
+                                
+                                # Skip built-in tools (handled by Anthropic servers)
+                                if tool_name == "web_search":
+                                    logger.info(f"🌐 Built-in tool detected: {tool_name}")
+                                    current_block = None
+                                else:
+                                    # Custom tool - needs continuation
+                                    has_custom_tool_use = True
+                                    current_block = {
+                                        "type": "tool_use",
+                                        "id": block.get("id"),
+                                        "name": tool_name,
+                                        "input": {},
+                                        "partial_input": ""
+                                    }
+                                    logger.info(f"🔧 Custom tool detected: {tool_name}")
+                            
+                            # Add to content array
+                            if current_block:
+                                assistant_message["content"].append(current_block)
+                        
+                        elif data.get("type") == AnthropicEvents.CONTENT_BLOCK_DELTA:
+                            delta = data.get("delta", {})
+                            
+                            if delta.get("type") == DeltaTypes.TEXT_DELTA and current_block:
+                                current_block["text"] += delta.get("text", "")
+                            elif delta.get("type") == DeltaTypes.THINKING_DELTA and current_block:
+                                if current_block.get("type") == "thinking":
+                                    current_block["thinking"] += delta.get("thinking", "")
+                            elif delta.get("type") == DeltaTypes.SIGNATURE_DELTA and current_block:
+                                if current_block.get("type") == "thinking":
+                                    current_block["signature"] += delta.get("signature", "")
+                            elif delta.get("type") == DeltaTypes.INPUT_JSON_DELTA and current_block:
+                                if current_block.get("type") == "tool_use":
+                                    partial_json = delta.get("partial_json", "")
+                                    current_block["partial_input"] += partial_json
+                        
+                        elif data.get("type") == AnthropicEvents.CONTENT_BLOCK_STOP:
+                            if current_block and current_block.get("type") == "tool_use":
+                                if "partial_input" in current_block:
+                                    try:
+                                        current_block["input"] = json.loads(current_block["partial_input"])
+                                        del current_block["partial_input"]
+                                        
+                                        custom_tools_detected.append({
+                                            "name": current_block["name"],
+                                            "id": current_block["id"],
+                                            "input": current_block["input"]
+                                        })
+                                        logger.info(f"✅ Custom tool ready: {current_block['name']}")
+                                    except json.JSONDecodeError:
+                                        logger.warning(f"❌ Failed to parse tool input JSON")
+                            current_block = None
+                        
+                        elif data.get("type") == AnthropicEvents.MESSAGE_DELTA:
+                            delta = data.get("delta", {})
+                            stop_reason = delta.get("stop_reason")
+                            usage = data.get("usage", {})
+                            
+                            if stop_reason:
+                                assistant_message["stop_reason"] = stop_reason
+                            if usage:
+                                assistant_message["usage"] = usage
+                        
+                        elif data.get("type") == AnthropicEvents.MESSAGE_STOP:
+                            stop_reason = assistant_message.get("stop_reason")
+                            usage = assistant_message.get("usage", {})
+                            
+                            if stop_reason == StopReasons.TOOL_USE and has_custom_tool_use:
+                                # Custom tools detected
+                                yield {
+                                    "type": "custom_tool_use_required",
+                                    "assistant_message": assistant_message,
+                                    "custom_tools": custom_tools_detected,
+                                    "stop_reason": stop_reason,
+                                    "usage": usage
+                                }
+                            else:
+                                # Normal completion
+                                yield {
+                                    "type": "completion_finished",
+                                    "assistant_message": assistant_message,
+                                    "stop_reason": stop_reason,
+                                    "usage": usage
+                                }
+                            
+                    except json.JSONDecodeError:
+                        continue
+    
+
     
     def get_model_info(self, model: str) -> Optional[Dict[str, Any]]:
         """Get information about a specific model."""

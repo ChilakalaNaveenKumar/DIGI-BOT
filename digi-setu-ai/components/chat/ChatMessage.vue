@@ -30,8 +30,25 @@
         <UiLoadingDots v-if="message.isLoading" size="sm" />
         
         <div v-else>
+          <!-- Reasoning Stepper (for assistant messages with reasoning) -->
+          <div v-if="message.role === 'assistant' && message.reasoningSteps && message.reasoningSteps.length > 0" class="reasoning-section">
+            <UiReasoningStepper
+              :steps="message.reasoningSteps"
+              :is-streaming="false"
+              :show-streaming-indicator="false"
+            />
+          </div>
+          
+          <!-- Streaming indicator for response generation (below reasoning) -->
+          <div v-if="message.role === 'assistant' && message.isStreaming && !message.content" class="response-streaming-indicator">
+            <div class="streaming-dots">
+              <span /><span /><span />
+            </div>
+            <span class="streaming-text">Generating response...</span>
+          </div>
+          
           <!-- Main Content -->
-          <div v-if="message.content || message.isStreaming" class="message-text">
+          <div v-if="message.content || (message.isStreaming && message.content)" class="message-text">
             <UiStreamingMarkdown
               :key="`content-${message.id}`"
               :content="message.content"
@@ -145,6 +162,47 @@ const regenerateMessage = () => {
   color: var(--text-primary);
 }
 
+.reasoning-section {
+  margin-bottom: 12px;
+}
+
+.response-streaming-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 0;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-style: italic;
+  margin-bottom: 8px;
+}
+
+.streaming-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.streaming-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.streaming-dots span {
+  width: 6px;
+  height: 6px;
+  background: var(--accent-primary);
+  border-radius: 50%;
+  animation: pulse 1.4s infinite ease-in-out;
+}
+
+.streaming-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.streaming-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
 .message-text {
   margin-bottom: 8px;
 }
@@ -208,5 +266,17 @@ const regenerateMessage = () => {
 
 .message--user .message-actions {
   justify-content: flex-end;
+}
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
 }
 </style>

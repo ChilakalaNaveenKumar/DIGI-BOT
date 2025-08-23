@@ -3,13 +3,12 @@ import { ref, computed } from 'vue'
 export interface Conversation {
   id: number
   title: string
-  summary?: string
   status: string
-  is_pinned: boolean
   message_count: number
   created_at: string
   updated_at: string
   last_message_at?: string
+  storage_type?: string  // 'active' | 'archived'
 }
 
 export const useConversations = () => {
@@ -18,12 +17,12 @@ export const useConversations = () => {
   const isLoading = ref(false)
   const error = ref<string | null>(null)
 
-  // Use enhanced auth system with secure cookies
-  const { authenticatedFetch, isAuthenticated } = useEnhancedAuth()
+  // Use Pinia auth store
+  const authStore = useAuthStore()
 
   // Fetch all conversations
   const fetchConversations = async () => {
-    if (!isAuthenticated.value) {
+    if (!authStore.isAuthenticated) {
       error.value = 'Not authenticated'
       return
     }
@@ -32,13 +31,14 @@ export const useConversations = () => {
       isLoading.value = true
       error.value = null
 
-      const response = await authenticatedFetch('http://localhost:8000/api/conversations/')
+      const data = await $fetch<Conversation[]>('http://localhost:8000/api/conversations/', {
+        method: 'GET',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
+      })
 
-      if (!response.ok) {
-        throw new Error(`Failed to fetch conversations: ${response.status}`)
-      }
-
-      const data = await response.json()
       conversations.value = data
       
       console.log('Conversations fetched:', data.length)
@@ -52,7 +52,7 @@ export const useConversations = () => {
 
   // Create a new conversation
   const createConversation = async (title: string = 'Untitled') => {
-    if (!isAuthenticated.value) {
+    if (!authStore.isAuthenticated) {
       throw new Error('Not authenticated')
     }
 
@@ -60,19 +60,17 @@ export const useConversations = () => {
       isLoading.value = true
       error.value = null
 
-      const response = await authenticatedFetch('http://localhost:8000/api/conversations/', {
+      const newConversation = await $fetch<Conversation>('http://localhost:8000/api/conversations/', {
         method: 'POST',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify({
-          title,
-          ai_provider: 'anthropic'
+          title
         })
       })
 
-      if (!response.ok) {
-        throw new Error(`Failed to create conversation: ${response.status}`)
-      }
-
-      const newConversation = await response.json()
       conversations.value.unshift(newConversation)
       currentConversation.value = newConversation
       
@@ -90,16 +88,14 @@ export const useConversations = () => {
   // Update conversation (mainly for title updates)
   const updateConversation = async (conversationId: number, updates: Partial<Conversation>) => {
     try {
-      const response = await authenticatedFetch(`http://localhost:8000/api/conversations/${conversationId}`, {
+      const updatedConversation = await $fetch<Conversation>(`http://localhost:8000/api/conversations/${conversationId}`, {
         method: 'PUT',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        },
         body: JSON.stringify(updates)
       })
-
-      if (!response.ok) {
-        throw new Error(`Failed to update conversation: ${response.status}`)
-      }
-
-      const updatedConversation = await response.json()
       
       // Update in local state
       const index = conversations.value.findIndex(c => c.id === conversationId)
@@ -123,13 +119,13 @@ export const useConversations = () => {
   // Delete conversation
   const deleteConversation = async (conversationId: number) => {
     try {
-      const response = await authenticatedFetch(`http://localhost:8000/api/conversations/${conversationId}`, {
-        method: 'DELETE'
+      await $fetch(`http://localhost:8000/api/conversations/${conversationId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: {
+          'Content-Type': 'application/json'
+        }
       })
-
-      if (!response.ok) {
-        throw new Error(`Failed to delete conversation: ${response.status}`)
-      }
 
       // Remove from local state
       conversations.value = conversations.value.filter(c => c.id !== conversationId)
@@ -185,11 +181,7 @@ export const useConversations = () => {
   // Computed properties
   const sortedConversations = computed(() => {
     return [...conversations.value].sort((a, b) => {
-      // Pinned conversations first
-      if (a.is_pinned && !b.is_pinned) return -1
-      if (!a.is_pinned && b.is_pinned) return 1
-      
-      // Then by last message time or updated time
+      // Sort by last message time or updated time (most recent first)
       const aTime = a.last_message_at || a.updated_at
       const bTime = b.last_message_at || b.updated_at
       

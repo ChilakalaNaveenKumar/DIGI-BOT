@@ -11,7 +11,7 @@ from typing import AsyncGenerator, Dict, List, Optional, Any
 import structlog
 import httpx
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 from app.core.exceptions import DigiSetuException
 
 logger = structlog.get_logger(__name__)

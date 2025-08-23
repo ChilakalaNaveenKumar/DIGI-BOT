@@ -13,7 +13,7 @@ from passlib.context import CryptContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 from app.core.exceptions import AuthenticationError, AuthorizationError
 from app.models.user import User
 

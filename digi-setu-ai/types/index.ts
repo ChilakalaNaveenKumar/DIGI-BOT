@@ -1,3 +1,12 @@
+// User authentication types
+export interface User {
+  id: string
+  email: string
+  name: string
+  picture?: string
+  verified_email: boolean
+}
+
 // Message types for chat interface
 export interface Message {
   id: string | number
@@ -15,10 +24,12 @@ export interface Message {
 
 export interface ReasoningStep {
   id: string
-  title: string
+  type: 'thinking' | 'tool_call'
   content: string
-  status: 'pending' | 'processing' | 'completed'
+  status: 'pending' | 'active' | 'completed' | 'error'
   timestamp?: Date
+  tool_name?: string
+  result?: string | unknown
 }
 
 export interface ToolCall {

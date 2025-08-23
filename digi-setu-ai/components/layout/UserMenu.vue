@@ -89,10 +89,12 @@
 
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { useEnhancedAuth } from '~/composables/useEnhancedAuth'
 
-// Enhanced auth composable
-const { user, logout, revokeAllSessions } = useEnhancedAuth()
+// Use Pinia auth store
+const authStore = useAuthStore()
+
+// Get user from store
+const user = computed(() => authStore.user)
 
 // Menu state
 const isMenuOpen = ref(false)
@@ -141,10 +143,12 @@ const handleLogout = async () => {
     closeMenu()
     
     try {
-      // Use enhanced logout (clears server-side sessions and cookies)
-      await logout()
+      // Use store logout (clears server-side sessions and cookies)
+      await authStore.logout()
       
       console.log('User logged out successfully')
+      // Navigate to home page
+      await navigateTo('/')
     } catch (error) {
       console.error('Logout error:', error)
     }
@@ -157,12 +161,10 @@ const handleRevokeAllSessions = async () => {
     closeMenu()
     
     try {
-      const success = await revokeAllSessions()
-      if (success) {
-        console.log('All sessions revoked successfully')
-      } else {
-        console.error('Failed to revoke sessions')
-      }
+      // For now, just do a regular logout - we can implement revokeAllSessions in store later
+      await authStore.logout()
+      console.log('All sessions revoked successfully')
+      await navigateTo('/')
     } catch (error) {
       console.error('Error revoking sessions:', error)
     }

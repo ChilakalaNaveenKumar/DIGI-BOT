@@ -5,7 +5,7 @@ Simple authentication dependencies for Digi Bot Services
 from typing import Optional
 from fastapi import HTTPException, Header
 import jwt
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 
 settings = get_settings()
 

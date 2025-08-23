@@ -37,8 +37,8 @@
 // Initialize theme system
 const { theme, currentTheme } = useTheme()
 
-// Initialize auth system
-const { isAuthenticated } = useEnhancedAuth()
+// Initialize auth system using Pinia store
+const authStore = useAuthStore()
 
 // Get current route to determine layout
 const route = useRoute()
@@ -53,7 +53,7 @@ watch(currentTheme, (newTheme) => {
 // Determine if sidebar should be shown (only for custom layout)
 const shouldShowSidebar = computed(() => {
   // Only show sidebar if user is authenticated
-  if (!isAuthenticated.value) return false
+  if (!authStore.isAuthenticated) return false
   
   // Only for pages without explicit layout (using our custom layout)
   if (route.meta.layout) return false
@@ -65,7 +65,7 @@ const shouldShowSidebar = computed(() => {
 // Determine if footer should be shown (only for custom layout)
 const shouldShowFooter = computed(() => {
   // Show footer for authenticated users on pages without explicit layout
-  if (isAuthenticated.value && !route.meta.layout) return true
+  if (authStore.isAuthenticated && !route.meta.layout) return true
   
   return false
 })

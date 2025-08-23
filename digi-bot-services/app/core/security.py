@@ -13,7 +13,7 @@ import jwt
 from jwt import PyJWTError
 import structlog
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()

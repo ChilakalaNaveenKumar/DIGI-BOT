@@ -1,7 +1,13 @@
 <template>
   <div class="landing-container">
+    <!-- Loading overlay while checking auth status -->
+    <div v-if="authStore.shouldShowLoading" class="auth-loading-overlay">
+      <div class="loading-spinner" />
+      <p>Checking authentication...</p>
+    </div>
+    
     <!-- Left Panel - Sign In -->
-    <div class="auth-panel">
+    <div v-else class="auth-panel">
       <div class="auth-content">
         <!-- Brand Header -->
         <div class="brand-header">
@@ -14,7 +20,7 @@
         <!-- Main Content -->
         <div class="auth-main">
           <div class="hero-section">
-            <h1 class="hero-title">Transform Learning<br />Into Experience.</h1>
+            <h1 class="hero-title">Transform Learning<br>Into Experience.</h1>
             <p class="hero-subtitle">The AI that turns static content into interactive educational journeys</p>
           </div>
 
@@ -30,11 +36,11 @@
             </div>
 
             <input 
+              v-model="email"
               type="email" 
               placeholder="Enter your personal or work email"
               class="email-input"
-              v-model="email"
-            />
+            >
             
             <button class="continue-btn" :disabled="!email">
               Continue with email
@@ -78,6 +84,9 @@
 </template>
 
 <script setup lang="ts">
+// Type imports
+import type { User } from '~/types'
+
 // Explicit component imports
 import PhotosynthesisDemo from '~/components/demo/examples/PhotosynthesisDemo.vue'
 import PhotosynthesisQuizDemo from '~/components/demo/examples/PhotosynthesisQuizDemo.vue'
@@ -98,13 +107,37 @@ const currentDemoIndex = ref(0)
 const isAnimating = ref(false)
 
 // Auth handling
-const handleAuthSuccess = (user: any) => {
+const route = useRoute()
+const authStore = useAuthStore()
+
+const handleAuthSuccess = (user: User) => {
   console.log('Authentication successful:', user)
-  // Redirect to chat page after successful login
-  navigateTo('/chat')
+  
+  // Update the auth store
+  authStore.setAuthenticated(user)
+  
+  // Get the intended redirect destination from query params
+  const redirectTo = route.query.redirect as string
+  
+  // Redirect to intended destination or default to chat
+  navigateTo(redirectTo || '/chat')
 }
 
-const handleAuthError = (error: any) => {
+// Check if user is already authenticated on page load
+onMounted(async () => {
+  // Wait for auth store to be initialized
+  if (!authStore.isInitialized) {
+    await authStore.initialize()
+  }
+  
+  if (authStore.isAuthenticated) {
+    console.log('User already authenticated, redirecting...')
+    const redirectTo = route.query.redirect as string
+    await navigateTo(redirectTo || '/chat')
+  }
+})
+
+const handleAuthError = (error: Error | string) => {
   console.error('Authentication failed:', error)
   // You could show a toast/notification here
 }
@@ -729,6 +762,42 @@ const switchToNextDemo = async () => {
   display: flex;
   align-items: center;
   justify-content: center;
+}
+
+/* Loading overlay */
+.auth-loading-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-primary);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+}
+
+.loading-spinner {
+  width: 40px;
+  height: 40px;
+  margin-bottom: 1rem;
+  border: 4px solid var(--border-primary);
+  border-top: 4px solid var(--accent-primary);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.auth-loading-overlay p {
+  color: var(--text-secondary);
+  font-size: 1rem;
+  margin: 0;
 }
 
 /* Responsive */

@@ -16,7 +16,7 @@
     
     <nav class="sidebar-nav">
       <div class="nav-section">
-        <h2 class="nav-title">Conversations</h2>
+        <h2 class="nav-title">Chats</h2>
         
         <!-- Loading state -->
         <div v-if="isLoading" class="loading-conversations">
@@ -34,7 +34,7 @@
             @click="handleSelectConversation(conversation)"
             :class="['nav-item', { active: currentConversation?.id === conversation.id }]"
           >
-            <Icon name="lucide:message-circle" class="nav-icon" :size="16" />
+            <Icon name="lucide:messages-square" class="nav-icon" :size="16" />
             <span class="conversation-title">{{ conversation.title }}</span>
             <button
               v-if="conversation.id === currentConversation?.id"
@@ -48,7 +48,7 @@
         
         <!-- Empty state -->
         <div v-else class="empty-conversations">
-          <Icon name="lucide:message-circle" :size="24" class="empty-icon" />
+          <Icon name="lucide:messages-square" :size="24" class="empty-icon" />
           <p class="empty-text">No conversations yet</p>
           <p class="empty-subtext">Start a new chat to begin</p>
         </div>
@@ -65,10 +65,9 @@
 <script setup lang="ts">
 import { onMounted } from 'vue'
 import { useConversations } from '~/composables/useConversations'
-import { useEnhancedAuth } from '~/composables/useEnhancedAuth'
 
-// Use enhanced auth
-const { isAuthenticated } = useEnhancedAuth()
+// Use Pinia auth store
+const authStore = useAuthStore()
 
 // Use conversations composable
 const {
@@ -76,7 +75,6 @@ const {
   currentConversation,
   isLoading,
   fetchConversations,
-  createConversation,
   deleteConversation,
   setCurrentConversation
 } = useConversations()
@@ -84,13 +82,17 @@ const {
 // Event handlers
 const handleNewChat = async () => {
   try {
-    const newConversation = await createConversation('Untitled')
-    console.log('New conversation created:', newConversation.id)
+    // Don't create conversation immediately - let the first message create it with proper title
+    // Just clear the current chat and navigate
+    const { startNewConversation } = useStreamingChat()
+    startNewConversation()
+    
+    console.log('Started new conversation (will be created on first message)')
     
     // Navigate to chat page if not already there
     await navigateTo('/chat')
   } catch (error) {
-    console.error('Failed to create new conversation:', error)
+    console.error('Failed to start new conversation:', error)
   }
 }
 
@@ -113,12 +115,25 @@ const handleDeleteConversation = async (conversationId: number) => {
   }
 }
 
-// Load conversations on mount (only if authenticated)
-onMounted(() => {
-  if (isAuthenticated.value) {
+// Load conversations when auth is ready
+onMounted(async () => {
+  // Wait for auth store to be initialized
+  if (!authStore.isInitialized) {
+    await authStore.initialize()
+  }
+  
+  // Now fetch conversations if authenticated
+  if (authStore.isAuthenticated) {
     fetchConversations()
   }
 })
+
+// Also watch for auth state changes (e.g., after login)
+watch(() => authStore.isAuthenticated, (isAuthenticated) => {
+  if (isAuthenticated) {
+    fetchConversations()
+  }
+}, { immediate: false })
 </script>
 
 <style scoped>
@@ -192,22 +207,22 @@ onMounted(() => {
 }
 
 .nav-section {
-  padding: 16px;
+  padding: 5px;
 }
 
 .nav-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: var(--text-tertiary);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  margin: 0 0 8px 0;
+  font-size: 14px;
+  font-weight: 400;
+  color: var(--text-secondary);
+  text-transform: none;
+  letter-spacing: 0;
+  margin: 0 0 12px 0;
 }
 
 .nav-items {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  gap: 1px;
 }
 
 .nav-item {
@@ -219,7 +234,7 @@ onMounted(() => {
   text-decoration: none;
   border: none;
   background: transparent;
-  border-radius: 6px;
+  border-radius: 10px;
   font-size: 14px;
   transition: all 0.2s ease;
   white-space: nowrap;
@@ -236,14 +251,23 @@ onMounted(() => {
   color: var(--text-primary);
 }
 
+.nav-item:hover:not(.active) {
+  background: var(--bg-hover);
+}
+
 .nav-item.active {
-  background: var(--accent-primary);
-  color: white;
+  background: var(--bg-hover);
+  color: var(--text-primary);
+  font-weight: 400;
 }
 
 .nav-icon {
   opacity: 0.7;
   flex-shrink: 0;
+}
+
+.nav-item.active .nav-icon {
+  opacity: 0.7;
 }
 
 .sidebar-footer {

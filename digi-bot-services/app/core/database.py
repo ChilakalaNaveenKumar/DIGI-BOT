@@ -17,7 +17,7 @@ from sqlalchemy.ext.asyncio import (
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 from sqlalchemy.sql import text
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 
 logger = structlog.get_logger(__name__)
 settings = get_settings()

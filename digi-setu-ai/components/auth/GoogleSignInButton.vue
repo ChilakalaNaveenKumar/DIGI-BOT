@@ -33,8 +33,8 @@ const errorMessage = ref('')
 // Auth service configuration
 const AUTH_SERVICE_URL = 'http://localhost:8000'
 
-// Use enhanced auth composable (get it at component setup time)
-const { loginWithGoogle, checkAuthStatus } = useEnhancedAuth()
+// Use Pinia auth store
+const authStore = useAuthStore()
 
 interface AuthResponse {
   access_token: string
@@ -105,8 +105,8 @@ const handleGoogleSignIn = async () => {
         if (response.ok) {
           console.log('Auth code exchanged successfully, cookies set')
           
-          // Verify auth status
-          const isNowAuthenticated = await checkAuthStatus()
+          // Verify auth status using store
+          const isNowAuthenticated = await authStore.checkAuthStatus()
           if (isNowAuthenticated) {
             console.log('Parent window authentication confirmed')
             emit('auth-success', result.user)

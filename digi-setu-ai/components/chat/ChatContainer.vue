@@ -8,7 +8,7 @@
           <div class="avatar-container">
             <Icon name="lucide:sparkles" :size="24" class="sparkle-icon" />
           </div>
-          <h1 class="welcome-title">Ready to create with Digi Setu?</h1>
+          <h1 class="welcome-title">Transform learning with AI</h1>
           <p class="welcome-subtitle">Transform static content into interactive learning experiences with AI</p>
         </div>
         
@@ -36,6 +36,15 @@
       
     <!-- Chat Messages (When messages exist) -->
     <div v-else class="chat-mode">
+      <!-- Conversation Header -->
+      <div v-if="conversationTitle" class="conversation-header">
+        <h2 class="conversation-title">{{ conversationTitle }}</h2>
+        <button @click="startNewConversation" class="new-chat-btn">
+          <Icon name="lucide:plus" :size="16" />
+          New Chat
+        </button>
+      </div>
+      
       <div class="chat-messages">
         <div class="messages-list">
           <ChatMessage
@@ -82,7 +91,10 @@ const {
   messages, 
   isLoading, 
   isStreaming, 
+  conversationId,
+  conversationTitle,
   sendMessage, 
+  startNewConversation,
   regenerateMessage 
 } = useStreamingChat()
 
@@ -233,6 +245,46 @@ watch(messages, () => {
   flex-direction: column;
   min-height: 100%;
   overflow: visible;
+}
+
+.conversation-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid rgb(var(--color-border));
+  background: rgb(var(--color-surface));
+  backdrop-filter: blur(10px);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.conversation-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: rgb(var(--color-text-primary));
+  margin: 0;
+}
+
+.new-chat-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: rgb(var(--color-primary));
+  color: rgb(var(--color-primary-foreground));
+  border: none;
+  border-radius: 0.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.new-chat-btn:hover {
+  background: rgb(var(--color-primary-hover));
+  transform: translateY(-1px);
 }
 
 .chat-messages {

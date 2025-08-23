@@ -12,14 +12,16 @@
 
 <script setup lang="ts">
 const isLoading = ref(false)
-const { logout } = useAuth()
+const authStore = useAuthStore()
 
 const handleLogout = async () => {
   isLoading.value = true
   
   try {
-    // Call logout from auth composable
-    logout()
+    // Call logout from auth store
+    await authStore.logout()
+    // Navigate to home page
+    await navigateTo('/')
   } catch (error) {
     console.error('Logout error:', error)
   } finally {

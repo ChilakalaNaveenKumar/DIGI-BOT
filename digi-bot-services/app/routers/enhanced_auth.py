@@ -16,7 +16,7 @@ from app.core.database import get_db_session
 from app.core.security import security_manager
 from app.core.enhanced_auth_deps import get_current_user_from_cookie
 from app.models.user import User
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 
 # We'll define these functions locally to avoid circular imports
 import asyncio

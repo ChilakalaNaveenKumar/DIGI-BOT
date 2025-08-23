@@ -1,9 +1,17 @@
-import type { Message } from '~/types'
+import type { Message, ReasoningStep } from '~/types'
 
 export const useStreamingChat = () => {
   const messages = ref<Message[]>([])
   const isLoading = ref(false)
   const isStreaming = ref(false)
+  
+  // Conversation state
+  const conversationId = ref<number | null>(null)
+  const conversationTitle = ref<string>('')
+  
+  // Reasoning state
+  const currentReasoningSteps = ref<ReasoningStep[]>([])
+  const isReasoning = ref(false)
   
   // Add request deduplication and cancellation
   const lastRequestContent = ref<string>('')
@@ -47,6 +55,20 @@ export const useStreamingChat = () => {
     try {
       isLoading.value = true
 
+      // Immediately show "thinking" state
+      const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+      if (messageIndex !== -1) {
+        const currentMessage = messages.value[messageIndex]
+        if (currentMessage) {
+          messages.value[messageIndex] = {
+            ...currentMessage,
+            content: '*Thinking...*',
+            isLoading: true,
+            isStreaming: false
+          }
+        }
+      }
+
       // Cancel any existing request
       if (currentAbortController.value) {
         currentAbortController.value.abort()
@@ -79,7 +101,9 @@ export const useStreamingChat = () => {
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          messages: conversationMessages
+          messages: conversationMessages,
+          conversation_id: conversationId.value,
+          user_id: 1  // TODO: Get from auth store
         }),
         signal: currentAbortController.value.signal
       })
@@ -143,22 +167,22 @@ export const useStreamingChat = () => {
                       messages.value[messageIndex] = {
                         ...currentMessage,
                         content: accumulatedContent,
+                        isLoading: false,
                         isStreaming: true
                       }
                     }
                   }
                 } else if (data.type === 'activity') {
                   // Handle activity messages (like "Creating visualizations...")
-                  accumulatedContent += `\n\n*${data.content}*\n\n`
-                  
                   const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
                   if (messageIndex !== -1) {
                     const currentMessage = messages.value[messageIndex]
                     if (currentMessage) {
                       messages.value[messageIndex] = {
                         ...currentMessage,
-                        content: accumulatedContent,
-                        isStreaming: true
+                        content: `*${data.content}*`,
+                        isLoading: true,
+                        isStreaming: false
                       }
                     }
                   }
@@ -177,11 +201,73 @@ export const useStreamingChat = () => {
                       }
                     }
                   }
+                } else if (data.type === 'reasoning') {
+                  // Handle reasoning/thinking steps - can happen anywhere during conversation
+                  isReasoning.value = true
+                  
+                  // Check if this is a continuation of existing reasoning or new step
+                  const lastStep = currentReasoningSteps.value[currentReasoningSteps.value.length - 1]
+                  
+                  if (lastStep && lastStep.status === 'active') {
+                    // Continue existing reasoning step
+                    lastStep.content += data.content || ''
+                    lastStep.timestamp = new Date()
+                  } else {
+                    // Create new reasoning step
+                    const stepId = `reasoning-${Date.now()}-${Math.random()}`
+                    const reasoningStep: ReasoningStep = {
+                      id: stepId,
+                      type: 'thinking',
+                      content: data.content || '',
+                      status: 'active',
+                      timestamp: new Date()
+                    }
+                    currentReasoningSteps.value.push(reasoningStep)
+                  }
+                  
+                  // Update the assistant message with reasoning steps
+                  const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                  if (messageIndex !== -1) {
+                    const currentMessage = messages.value[messageIndex]
+                    if (currentMessage) {
+                      messages.value[messageIndex] = {
+                        ...currentMessage,
+                        reasoningSteps: [...currentReasoningSteps.value],
+                        isLoading: false,
+                        isStreaming: true
+                      }
+                    }
+                  }
+                } else if (data.type === 'conversation_created') {
+                  // Handle conversation creation (first message only)
+                  conversationId.value = data.conversation_id
+                  conversationTitle.value = data.title
+                  console.log('Conversation created:', data.conversation_id, data.title)
                 } else if (data.type === 'status') {
                   // Handle status messages (like "Thinking...", "Creating visualization...")
                   console.log('Status:', data.content)
                 } else if (data.type === 'complete') {
                   // Stream is complete
+                  isReasoning.value = false
+                  
+                  // Mark all reasoning steps as completed
+                  currentReasoningSteps.value = currentReasoningSteps.value.map(step => ({
+                    ...step,
+                    status: 'completed' as const
+                  }))
+                  
+                  // Update the assistant message with final reasoning steps
+                  const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                  if (messageIndex !== -1) {
+                    const currentMessage = messages.value[messageIndex]
+                    if (currentMessage) {
+                      messages.value[messageIndex] = {
+                        ...currentMessage,
+                        reasoningSteps: [...currentReasoningSteps.value]
+                      }
+                    }
+                  }
+                  
                   break
                 } else if (data.type === 'error') {
                   throw new Error(data.content || 'Unknown error from backend')
@@ -240,6 +326,16 @@ export const useStreamingChat = () => {
 
   const clearMessages = () => {
     messages.value = []
+    conversationId.value = null
+    conversationTitle.value = ''
+  }
+  
+  const startNewConversation = () => {
+    clearMessages()
+    conversationId.value = null
+    conversationTitle.value = ''
+    currentReasoningSteps.value = []
+    isReasoning.value = false
   }
 
   const regenerateMessage = async (messageId: string | number) => {
@@ -265,8 +361,13 @@ export const useStreamingChat = () => {
     messages,
     isLoading,
     isStreaming,
+    conversationId: readonly(conversationId),
+    conversationTitle: readonly(conversationTitle),
+    currentReasoningSteps: readonly(currentReasoningSteps),
+    isReasoning: readonly(isReasoning),
     sendMessage: sendStreamingMessage,
     clearMessages,
+    startNewConversation,
     regenerateMessage
   }
 }

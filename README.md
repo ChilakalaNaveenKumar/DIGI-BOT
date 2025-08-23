@@ -118,13 +118,13 @@ digi-setu-ai/
 │   └── demo/                # Demo components
 │       └── examples/        # Educational demos
 ├── composables/             # Vue 3 composables
-│   ├── useAuth.ts          # Authentication state
-│   ├── useEnhancedAuth.ts  # Google OAuth integration
 │   ├── useChat.ts          # Chat functionality
 │   ├── useStreamingChat.ts # Real-time streaming
 │   ├── useConversations.ts # Chat history
 │   ├── useMarkdown.ts      # Markdown processing
 │   └── useTheme.ts         # Theme management
+├── stores/                  # Pinia state management
+│   └── auth.ts             # Global authentication store
 ├── pages/                   # Application routes
 │   ├── index.vue           # Landing page
 │   ├── chat.vue            # Main chat interface

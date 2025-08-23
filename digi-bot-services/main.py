@@ -15,26 +15,24 @@ import logging
 import sys
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
-from typing import AsyncGenerator, List, Optional
+from typing import AsyncGenerator, Optional
 
 import structlog
 import uvicorn
 import httpx
 import jwt
-from fastapi import FastAPI, HTTPException, Request, Depends, Header
+from fastapi import FastAPI, HTTPException, Depends
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse, HTMLResponse, StreamingResponse, Response
+from fastapi.responses import JSONResponse, HTMLResponse, Response
 from pydantic import BaseModel
-from pydantic_settings import BaseSettings
 from google.oauth2 import id_token
 from google.auth.transport import requests as google_requests
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 from app.core.database import init_db, close_db, get_db_session
 from app.models.user import User
-from app.models.conversation import Conversation
 from app.routers import direct_chat, files, conversations
 from app.routers.enhanced_auth import router as enhanced_auth_router
 
@@ -165,9 +163,6 @@ async def get_or_create_user(google_user: dict, db: AsyncSession) -> User:
         if user:
             # Update last login
             user.last_login_at = datetime.now(timezone.utc)
-            user.email = google_user.get('email', user.email)
-            user.name = google_user.get('name', user.name)
-            user.picture = google_user.get('picture', user.picture)
             user.verified_email = google_user.get('email_verified', user.verified_email)
             logger.info(f"User login: {user.email}")
         else:
@@ -212,12 +207,7 @@ app = FastAPI(
 # Configure CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:3000",
-        "http://127.0.0.1:3000",
-        "https://testing.digi-setu.com",
-        "https://digi-setu.com"
-    ],
+    allow_origins=settings.get_cors_origins_list(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allow_headers=["*"],
@@ -461,48 +451,6 @@ async def google_callback(
             status_code=500,
             content={"error": "Authentication failed", "details": str(e)}
         )
-
-
-@app.get("/auth/me")
-async def get_current_user(authorization: str = None):
-    """Get current user information from JWT token"""
-    if not authorization:
-        raise HTTPException(status_code=401, detail="Authorization header missing")
-    
-    try:
-        # Extract token from "Bearer <token>"
-        token = authorization.split(" ")[1] if authorization.startswith("Bearer ") else authorization
-        
-        # Decode JWT token
-        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
-        
-        return {
-            "id": payload.get("sub"),
-            "google_id": payload.get("google_id"),
-            "email": payload.get("email"),
-            "name": payload.get("name")
-        }
-    except jwt.ExpiredSignatureError:
-        raise HTTPException(status_code=401, detail="Token expired")
-    except jwt.JWTError:
-        raise HTTPException(status_code=401, detail="Invalid token")
-
-
-@app.post("/auth/logout")
-async def logout():
-    """Logout user (client-side token removal)"""
-    return {"message": "Logged out successfully"}
-
-
-@app.get("/auth/debug")
-async def debug_auth(authorization: Optional[str] = Header(None)):
-    """Debug endpoint to check authentication state"""
-    return {
-        "has_authorization_header": authorization is not None,
-        "authorization_preview": authorization[:50] + "..." if authorization and len(authorization) > 50 else authorization,
-        "timestamp": datetime.now(timezone.utc).isoformat()
-    }
-
 
 # Include routers
 app.include_router(enhanced_auth_router)  # Enhanced secure authentication

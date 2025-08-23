@@ -3,10 +3,7 @@
     <div class="header-content">
       <div class="header-left">
         <h1 class="header-title">{{ displayTitle }}</h1>
-        <div v-if="!currentConversation" class="status-badge">
-          <div class="status-dot" />
-          <span>Ready</span>
-        </div>
+        <!-- Status badge removed as requested -->
       </div>
       
       <div class="header-actions">
@@ -30,7 +27,7 @@ const displayTitle = computed(() => {
   if (currentConversation.value) {
     return currentConversation.value.title
   }
-  return 'Digi Setu AI'
+  return 'Untitled'
 })
 </script>
 

@@ -1,7 +1,6 @@
 """
-Configuration management for Digi Setu AI Backend
-
-Uses Pydantic Settings for type-safe configuration with environment variable support.
+Configuration management for Digi Bot Services
+Unified configuration with environment variable support and security features.
 """
 
 import os
@@ -27,38 +26,43 @@ class Settings(BaseSettings):
     
     # Security
     SECRET_KEY: str = Field(
-        default="dev-secret-key-change-this-in-production-please-make-it-very-long-and-secure",
+        default=None,
         env="SECRET_KEY"
     )
     ALGORITHM: str = Field(default="HS256", env="ALGORITHM")
-    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=30, env="ACCESS_TOKEN_EXPIRE_MINUTES")
-    ALLOWED_HOSTS: List[str] = Field(default=["*"], env="ALLOWED_HOSTS")
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = Field(default=15, env="ACCESS_TOKEN_EXPIRE_MINUTES")  # Short-lived access tokens
+    REFRESH_TOKEN_EXPIRE_DAYS: int = Field(default=7, env="REFRESH_TOKEN_EXPIRE_DAYS")  # Long-lived refresh tokens
+    ALLOWED_HOSTS: str = Field(default=None, env="ALLOWED_HOSTS")
+    
+    # Cookie Security (HIPAA Compliance)
+    COOKIE_SECURE: bool = Field(default=False, env="COOKIE_SECURE")  # Set to True in production with HTTPS
+    COOKIE_DOMAIN: Optional[str] = Field(default=None, env="COOKIE_DOMAIN")  # Set to your domain in production
+    COOKIE_HTTPONLY: bool = Field(default=True, env="COOKIE_HTTPONLY")  # Prevent XSS attacks
+    
+    # CSRF Protection
+    CSRF_PROTECTION_ENABLED: bool = Field(default=True, env="CSRF_PROTECTION_ENABLED")
+    
+    # Session Security
+    SESSION_TIMEOUT_MINUTES: int = Field(default=60, env="SESSION_TIMEOUT_MINUTES")  # Auto-logout after inactivity
+    MAX_CONCURRENT_SESSIONS: int = Field(default=3, env="MAX_CONCURRENT_SESSIONS")  # Limit concurrent sessions per user
     
     # CORS
-    CORS_ORIGINS: List[str] = Field(
-        default=[
-            "http://localhost:3000",
-            "http://127.0.0.1:3000",
-            "http://localhost:8080",
-            "http://127.0.0.1:8080",
-        ],
+    CORS_ORIGINS: str = Field(
+        default=None,
         env="CORS_ORIGINS"
     )
     
     # Database
     DATABASE_URL: str = Field(
-        default="postgresql+asyncpg://digi_setu_user:secure_password_2024!@localhost/digi_setu_ai",
+        default=None,
         env="DATABASE_URL"
     )
     DATABASE_ECHO: bool = Field(default=False, env="DATABASE_ECHO")
     
-    # Redis
-    REDIS_URL: str = Field(default="redis://localhost:6379", env="REDIS_URL")
-    
     # Google OAuth
     GOOGLE_CLIENT_ID: str = Field(default="", env="GOOGLE_CLIENT_ID")
     GOOGLE_CLIENT_SECRET: str = Field(default="", env="GOOGLE_CLIENT_SECRET") 
-    GOOGLE_REDIRECT_URI: str = Field(default="http://localhost:8000/auth/callback", env="GOOGLE_REDIRECT_URI")
+    GOOGLE_REDIRECT_URI: str = Field(default=None, env="GOOGLE_REDIRECT_URI")
     
     # AI Providers
     OPENAI_API_KEY: Optional[str] = Field(default=None, env="OPENAI_API_KEY")
@@ -66,22 +70,18 @@ class Settings(BaseSettings):
     GROK_API_KEY: Optional[str] = Field(default=None, env="GROK_API_KEY")
     
     # AI Configuration
-    DEFAULT_AI_PROVIDER: str = Field(default="openai", env="DEFAULT_AI_PROVIDER")
-    MAX_TOKENS: int = Field(default=50000, env="MAX_TOKENS")
-    REASONING_BUDGET: int = Field(default=3000, env="REASONING_BUDGET")
-    TEMPERATURE: float = Field(default=0.7, env="TEMPERATURE")
+    DEFAULT_AI_PROVIDER: str = Field(default="anthropic", env="DEFAULT_AI_PROVIDER")
+    DEFAULT_AI_MODEL: str = Field(default="claude-sonnet-4-20250514", env="DEFAULT_AI_MODEL")
+    MAX_TOKENS: int = Field(default=32000, env="MAX_TOKENS")
+    REASONING_BUDGET: int = Field(default=64000, env="REASONING_BUDGET")  # Large budget for complex reasoning
+    TEMPERATURE: float = Field(default=0.5, env="TEMPERATURE")
+    ENABLE_INTERLEAVED_THINKING: bool = Field(default=True, env="ENABLE_INTERLEAVED_THINKING")
     
     # File Storage
     UPLOAD_DIR: str = Field(default="uploads", env="UPLOAD_DIR")
     MAX_FILE_SIZE: int = Field(default=50 * 1024 * 1024, env="MAX_FILE_SIZE")  # 50MB
-    ALLOWED_FILE_TYPES: List[str] = Field(
-        default=[
-            "image/jpeg", "image/png", "image/gif", "image/webp",
-            "application/pdf", "text/plain", "text/markdown",
-            "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            "audio/mpeg", "audio/wav", "video/mp4"
-        ],
+    ALLOWED_FILE_TYPES: str = Field(
+       default=None,
         env="ALLOWED_FILE_TYPES"
     )
     
@@ -89,25 +89,13 @@ class Settings(BaseSettings):
     LOG_LEVEL: str = Field(default="INFO", env="LOG_LEVEL")
     LOG_FORMAT: str = Field(default="json", env="LOG_FORMAT")
     
-    # Monitoring
-    ENABLE_METRICS: bool = Field(default=True, env="ENABLE_METRICS")
-    SENTRY_DSN: Optional[str] = Field(default=None, env="SENTRY_DSN")
-    
-    # Rate Limiting
-    RATE_LIMIT_REQUESTS: int = Field(default=100, env="RATE_LIMIT_REQUESTS")
-    RATE_LIMIT_WINDOW: int = Field(default=60, env="RATE_LIMIT_WINDOW")
-    
-    # Activity Streaming
-    ACTIVITY_STREAM_ENABLED: bool = Field(default=True, env="ACTIVITY_STREAM_ENABLED")
-    ACTIVITY_PRIVACY_MODE: bool = Field(default=True, env="ACTIVITY_PRIVACY_MODE")
-    
-    # Tool Execution
-    ENABLE_TOOL_EXECUTION: bool = Field(default=True, env="ENABLE_TOOL_EXECUTION")
-    TOOL_TIMEOUT: int = Field(default=30, env="TOOL_TIMEOUT")
-    
-    # Content Processing
-    ENABLE_CONTENT_ANALYSIS: bool = Field(default=True, env="ENABLE_CONTENT_ANALYSIS")
-    MAX_CONTENT_LENGTH: int = Field(default=100000, env="MAX_CONTENT_LENGTH")
+    # Privacy & Security Settings
+    DATA_RETENTION_DAYS: int = Field(default=30, env="DATA_RETENTION_DAYS")  # Auto-delete conversations after X days
+    ENABLE_AUDIT_LOGGING: bool = Field(default=True, env="ENABLE_AUDIT_LOGGING")  # Track data access
+    HASH_USER_IDENTIFIERS: bool = Field(default=True, env="HASH_USER_IDENTIFIERS")  # Hash sensitive IDs
+    STORE_CONVERSATION_CONTENT: bool = Field(default=False, env="STORE_CONVERSATION_CONTENT")  # Don't store full chat content
+    ENABLE_DATA_ENCRYPTION: bool = Field(default=True, env="ENABLE_DATA_ENCRYPTION")  # Encrypt sensitive fields
+    ANONYMIZE_LOGS: bool = Field(default=True, env="ANONYMIZE_LOGS")  # Remove PII from logs
     
     @validator("ENVIRONMENT")
     def validate_environment(cls, v):
@@ -133,38 +121,25 @@ class Settings(BaseSettings):
             raise ValueError(f"AI provider must be one of {allowed}")
         return v
     
-    @validator("CORS_ORIGINS", pre=True)
-    def parse_cors_origins(cls, v):
-        """Parse CORS origins from string or list."""
-        if isinstance(v, str):
-            if not v.strip():
-                return ["*"]  # Default fallback
-            return [origin.strip() for origin in v.split(",") if origin.strip()]
-        return v
+    # Helper methods to parse comma-separated strings
+    def get_cors_origins_list(self) -> List[str]:
+        """Get CORS origins as a list."""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",") if origin.strip()]
     
-    @validator("ALLOWED_HOSTS", pre=True)
-    def parse_allowed_hosts(cls, v):
-        """Parse allowed hosts from string or list."""
-        if isinstance(v, str):
-            if not v.strip():
-                return ["*"]  # Default fallback
-            return [host.strip() for host in v.split(",") if host.strip()]
-        return v
+    def get_allowed_hosts_list(self) -> List[str]:
+        """Get allowed hosts as a list."""
+        return [host.strip() for host in self.ALLOWED_HOSTS.split(",") if host.strip()]
     
-    @validator("ALLOWED_FILE_TYPES", pre=True)
-    def parse_allowed_file_types(cls, v):
-        """Parse allowed file types from string or list."""
-        if isinstance(v, str):
-            if not v.strip():
-                return ["image/jpeg", "image/png", "text/plain"]  # Default fallback
-            return [file_type.strip() for file_type in v.split(",") if file_type.strip()]
-        return v
+    def get_allowed_file_types_list(self) -> List[str]:
+        """Get allowed file types as a list."""
+        return [file_type.strip() for file_type in self.ALLOWED_FILE_TYPES.split(",") if file_type.strip()]
     
     class Config:
         """Pydantic configuration."""
         env_file = ".env"
         env_file_encoding = "utf-8"
         case_sensitive = True
+        extra = "ignore"  # Ignore extra fields from .env
 
 
 @lru_cache()
@@ -186,14 +161,13 @@ class ProductionSettings(Settings):
     DEBUG: bool = False
     DATABASE_ECHO: bool = False
     LOG_LEVEL: str = "INFO"
-    ALLOWED_HOSTS: List[str] = Field(..., env="ALLOWED_HOSTS")
+    COOKIE_SECURE: bool = True  # Force HTTPS cookies in production
 
 
 class TestingSettings(Settings):
     """Testing environment settings."""
     DEBUG: bool = True
     DATABASE_URL: str = "postgresql+asyncpg://test_user:test_pass@localhost/test_db"
-    REDIS_URL: str = "redis://localhost:6379/1"
     LOG_LEVEL: str = "WARNING"
 
 

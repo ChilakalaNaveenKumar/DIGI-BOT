@@ -3,19 +3,24 @@
  * Redirects unauthenticated users to the signin page
  */
 
-export default defineNuxtRouteMiddleware((to, from) => {
-  const { isAuthenticated } = useAuth()
-  
+export default defineNuxtRouteMiddleware(async (to, from) => {
   // Skip middleware on server-side rendering to avoid hydration issues
-  if (process.server) return
+  if (import.meta.server) return
   
-  if (!isAuthenticated.value) {
+  const authStore = useAuthStore()
+  
+  // Wait for auth store to be initialized
+  if (!authStore.isInitialized) {
+    await authStore.initialize()
+  }
+  
+  if (!authStore.isAuthenticated) {
     // Store the intended destination
     const intendedRoute = to.fullPath
     
     // Redirect to signin with return URL
     return navigateTo({
-      path: '/auth/signin',
+      path: '/signin',
       query: { redirect: intendedRoute }
     })
   }

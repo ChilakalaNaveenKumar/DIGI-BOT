@@ -30,8 +30,7 @@ anthropic==0.7.7
 httpx==0.25.2
 
 # Caching & Session
-redis==5.0.1
-aioredis==2.0.1
+
 
 # Logging & Monitoring
 structlog==23.2.0

@@ -14,7 +14,7 @@ def get_chart_tools() -> List[Dict[str, Any]]:
     return [
         {
             "name": "chartjs_tool",
-            "description": "Create Chart.js charts ONLY for simple numerical data",
+            "description": "Create Chart.js charts when you want to increase learning experience to explain same concept charts, but check the possibility and correctness",
             "input_schema": {
                 "type": "object",
                 "properties": {

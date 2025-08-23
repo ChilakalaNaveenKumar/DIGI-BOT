@@ -12,7 +12,8 @@ export default defineNuxtConfig({
     '@nuxt/scripts',
     '@nuxt/test-utils',
     // '@nuxt/ui',        // Removed - using manual Tailwind v4 setup instead
-    '@nuxt/icon'
+    '@nuxt/icon',
+    '@pinia/nuxt'
   ],
 
   css: [
@@ -51,11 +52,12 @@ export default defineNuxtConfig({
 
   vite: {
     plugins: [tailwindcss()],
+    build: {
+      sourcemap: false
+    },
     server: {
       hmr: {
-        port: 24678,
-        clientPort: 443,
-        host: 'testing.digi-setu.com'
+        port: 24678
       }
     }
   },

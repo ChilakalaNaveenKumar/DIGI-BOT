@@ -15,7 +15,7 @@ from fastapi import UploadFile
 from PIL import Image
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.simple_config import get_settings
+from app.core.config import get_settings
 from app.core.exceptions import FileProcessingError
 from app.models.file import File
 
