@@ -22,7 +22,7 @@ from app.services.conversation_manager import ConversationManager
 from app.models.user import User
 from app.core.database import get_db_session
 from app.core.config import get_settings
-from app.core.enhanced_auth_deps import get_current_user_required
+from app.core.auth_deps import get_current_user_required
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)

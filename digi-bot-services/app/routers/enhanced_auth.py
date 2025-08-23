@@ -14,7 +14,7 @@ import structlog
 
 from app.core.database import get_db_session
 from app.core.security import security_manager
-from app.core.enhanced_auth_deps import get_current_user_from_cookie
+from app.core.auth_deps import get_current_user_from_cookie
 from app.models.user import User
 from app.core.config import get_settings
 

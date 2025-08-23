@@ -12,7 +12,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
-from app.core.auth_deps import get_current_user
+from app.core.auth_deps import CurrentUser
 from app.core.database import get_db_session
 from app.models.user import User
 from app.services.file_service import FileService
@@ -35,7 +35,7 @@ async def test_endpoint():
 @router.get("/{file_id}")
 async def serve_file(
     file_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: dict = CurrentUser,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Serve a file by its ID."""
@@ -55,7 +55,7 @@ async def serve_file(
             raise HTTPException(status_code=404, detail="File not found")
         
         # Check if user owns the file
-        if file_record.user_id != current_user.id:
+        if file_record.user_id != current_user["id"]:
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Check if file exists on disk
@@ -79,7 +79,7 @@ async def serve_file(
 
 @router.get("/")
 async def get_user_files(
-    current_user: User = Depends(get_current_user),
+    current_user: dict = CurrentUser,
     db: AsyncSession = Depends(get_db_session),
     file_type: Optional[str] = Query(None, description="Filter by file type (audio, image, document)"),
     limit: int = Query(50, ge=1, le=100),
@@ -89,7 +89,7 @@ async def get_user_files(
     try:
         file_service = FileService()
         files = await file_service.get_user_files(
-            user_id=current_user.id,
+            user_id=current_user["id"],
             db=db,
             file_type=file_type,
             limit=limit,
@@ -115,7 +115,7 @@ async def get_user_files(
 @router.delete("/{file_id}")
 async def delete_file(
     file_id: str,
-    current_user: User = Depends(get_current_user),
+    current_user: dict = CurrentUser,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Delete a file."""
@@ -133,7 +133,7 @@ async def delete_file(
             raise HTTPException(status_code=404, detail="File not found")
         
         # Check if user owns the file
-        if file_record.user_id != current_user.id:
+        if file_record.user_id != current_user["id"]:
             raise HTTPException(status_code=403, detail="Access denied")
         
         # Delete file from disk
@@ -147,7 +147,7 @@ async def delete_file(
         )
         await db.commit()
         
-        logger.info("File deleted", file_id=file_id, user_id=current_user.id)
+        logger.info("File deleted", file_id=file_id, user_id=current_user["id"])
         
         return {"message": "File deleted successfully", "file_id": file_id}
         
@@ -161,7 +161,7 @@ async def delete_file(
 
 @router.get("/stats/summary")
 async def get_file_stats(
-    current_user: User = Depends(get_current_user),
+    current_user: dict = CurrentUser,
     db: AsyncSession = Depends(get_db_session)
 ):
     """Get file statistics for the user."""
@@ -176,7 +176,7 @@ async def get_file_stats(
                 func.count().label('count'),
                 func.sum(File.file_size).label('total_size')
             )
-            .where(File.user_id == current_user.id)
+            .where(File.user_id == current_user["id"])
             .group_by(func.substr(File.content_type, 1, func.instr(File.content_type, '/') - 1))
         )
         

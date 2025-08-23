@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 import structlog
 
-from app.core.enhanced_auth_deps import CurrentUser, AuthenticatedUserWithCSRF
+from app.core.auth_deps import CurrentUser, AuthenticatedUserWithCSRF
 from app.core.database import get_db_session
 from app.models.user import User
 from app.models.conversation import Conversation, ConversationStatus
