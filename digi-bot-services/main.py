@@ -39,6 +39,9 @@ from app.core.config import get_settings
 from app.core.database import init_db, close_db, get_db_session
 from app.models.user import User
 from app.routers.component_matcher import router as component_matcher_router
+from app.routers.audio_processing import router as audio_processing_router
+from app.routers.file_processing import router as file_processing_router
+from app.routers.vision_processing import router as vision_processing_router
 from app.services.auth.router.enhanced_auth_router import router as enhanced_auth_router
 
 # Configure clean logging (no spam)
@@ -452,6 +455,9 @@ async def google_callback(
 # Include routers
 app.include_router(enhanced_auth_router)  # Enhanced secure authentication
 app.include_router(component_matcher_router)  # Component matcher with thinking blocks
+app.include_router(audio_processing_router)  # Audio transcription and synthesis
+app.include_router(file_processing_router)  # File analysis and vector stores
+app.include_router(vision_processing_router)  # Image analysis and generation
 
 
 if __name__ == "__main__":

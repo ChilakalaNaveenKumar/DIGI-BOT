@@ -12,7 +12,8 @@ from pydantic import BaseModel
 import structlog
 
 from app.services.auth.core.auth_deps import get_current_user_required
-from app.services.component_matcher import ComponentMatcherClient, VectorStoreManager
+from app.services.component_matcher import VectorStoreManager
+from app.services.component_matcher.gpt5_client import GPT5ComponentMatcherClient
 
 logger = structlog.get_logger(__name__)
 
@@ -24,10 +25,16 @@ class ComponentMatcherRequest(BaseModel):
 
 
 class ComponentMatcherRouter:
-    """Router for component matcher with thinking block streaming"""
+    """Router for component matcher with thinking block streaming using GPT-5"""
     
     def __init__(self):
-        self.component_matcher = ComponentMatcherClient()
+        # Initialize GPT-5 client with enhanced reasoning
+        self.component_matcher = GPT5ComponentMatcherClient(
+            model="gpt-5",
+            reasoning_effort="medium",  # Enhanced reasoning for better pattern matching
+            liberal_match=True,
+            allow_placeholders=True
+        )
         self.vector_manager = None
     
     async def initialize(self):
@@ -48,12 +55,13 @@ component_router = ComponentMatcherRouter()
 
 async def convert_to_thinking_blocks(
     query: str, 
-    component_matcher: ComponentMatcherClient,
+    component_matcher: GPT5ComponentMatcherClient,
     vector_manager: VectorStoreManager
 ) -> AsyncGenerator[str, None]:
     """
-    Convert OpenAI streaming response to thinking block format
+    Convert AI streaming response to thinking block format
     Only yields data if matches are found
+    Uses enhanced reasoning capabilities for better pattern matching
     """
     
     # First check if there are any matches using quick_match
@@ -128,8 +136,10 @@ async def analyze_component_match(
         
         # Log the request
         logger.info(
-            "Component matcher request", 
+            "GPT-5 component matcher request", 
             user_id=current_user["id"],
+            model=component_router.component_matcher.model,
+            reasoning_effort=component_router.component_matcher.reasoning_effort,
             query=request.query[:100] + "..." if len(request.query) > 100 else request.query
         )
         

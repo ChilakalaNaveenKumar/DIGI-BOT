@@ -33,7 +33,7 @@ class GPT5ComponentMatcherClient:
         liberal_match: bool = True,      # prefer semantic/pattern matches
         allow_placeholders: bool = True, # emit skeletons when data missing
         reasoning_effort: Optional[str] = None, # "low" | "medium" | "high"
-        verbosity: Optional[str] = None,        # "short" | "medium" | "long"
+
         # optional: pass your own few-shots that reflect your docs' block style
         few_shots: Optional[List[Dict[str, str]]] = None,
     ):
@@ -48,7 +48,6 @@ class GPT5ComponentMatcherClient:
         self.liberal_match = liberal_match
         self.allow_placeholders = allow_placeholders
         self.reasoning_effort = reasoning_effort
-        self.verbosity = verbosity
         self.few_shots = few_shots or []  # [{"user": "...", "assistant": "..."}]
 
     async def initialize(self):
@@ -108,12 +107,17 @@ class GPT5ComponentMatcherClient:
             return
 
         doc_text = "\n\n".join(docs)
-        prompt = self._build_prompt(query, doc_text)
-
+        
         try:
             # Use GPT-5 Responses API if available, otherwise fallback to Chat Completions
             if self.model == "gpt-5":
-                async for event in self._stream_with_responses_api(prompt):
+                system_instruction = self._build_system_instruction()
+                user_text = f"""QUERY:
+{query}
+
+DOCUMENTATION:
+{doc_text}"""
+                async for event in self._stream_with_responses_api(system_instruction, user_text):
                     yield event
             else:
                 # Fallback to Chat Completions API for non-GPT-5 models
@@ -123,31 +127,26 @@ class GPT5ComponentMatcherClient:
         except Exception as e:
             yield {"type": "error", "error": str(e)}
 
-    async def _stream_with_responses_api(self, prompt: str) -> AsyncGenerator[Dict[str, Any], None]:
-        """Stream using GPT-5 Responses API with automatic parameter fallback."""
+    async def _stream_with_responses_api(self, system_instruction: str, user_text: str) -> AsyncGenerator[Dict[str, Any], None]:
+        """Stream using GPT-5 Responses API with proper message structure."""
         
-        # Base request kwargs
+        # Build the standard Responses API "input" with system + user roles
         base_kwargs: Dict[str, Any] = {
             "model": self.model,
             "input": [
-                {
-                    "role": "user",
-                    "content": [{"type": "input_text", "text": prompt}],
-                }
+                {"role": "system", "content": [{"type": "input_text", "text": system_instruction}]},
+                {"role": "user", "content": [{"type": "input_text", "text": user_text}]},
             ],
+            # Primary token cap for Responses API
+            "max_output_tokens": self.max_tokens,
         }
         
-        # Add reasoning parameters if specified
-        if self.reasoning_effort:
+        # Add reasoning ONLY if explicitly set AND supported by the model
+        if self.reasoning_effort and self.model == "gpt-5":
             base_kwargs["reasoning"] = {"effort": self.reasoning_effort}
-        if self.verbosity:
-            base_kwargs["verbosity"] = self.verbosity
 
-        # Try modern param first, then fall back (SDKs differ)
-        async def _stream_with_param(param_name: str):
-            kwargs = dict(base_kwargs)
-            kwargs[param_name] = self.max_tokens
-            async with self.client.responses.stream(**kwargs) as stream:
+        try:
+            async with self.client.responses.stream(**base_kwargs) as stream:
                 async for event in stream:
                     event_type = getattr(event, "type", "")
                     if event_type == "response.output_text.delta":
@@ -161,28 +160,8 @@ class GPT5ComponentMatcherClient:
                     elif event_type == "response.completed":
                         yield {"type": "completion", "finish_reason": "done"}
                         return
-
-        # Try with best-known param, then fallback if needed
-        tried_fallback = False
-        try:
-            async for ev in _stream_with_param("max_completion_tokens"):
-                yield ev
-            return
-        except TypeError:
-            tried_fallback = True
         except Exception as e:
-            # Some SDKs wrap this as a general Exception with that same message
-            if "unexpected keyword argument 'max_completion_tokens'" not in str(e):
-                yield {"type": "error", "error": str(e)}
-                return
-            tried_fallback = True
-
-        if tried_fallback:
-            try:
-                async for ev in _stream_with_param("max_output_tokens"):
-                    yield ev
-            except Exception as e:
-                yield {"type": "error", "error": str(e)}
+            yield {"type": "error", "error": str(e)}
 
     async def _stream_with_chat_api(self, query: str, doc_text: str) -> AsyncGenerator[Dict[str, Any], None]:
         """Fallback to Chat Completions API for non-GPT-5 models."""
@@ -204,49 +183,45 @@ class GPT5ComponentMatcherClient:
                 if chunk.choices[0].finish_reason:
                     yield {"type": "completion", "finish_reason": chunk.choices[0].finish_reason}
 
-    def _build_prompt(self, query: str, doc_text: str) -> str:
-        """Build prompt for GPT-5 Responses API."""
+    def _build_system_instruction(self) -> str:
+        """Build system instruction for GPT-5 Responses API."""
         mode = "LIBERAL" if self.liberal_match else "CONSERVATIVE"
         placeholders = "ALLOWED" if self.allow_placeholders else "DISALLOWED"
 
         system_instruction = f"""
-You are a generic FORMAT MATCHER.
+You are a FORMAT ANSWERER.
 
-Your job:
-- Read DOCUMENTATION that contains one or more canonical "blocks" or "formats" (could be code blocks, config blocks, UI components, templates, etc.).
-- Decide which documented block(s) best answer the QUERY by PATTERN/INTENT, not by exact wording or entity names.
-- If the QUERY clearly maps to a documented pattern but lacks some values, and placeholders are {placeholders}, output a valid skeleton using obvious placeholders (e.g. <value1>, <column_B>, <param>).
-- In {mode} mode:
-  • LIBERAL → prefer mapping by pattern/intent and allow reasonable substitutions.
-  • CONSERVATIVE → require a closer fit to one of the documented blocks.
+Goal:
+- Read the QUERY and the DOCUMENTATION.
+- Silently analyze the QUERY (do your reasoning in your head).
+- Figure out the best possible answer.
+- Express that answer ONLY in the documented output formats (blocks) defined in the DOCUMENTATION.
+- If values are missing, use placeholders like <value1>, <label_B>, <param>.
+- Provide multiple formats if needed.
+Mode: {mode}
+  • LIBERAL → match by intent/pattern; allow placeholders and substitutions.
+  • CONSERVATIVE → require close fit before outputting a block.
 
 Hard constraints:
-- Output ONLY:
-  (a) one or more block(s) VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,
-  OR
-  (b) the single string NO_MATCH if nothing applies.
+- Output ONLY ONE of the following:
+  (a) One or more documented block(s), verbatim in structure (same keys/order/shape as in docs), with adapted labels/values/placeholders if needed
+  (b) The single string "NO_MATCH" (if nothing applies)
 
-- DO NOT add commentary, prose, or explanations.
-- Do NOT stop at one go, check all types of formats and check weather it matched the documentation. Go hard thinking comparing things in the query or any kind of patterns we may expect in the answer based on question.
+Do NOT output plain text answers, explanations, or reasoning.
+Do NOT include notes or extra commentary.
+Do NOT show your thought process.
 """.strip()
 
         # Add few-shots if available
-        few_shots_text = ""
         if self.few_shots:
-            few_shots_text = "\n\nEXAMPLES:\n"
+            system_instruction += "\n\nEXAMPLES:\n"
             for i, fs in enumerate(self.few_shots, 1):
                 user = fs.get("user", "")
                 assistant = fs.get("assistant", "")
                 if user and assistant:
-                    few_shots_text += f"\nExample {i}:\nQuery: {user}\nResponse: {assistant}\n"
+                    system_instruction += f"\nExample {i}:\nQuery: {user}\nResponse: {assistant}\n"
 
-        return f"""{system_instruction}{few_shots_text}
-
-QUERY:
-{query}
-
-DOCUMENTATION:
-{doc_text}"""
+        return system_instruction
 
     def _build_messages(self, query: str, doc_text: str) -> List[Dict[str, str]]:
         """Build messages for Chat Completions API (fallback)."""
@@ -254,24 +229,27 @@ DOCUMENTATION:
         placeholders = "ALLOWED" if self.allow_placeholders else "DISALLOWED"
 
         system = f"""
-You are a generic FORMAT MATCHER.
+You are a FORMAT MATCHER.
 
-Your job:
-- Read DOCUMENTATION that contains one or more canonical "blocks" or "formats" (could be code blocks, config blocks, UI components, templates, etc.).
-- Decide which documented block(s) best answer the QUERY by PATTERN/INTENT, not by exact wording or entity names.
-- If the QUERY clearly maps to a documented pattern but lacks some values, and placeholders are {placeholders}, output a valid skeleton using obvious placeholders (e.g. <value1>, <column_B>, <param>).
-- In {mode} mode:
-  • LIBERAL → prefer mapping by pattern/intent and allow reasonable substitutions.
-  • CONSERVATIVE → require a closer fit to one of the documented blocks.
+Goal:
+- Read DOCUMENTATION that defines canonical output "blocks" or "formats".
+- Silently analyze the QUERY and the DOCUMENTATION. Make a brief plan in your head.
+- Choose the best-fitting documented block(s) by PATTERN/INTENT (not only exact words).
 
-Hard constraints:
-- Output ONLY:
-  (a) one or more block(s) VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,
-  OR
-  (b) the single string NO_MATCH if nothing applies.
+If the QUERY maps to a documented pattern but some values are missing and placeholders are {placeholders},
+emit a valid skeleton with obvious placeholders (e.g., <value1>, <column_B>, <param>).
 
-- DO NOT add commentary, prose, or explanations.
-- Do NOT stop at one go, check all types of formats and check weather it matched the documentation. Go hard thinking comparing things in the query or any kind of patterns we may expect in the answer based on question.
+Mode: {mode}
+  • LIBERAL → match by pattern/intent; allow reasonable substitutions.
+  • CONSERVATIVE → require a close fit to a documented block.
+
+Hard constraints (very important):
+- Output ONLY ONE of the following:
+  (a) one or more block(s) VERBATIM IN STRUCTURE (same keys/order/shape as in the docs), with adapted labels/values/placeholders if needed
+  (b) the single string: NO_MATCH
+
+- Do NOT include explanations, notes, or thoughts in your output.
+- Do NOT print your plan. Think through all candidate formats, but output only the final block(s) or NO_MATCH.
 """.strip()
 
         msgs: List[Dict[str, str]] = [{"role": "system", "content": system}]
