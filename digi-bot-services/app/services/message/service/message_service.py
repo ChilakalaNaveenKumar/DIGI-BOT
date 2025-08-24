@@ -291,7 +291,7 @@ class MessageService:
             last_message_at = result.scalar()
             
             # Import here to avoid circular imports
-            from app.services.conversation_service import ConversationService
+            from app.services.conversation import ConversationService
             conv_service = ConversationService(self.db)
             await conv_service.update_conversation_stats(
                 conversation_id=conversation_id,

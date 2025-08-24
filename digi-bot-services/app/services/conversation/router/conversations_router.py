@@ -12,7 +12,11 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, desc
 import structlog
 
-from app.core.auth_deps import CurrentUser, AuthenticatedUserWithCSRF
+from app.services.auth import get_current_user_required, get_current_user_from_cookie
+
+# Create dependency aliases for backward compatibility
+CurrentUser = Depends(get_current_user_required)
+AuthenticatedUserWithCSRF = Depends(get_current_user_required)  # Using same for now
 from app.core.database import get_db_session
 from app.models.user import User
 from app.models.conversation import Conversation, ConversationStatus

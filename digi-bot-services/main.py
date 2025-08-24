@@ -33,8 +33,10 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.database import init_db, close_db, get_db_session
 from app.models.user import User
-from app.routers import direct_chat, files, conversations
-from app.routers.enhanced_auth import router as enhanced_auth_router
+from app.routers import direct_chat
+from app.services.conversation import conversations_router
+from app.services.message import stream_router
+from app.services.auth import enhanced_auth_router
 
 # Configure clean logging (no spam)
 logging.basicConfig(
@@ -74,12 +76,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
         await init_db()
         logger.info("Database initialized successfully")
         
-        # Initialize file storage
-        from app.services.file_service import FileService
-        file_service = FileService()
-        await file_service.initialize()
-        app.state.file_service = file_service
-        logger.info("File Service initialized successfully")
+        # File service removed as requested
         
         logger.info("Digi Bot Services started successfully")
         
@@ -93,10 +90,7 @@ async def lifespan(app: FastAPI) -> AsyncGenerator[None, None]:
     logger.info("Shutting down Digi Bot Services")
     
     try:
-        # Cleanup file service
-        if hasattr(app.state, 'file_service'):
-            await app.state.file_service.cleanup()
-            logger.info("File Service cleaned up")
+        # File service cleanup removed
         
         # Close database connections
         await close_db()
@@ -360,7 +354,7 @@ async def google_callback(
                 raise HTTPException(status_code=500, detail="Database error during authentication")
             
             # Use enhanced security system to generate tokens and set cookies
-            from app.core.security import security_manager
+            from app.services.auth import security_manager
             
             user_data = {
                 "id": user.id,
@@ -455,8 +449,8 @@ async def google_callback(
 # Include routers
 app.include_router(enhanced_auth_router)  # Enhanced secure authentication
 app.include_router(direct_chat.router)
-app.include_router(files.router, prefix="/api")
-app.include_router(conversations.router)
+app.include_router(conversations_router)
+app.include_router(stream_router)
 
 
 if __name__ == "__main__":

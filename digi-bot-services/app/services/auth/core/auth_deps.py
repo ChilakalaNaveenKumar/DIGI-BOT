@@ -10,7 +10,7 @@ from sqlalchemy import select
 import structlog
 
 from app.core.database import get_db_session
-from app.core.security import security_manager
+from .security import security_manager
 from app.models.user import User
 
 logger = structlog.get_logger(__name__)

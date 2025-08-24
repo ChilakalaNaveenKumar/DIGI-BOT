@@ -4,6 +4,7 @@ Simple Configuration - Only what we actually need
 import os
 from functools import lru_cache
 from pydantic_settings import BaseSettings
+from pydantic import ConfigDict
 
 
 class Settings(BaseSettings):
@@ -31,8 +32,10 @@ class Settings(BaseSettings):
     # CORS (one setting)
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
     
-    class Config:
-        env_file = ".env"
+    model_config = ConfigDict(
+        env_file=".env",
+        extra="allow"  # Allow extra fields from .env file
+    )
 
 
 @lru_cache()

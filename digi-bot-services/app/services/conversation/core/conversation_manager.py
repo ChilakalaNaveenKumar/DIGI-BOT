@@ -11,8 +11,8 @@ import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.ai_providers.anthropic_provider import AnthropicProvider
-from app.services.message_service import MessageService
-from app.services.conversation_service import ConversationService
+from app.services.message import MessageService
+from ..service.conversation_service import ConversationService
 from app.models.conversation import MessageRole
 
 logger = structlog.get_logger(__name__)

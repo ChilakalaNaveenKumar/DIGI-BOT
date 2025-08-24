@@ -13,8 +13,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 import structlog
 
 from app.core.database import get_db_session
-from app.core.security import security_manager
-from app.core.auth_deps import get_current_user_from_cookie
+from ..core.security import security_manager
+from ..core.auth_deps import get_current_user_from_cookie
 from app.models.user import User
 from app.core.config import get_settings
 

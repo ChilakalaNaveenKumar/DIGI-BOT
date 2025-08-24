@@ -17,12 +17,11 @@ import structlog
 
 from app.services.ai_providers.anthropic_provider import AnthropicProvider
 from app.services.comprehensive_tools import get_conditional_tools, process_comprehensive_tool_calls
-from app.services.conversation_service import ConversationService
-from app.services.conversation_manager import ConversationManager
+from app.services.conversation import ConversationService, ConversationManager
 from app.models.user import User
 from app.core.database import get_db_session
 from app.core.config import get_settings
-from app.core.auth_deps import get_current_user_required
+from app.services.auth import get_current_user_required
 from sqlalchemy.ext.asyncio import AsyncSession
 
 logger = structlog.get_logger(__name__)
