@@ -13,6 +13,11 @@ Features:
 
 import logging
 import sys
+import os
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta, timezone
 from typing import AsyncGenerator, Optional
@@ -33,10 +38,8 @@ from sqlalchemy import select
 from app.core.config import get_settings
 from app.core.database import init_db, close_db, get_db_session
 from app.models.user import User
-from app.routers import direct_chat
-from app.services.conversation import conversations_router
-from app.services.message import stream_router
-from app.services.auth import enhanced_auth_router
+from app.routers.component_matcher import router as component_matcher_router
+from app.services.auth.router.enhanced_auth_router import router as enhanced_auth_router
 
 # Configure clean logging (no spam)
 logging.basicConfig(
@@ -448,9 +451,7 @@ async def google_callback(
 
 # Include routers
 app.include_router(enhanced_auth_router)  # Enhanced secure authentication
-app.include_router(direct_chat.router)
-app.include_router(conversations_router)
-app.include_router(stream_router)
+app.include_router(component_matcher_router)  # Component matcher with thinking blocks
 
 
 if __name__ == "__main__":

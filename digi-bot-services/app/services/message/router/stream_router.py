@@ -16,7 +16,6 @@ from pydantic import BaseModel
 import structlog
 
 from app.services.ai_providers.anthropic_provider import AnthropicProvider
-from app.services.comprehensive_tools import get_conditional_tools, process_comprehensive_tool_calls
 from app.services.conversation import ConversationService, ConversationManager
 from app.models.user import User
 from app.core.database import get_db_session

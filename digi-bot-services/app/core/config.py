@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     
     # Database  
     DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/digi_bot")
+    DATABASE_ECHO: bool = os.getenv("DATABASE_ECHO", "false").lower() == "true"
     
     # Google OAuth (only what's needed)
     GOOGLE_CLIENT_ID: str = os.getenv("GOOGLE_CLIENT_ID", "")
@@ -31,6 +32,21 @@ class Settings(BaseSettings):
     
     # CORS (one setting)
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")
+    
+    # Server settings
+    HOST: str = os.getenv("HOST", "0.0.0.0")
+    PORT: int = int(os.getenv("PORT", "8000"))
+    
+    # JWT settings
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "1440"))  # 24 hours
+    ALGORITHM: str = "HS256"
+    
+    # Google OAuth redirect
+    GOOGLE_REDIRECT_URI: str = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+    
+    def get_cors_origins_list(self) -> list:
+        """Get CORS origins as a list"""
+        return [origin.strip() for origin in self.CORS_ORIGINS.split(",")]
     
     model_config = ConfigDict(
         env_file=".env",

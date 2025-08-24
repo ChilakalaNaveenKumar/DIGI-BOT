@@ -1,26 +1,28 @@
-# Chart.js Markdown Format Documentation v1
+# Chart.js Markdown Format Documentation v2
 
 ## Overview
 
-This documentation describes how to create Chart.js visualizations using direct markdown syntax. The system automatically renders interactive Chart.js charts when the format enhances learning and understanding.
+This documentation explains how to create **Chart.js visualizations** using direct markdown syntax.
+Charts should only be generated when they **clarify, explain, or enhance** understanding of data.
 
-## Core Philosophy
+## Core Principles
 
-**Smart Visualization**: Only create charts when they genuinely improve comprehension or learning experience. Avoid unnecessary visualizations for simple text-based queries.
+* **Purposeful Visualization**: Only use charts when they add real value.
+* **Pattern Recognition**: Match queries to chart types by data shape, not keywords.
+* **Educational Focus**: Prioritize visuals that make comparisons, proportions, or trends easier to grasp.
+* **Direct Format**: Always output using `:::chart-type ... :::` blocks for automatic rendering.
 
-**Educational Focus**: Prioritize visualizations that help explain concepts, show relationships, or make complex data more understandable.
-
-**Direct Format**: Use simple markdown syntax that automatically renders as interactive Chart.js charts.
+---
 
 ## Chart.js Formats
 
-### 1. Pie Charts
-**Use for**: Percentages, proportions, market share, demographics
+### Pie Chart
 
-**Format**:
+**Use for**: Proportions, market share, percentages, demographics.
+
 ```
 :::pie-chart
-title: Social Media Market Share 2024
+title: Market Share 2024
 data: [
   {"label": "Instagram", "value": 45},
   {"label": "TikTok", "value": 30},
@@ -30,13 +32,13 @@ data: [
 :::
 ```
 
-### 2. Bar Charts
-**Use for**: Category comparisons, sales by region, survey results
+### Bar Chart
 
-**Format**:
+**Use for**: Comparing categories, regions, teams, or inventory.
+
 ```
 :::bar-chart
-title: Regional Sales Performance Q4 2024
+title: Regional Sales Q4
 data: [
   {"label": "North America", "value": 125000},
   {"label": "Europe", "value": 98000},
@@ -46,13 +48,13 @@ data: [
 :::
 ```
 
-### 3. Line Charts
-**Use for**: Trends over time, growth rates, performance metrics
+### Line Chart
 
-**Format**:
+**Use for**: Trends over time, growth, seasonality.
+
 ```
 :::line-chart
-title: AI Adoption Growth 2020-2024
+title: AI Adoption 2020-2024
 data: [
   {"label": "2020", "value": 15},
   {"label": "2021", "value": 28},
@@ -63,10 +65,10 @@ data: [
 :::
 ```
 
-### 4. Doughnut Charts
-**Use for**: Similar to pie but with center space for additional info
+### Doughnut Chart
 
-**Format**:
+**Use for**: Similar to pie but with a central space (budget, allocation).
+
 ```
 :::doughnut-chart
 title: Budget Allocation 2024
@@ -79,13 +81,13 @@ data: [
 :::
 ```
 
-### 5. Scatter Plots
-**Use for**: Correlation analysis, x-y relationships
+### Scatter Plot
 
-**Format**:
+**Use for**: Correlations, x-y relationships.
+
 ```
 :::scatter-chart
-title: Price vs Performance Analysis
+title: Price vs Performance
 data: [
   {"x": 100, "y": 85},
   {"x": 150, "y": 92},
@@ -95,155 +97,105 @@ data: [
 :::
 ```
 
-## Usage Guidelines for Chart.js
+---
 
-### Decision Matrix: Chart Types
+## Decision Rules (Pattern → Chart Type)
 
-| Data Type | Chart Type | Reasoning |
-|-----------|------------|-----------|
-| Percentages/Proportions | Pie/Doughnut Chart | Visual proportions are easier to understand |
-| Category Comparisons | Bar Chart | Height comparison shows differences clearly |
-| Time Series | Line Chart | Trends are immediately visible |
-| Correlations | Scatter Plot | Relationship patterns emerge visually |
+| Query Pattern                                 | Chart Type             | Reason                         |
+| --------------------------------------------- | ---------------------- | ------------------------------ |
+| Percentages sum ≈ 100%                        | Pie/Doughnut           | Shows proportions clearly      |
+| Categorical values (teams, regions, products) | Bar                    | Easy comparison of heights     |
+| Time series (dates, months, years)            | Line                   | Shows growth/decline over time |
+| Paired variables (x,y)                        | Scatter                | Reveals relationships          |
+| Multi-attribute per entity                    | Data Table (not chart) | Structure > visualization      |
 
-### Best Practices for Chart.js
+---
 
-1. **Educational Value First**: Only create visualizations that genuinely enhance learning
-2. **Appropriate Chart Types**: Match chart type to data characteristics
-3. **Clear Titles**: Use descriptive titles that explain what the chart shows
-4. **Simple Data Format**: Use straightforward JSON arrays with label/value pairs
-5. **Context Awareness**: Consider whether the user's question benefits from visualization
-6. **Direct Format**: Use the `:::chart-type` syntax directly in responses
+## Best Practices
 
-### Chart.js Example Scenarios
+1. **Clear Title**: Always describe what the chart shows.
+2. **Consistent Values**: Use same unit (%, \$, count).
+3. **Few Categories**: Max 5–8 for readability.
+4. **Fallback**: If no clear chart type applies, return `"NO_MATCH"`.
+5. **Semantic Mapping**: Treat *regions, teams, categories* all as bar-chart candidates.
 
-#### ✅ Good Use Cases for Chart.js
+---
 
-**Query**: "What's the market share of social media platforms?"
-**Response**: Include pie chart with direct format:
-```
-:::pie-chart
-title: Social Media Market Share 2024
-data: [{"label": "Instagram", "value": 45}, {"label": "TikTok", "value": 30}]
-:::
-```
-**Reasoning**: Proportional data is best understood visually
+## Example Scenarios
 
-**Query**: "Compare sales performance across different regions"
-**Response**: Include bar chart with direct format:
+### ✅ Good Matches
+
+**Query**: "Compare team productivity: Frontend 45 tasks, Backend 38, QA 29"
+
 ```
 :::bar-chart
-title: Regional Sales Comparison
-data: [{"label": "North America", "value": 125000}, {"label": "Europe", "value": 98000}]
+title: Team Productivity
+data: [
+  {"label": "Frontend", "value": 45},
+  {"label": "Backend", "value": 38},
+  {"label": "QA", "value": 29}
+]
 :::
 ```
-**Reasoning**: Comparison data benefits from visual height differences
 
-**Query**: "Show me the trend of AI adoption over the past 5 years"
-**Response**: Include line chart with direct format:
+**Query**: "Show me last 6 months of revenue growth"
+
 ```
 :::line-chart
-title: AI Adoption Trend 2020-2024
-data: [{"label": "2020", "value": 15}, {"label": "2024", "value": 82}]
+title: Revenue Growth 2024
+data: [
+  {"label": "Jan", "value": 12000},
+  {"label": "Feb", "value": 15000},
+  {"label": "Mar", "value": 18000},
+  {"label": "Apr", "value": 20000},
+  {"label": "May", "value": 22500},
+  {"label": "Jun", "value": 25000}
+]
 :::
 ```
-**Reasoning**: Trends are immediately visible in line charts
 
-#### ❌ Poor Use Cases for Chart.js
+**Query**: "What’s the salary distribution?"
 
-**Query**: "What is artificial intelligence?"
-**Response**: Text explanation only
-**Reasoning**: Conceptual explanation doesn't need visualization
-
-**Query**: "List the benefits of exercise"
-**Response**: Text list only
-**Reasoning**: Simple enumeration doesn't benefit from charts
-
-**Query**: "How do I cook pasta?"
-**Response**: Text instructions only
-**Reasoning**: Process instructions are better as text
-
-## Technical Implementation for Chart.js
-
-### Direct Format Flow
-
-1. **Query Analysis**: Determine if Chart.js visualization would enhance understanding
-2. **Data Extraction**: Identify numerical/categorical data in content
-3. **Chart Type Selection**: Choose most appropriate Chart.js visualization
-4. **Direct Format**: Use `:::chart-type` syntax directly in response
-5. **Auto-Rendering**: Frontend automatically renders interactive Chart.js charts
-
-### Chart.js Data Format Examples
-
-**Pie Chart Data**:
-```json
-[
-  {"label": "Instagram", "value": 45},
-  {"label": "TikTok", "value": 30},
-  {"label": "Facebook", "value": 15},
-  {"label": "Twitter", "value": 10}
+```
+:::doughnut-chart
+title: Salary Distribution
+data: [
+  {"label": "Managers", "value": 40},
+  {"label": "Developers", "value": 35},
+  {"label": "Designers", "value": 15},
+  {"label": "QA", "value": 10}
 ]
+:::
 ```
 
-**Bar Chart Data**:
-```json
-[
-  {"label": "Q1 2024", "value": 125000},
-  {"label": "Q2 2024", "value": 145000},
-  {"label": "Q3 2024", "value": 162000},
-  {"label": "Q4 2024", "value": 178000}
-]
-```
+### ❌ Poor Matches
 
-**Scatter Plot Data**:
-```json
-[
-  {"x": 10, "y": 20},
-  {"x": 15, "y": 35},
-  {"x": 20, "y": 45},
-  {"x": 25, "y": 55}
-]
-```
+* **Query**: "Explain quantum computing" → Use text only.
+* **Query**: "Benefits of daily exercise" → Use bullet list.
+* **Query**: "Departmental financials with budget, spend, ROI" → Use `:::data-table`, not chart.
 
-## Integration with AI Models for Chart.js
+---
 
-### Reasoning Mode Considerations
+## Quick Reference
 
-When using reasoning models (o1-preview, o1-mini):
-- Carefully analyze whether Chart.js visualization adds educational value
-- Consider multiple chart types before selecting optimal one
-- Evaluate if the user's learning objective benefits from visual representation
-- Use direct `:::chart-type` format when charts enhance understanding
-- Avoid over-visualization of simple concepts
+**Available Chart Types**:
 
-### Direct Format Guidelines for AI
+* `:::pie-chart` — Proportions
+* `:::bar-chart` — Category comparisons
+* `:::line-chart` — Trends over time
+* `:::doughnut-chart` — Proportions + center info
+* `:::scatter-chart` — Correlations
 
-**When to Use Chart.js Format**:
-- User asks about numerical data, comparisons, or trends
-- Visualization would genuinely enhance understanding
-- Data is suitable for Chart.js representation
-- Educational value is clear
+**When NOT to use**:
 
-**How to Use**:
-- Include the `:::chart-type` block directly in your response
-- Choose appropriate Chart.js chart type for the data
-- Use clear, descriptive titles
-- Format data as simple JSON arrays
+* Multi-metric structured data → Data Table
+* Pure explanations → Text
+* Step-by-step processes → List
 
-## Conclusion
+---
 
-The Chart.js markdown format system provides intelligent, context-aware data visualization that enhances learning and understanding. By using simple `:::chart-type` syntax directly in responses, it creates meaningful educational experiences while avoiding unnecessary complexity.
+## Key Principle
 
-The key principle is **purposeful Chart.js visualization**: every chart should serve a clear educational or analytical purpose, making complex information more accessible and understandable for users.
-
-### Quick Reference for Chart.js
-
-**Available Chart.js Types**:
-- `:::pie-chart` - For percentages and proportions
-- `:::bar-chart` - For category comparisons  
-- `:::line-chart` - For trends over time
-- `:::doughnut-chart` - For proportions with center space
-- `:::scatter-chart` - For correlations and x-y relationships
-
-**Remember**: Only use Chart.js charts when they genuinely enhance understanding. Simple text explanations are often better than unnecessary visualizations.
-
+👉 Use charts for **visual clarity** (proportions, trends, comparisons, relationships).
+👉 Use tables for **structured detail**.
+👉 Use text for **concepts**.
