@@ -193,10 +193,70 @@
       stroke-linecap="round"
       stroke-linejoin="round"
     />
+    
+    <!-- Brain Circuit (better thinking icon) -->
+    <path
+      v-if="iconName === 'brain-circuit'"
+      d="M12 5a3 3 0 1 0-5.997.125 4 4 0 0 0-2.526 5.77 4 4 0 0 0 .556 6.588A4 4 0 1 0 12 18Z"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      v-if="iconName === 'brain-circuit'"
+      d="M12 5a3 3 0 1 1 5.997.125 4 4 0 0 1 2.526 5.77 4 4 0 0 1-.556 6.588A4 4 0 1 1 12 18Z"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      v-if="iconName === 'brain-circuit'"
+      d="M15 13a4.5 4.5 0 0 1-3-4 4.5 4.5 0 0 1-3 4"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      v-if="iconName === 'brain-circuit'"
+      d="M17.599 6.5a3 3 0 0 0 .399-1.375"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      v-if="iconName === 'brain-circuit'"
+      d="M6.003 5.125A3 3 0 0 0 6.401 6.5"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      v-if="iconName === 'brain-circuit'"
+      d="M6.83 16.725a4.5 4.5 0 0 1 .17-.725"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
+    <path
+      v-if="iconName === 'brain-circuit'"
+      d="M17.17 16.725a4.5 4.5 0 0 0-.17-.725"
+      stroke="currentColor"
+      stroke-width="2"
+      stroke-linecap="round"
+      stroke-linejoin="round"
+    />
   </svg>
 </template>
 
 <script setup lang="ts">
+import { computed } from 'vue'
+
 interface Props {
   name: string
   size?: number | string

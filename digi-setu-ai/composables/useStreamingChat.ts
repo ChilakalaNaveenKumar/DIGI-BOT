@@ -161,15 +161,15 @@ export const useStreamingChat = () => {
                       }
                     }
                   }
-                } else if (data.type === 'thinking_delta') {
+                } else if (data.type === 'content_block_delta' && data.delta?.type === 'thinking_delta') {
                   // Handle thinking content - add to reasoning steps
-                  if (data.text) {
+                  if (data.delta.thinking) {
                     // Check if this is a continuation of existing reasoning or new step
                     const lastStep = currentReasoningSteps.value[currentReasoningSteps.value.length - 1]
                     
                     if (lastStep && lastStep.status === 'active') {
                       // Continue existing reasoning step
-                      lastStep.content += data.text
+                      lastStep.content += data.delta.thinking
                       lastStep.timestamp = new Date()
                     } else {
                       // Create new reasoning step
@@ -177,7 +177,7 @@ export const useStreamingChat = () => {
                       const reasoningStep: ReasoningStep = {
                         id: stepId,
                         type: 'thinking',
-                        content: data.text,
+                        content: data.delta.thinking,
                         status: 'active',
                         timestamp: new Date()
                       }
@@ -198,16 +198,24 @@ export const useStreamingChat = () => {
                       }
                     }
                   }
-                } else if (data.type === 'thinking_stop') {
-                  // Stop thinking mode and mark reasoning steps as completed
-                  isReasoning.value = false
-                  
-                  // Mark all active reasoning steps as completed
-                  currentReasoningSteps.value.forEach(step => {
-                    if (step.status === 'active') {
-                      step.status = 'completed'
+                } else if (data.type === 'content_block_stop') {
+                  if (data.index === 0) {
+                    // Stop thinking mode and mark reasoning steps as completed (thinking block is index 0)
+                    isReasoning.value = false
+                    
+                    // Mark all active thinking steps as completed
+                    currentReasoningSteps.value.forEach(step => {
+                      if (step.type === 'thinking' && step.status === 'active') {
+                        step.status = 'completed'
+                      }
+                    })
+                  } else {
+                    // Handle tool completion
+                    const lastStep = currentReasoningSteps.value[currentReasoningSteps.value.length - 1]
+                    if (lastStep && lastStep.type === 'tool_call' && lastStep.status === 'active') {
+                      lastStep.status = 'completed'
                     }
-                  })
+                  }
                   
                   const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
                   if (messageIndex !== -1) {
@@ -215,7 +223,6 @@ export const useStreamingChat = () => {
                     if (currentMessage) {
                       messages.value[messageIndex] = {
                         ...currentMessage,
-                        content: '',
                         reasoningSteps: [...currentReasoningSteps.value],
                         isLoading: false,
                         isStreaming: true
@@ -223,11 +230,106 @@ export const useStreamingChat = () => {
                     }
                   }
                 } else if (data.type === 'content_block_start') {
-                  // Content block started
-                  console.log('Content block started')
-                } else if (data.type === 'content_block_delta') {
-                  // Handle actual content streaming
-                  if (data.delta && data.delta.type === 'text_delta' && data.delta.text) {
+                  // Content block started - handle tool calls
+                  if (data.content_block?.type === 'server_tool_use') {
+                    const toolStep: ReasoningStep = {
+                      id: `tool-${data.content_block.id}`,
+                      type: 'tool_call',
+                      content: `Using ${data.content_block.name}...`,
+                      tool_name: data.content_block.name,
+                      status: 'active',
+                      timestamp: new Date()
+                    }
+                    currentReasoningSteps.value.push(toolStep)
+                    
+                    // Update message with new tool step
+                    const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                    if (messageIndex !== -1) {
+                      const currentMessage = messages.value[messageIndex]
+                      if (currentMessage) {
+                        messages.value[messageIndex] = {
+                          ...currentMessage,
+                          reasoningSteps: [...currentReasoningSteps.value]
+                        }
+                      }
+                    }
+                  } else if (data.content_block?.type === 'web_search_tool_result') {
+                    // Handle web search results
+                    const toolStep: ReasoningStep = {
+                      id: `web-result-${data.content_block.tool_use_id}`,
+                      type: 'tool_call',
+                      content: 'Web search results',
+                      tool_name: 'web_search',
+                      status: 'completed',
+                      result: data.content_block.content,
+                      timestamp: new Date()
+                    }
+                    
+                    // Find and update the corresponding tool step
+                    const existingStepIndex = currentReasoningSteps.value.findIndex(
+                      step => step.id === `tool-${data.content_block.tool_use_id}`
+                    )
+                    
+                    if (existingStepIndex !== -1) {
+                      const existingStep = currentReasoningSteps.value[existingStepIndex]
+                      if (existingStep) {
+                        existingStep.result = data.content_block.content
+                        existingStep.status = 'completed'
+                      }
+                    } else {
+                      currentReasoningSteps.value.push(toolStep)
+                    }
+                    
+                    // Update message with web search results
+                    const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                    if (messageIndex !== -1) {
+                      const currentMessage = messages.value[messageIndex]
+                      if (currentMessage) {
+                        messages.value[messageIndex] = {
+                          ...currentMessage,
+                          reasoningSteps: [...currentReasoningSteps.value]
+                        }
+                      }
+                    }
+                  }
+
+                } else if (data.type === 'content_block_delta' && data.delta?.type === 'input_json_delta') {
+                  // Handle tool input streaming
+                  const lastStep = currentReasoningSteps.value[currentReasoningSteps.value.length - 1]
+                  if (lastStep && lastStep.type === 'tool_call' && lastStep.status === 'active') {
+                    if (!(lastStep as any).inputJson) (lastStep as any).inputJson = ''
+                    ;(lastStep as any).inputJson += data.delta.partial_json || ''
+                    
+                    // Try to parse the JSON to extract query for web search
+                    if (lastStep.tool_name === 'web_search') {
+                      try {
+                        const parsed = JSON.parse((lastStep as any).inputJson)
+                        if (parsed.query) {
+                          lastStep.content = `Searching: ${parsed.query}`
+                        }
+                      } catch {
+                        // JSON not complete yet, keep building
+                        lastStep.content = `Preparing search...`
+                      }
+                    } else {
+                      lastStep.content = `Using ${lastStep.tool_name}...`
+                    }
+                    
+                    // Update message with tool input
+                    const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                    if (messageIndex !== -1) {
+                      const currentMessage = messages.value[messageIndex]
+                      if (currentMessage) {
+                        messages.value[messageIndex] = {
+                          ...currentMessage,
+                          reasoningSteps: [...currentReasoningSteps.value]
+                        }
+                      }
+                    }
+                  }
+                } else if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
+                  // Handle actual content streaming (not thinking)
+                  if (data.delta.text) {
                     accumulatedContent += data.delta.text
                     
                     // Update message content in real-time

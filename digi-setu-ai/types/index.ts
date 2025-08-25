@@ -30,6 +30,7 @@ export interface ReasoningStep {
   timestamp?: Date
   tool_name?: string
   result?: string | unknown
+  inputJson?: string
 }
 
 export interface ToolCall {

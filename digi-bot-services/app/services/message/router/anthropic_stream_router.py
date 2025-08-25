@@ -266,9 +266,6 @@ async def stream_endpoint(
                 message_preview=user_message[:100]
             )
             
-            # Initialize services
-            yield f"data: {json.dumps({'type': 'activity', 'content': 'Initializing AI services...'})}\n\n"
-            
             provider = AnthropicProvider()
             await provider.initialize()
             
@@ -282,12 +279,9 @@ async def stream_endpoint(
             
             # Generate title for first message
             if is_first_message:
-                yield f"data: {json.dumps({'type': 'activity', 'content': 'Creating conversation...'})}\n\n"
                 conversation_title = await generate_conversation_title(user_message, provider)
                 logger.info("Generated conversation title", title=conversation_title)
             
-            # Build vector context
-            yield f"data: {json.dumps({'type': 'activity', 'content': 'Searching relevant context...'})}\n\n"
             
             context_message = await context_processor.build_context_message(
                 query=user_message,
@@ -345,42 +339,40 @@ async def stream_endpoint(
                 elif chunk.get("type") == "message_stop":
                     break
             
-            # Save conversation
-            yield f"data: {json.dumps({'type': 'activity', 'content': 'Saving conversation...'})}\n\n"
-            
-            if is_first_message and conversation_title:
-                # Create new conversation
-                conv_service = ConversationService(db)
-                conversation = await conv_service.create_conversation(
-                    user_id=user_id,
-                    title=conversation_title
-                )
-                conversation_id = conversation.id
-                
-                # Save conversation turn
-                await conv_manager.save_conversation_turn(
-                    conversation_id=conversation_id,
-                    user_message=user_message,
-                    assistant_response=assistant_content,
-                    user_id=user_id,
-                    tool_calls_used=1 if request.enable_web_search else 0,
-                    summary=conversation_summary
-                )
-                
-                yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id, 'title': conversation_title})}\n\n"
-                
-            elif conversation_id:
-                # Update existing conversation
-                await conv_manager.save_conversation_turn(
-                    conversation_id=conversation_id,
-                    user_message=user_message,
-                    assistant_response=assistant_content,
-                    user_id=user_id,
-                    tool_calls_used=1 if request.enable_web_search else 0,
-                    summary=conversation_summary
-                )
-                
-                yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id})}\n\n"
+            # TODO: Re-enable conversation saving after fixing database issues
+            # if is_first_message and conversation_title:
+            #     # Create new conversation
+            #     conv_service = ConversationService(db)
+            #     conversation = await conv_service.create_conversation(
+            #         user_id=user_id,
+            #         title=conversation_title
+            #     )
+            #     conversation_id = conversation.id
+            #     
+            #     # Save conversation turn
+            #     await conv_manager.save_conversation_turn(
+            #         conversation_id=conversation_id,
+            #         user_message=user_message,
+            #         assistant_response=assistant_content,
+            #         user_id=user_id,
+            #         tool_calls_used=1 if request.enable_web_search else 0,
+            #         summary=conversation_summary
+            #     )
+            #     
+            #     yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id, 'title': conversation_title})}\n\n"
+            #     
+            # elif conversation_id:
+            #     # Update existing conversation
+            #     await conv_manager.save_conversation_turn(
+            #         conversation_id=conversation_id,
+            #         user_message=user_message,
+            #         assistant_response=assistant_content,
+            #         user_id=user_id,
+            #         tool_calls_used=1 if request.enable_web_search else 0,
+            #         summary=conversation_summary
+            #     )
+            #     
+            #     yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id})}\n\n"
             
             # Send completion
             yield f"data: {json.dumps({'type': 'completion', 'finish_reason': 'stop'})}\n\n"

@@ -4,7 +4,7 @@
       <div class="stepper-line" />
       <div class="accordion-steps">
         <div 
-          v-for="(step, index) in steps" 
+          v-for="(step, index) in _props.steps" 
           :key="index"
           class="accordion-step"
         >
@@ -16,15 +16,21 @@
               <UiIcon 
                 v-if="step.type === 'tool_call'"
                 :name="getToolIcon(step.tool_name)" 
-                :size="14" 
+                :size="16" 
                 class="step-icon"
-              />
-              <div 
-                v-else
-                class="thinking-dot"
                 :class="{ 
-                  'thinking-dot--active': step.status === 'active',
-                  'thinking-dot--completed': step.status === 'completed'
+                  'step-icon--active': index === currentlyRunningStepIndex,
+                  'step-icon--completed': step.status === 'completed'
+                }"
+              />
+              <UiIcon 
+                v-else
+                name="brain-circuit"
+                :size="16"
+                class="thinking-icon"
+                :class="{ 
+                  'thinking-icon--active': index === currentlyRunningStepIndex,
+                  'thinking-icon--completed': step.status === 'completed'
                 }"
               />
             </div>
@@ -40,21 +46,35 @@
           </div>
           
           <!-- Expanded content directly under the step -->
-          <div v-if="expandedSteps.has(index) && step.result" class="step-expanded-content">
+          <div v-if="expandedSteps.has(index)" class="step-expanded-content">
             <UiStreamingMarkdown
-              :key="`step-${index}-result`"
-              :content="String(step.result || '')"
+              :key="`step-${index}-content`"
+              :content="step.content || ''"
               :is-streaming="false"
               :show-cursor="false"
               mode="static"
             />
+            
+            <!-- Show tool results if available -->
+            <div v-if="step.result && step.type === 'tool_call'" class="tool-result-section">
+
+              <div class="tool-result-content">
+                <UiStreamingMarkdown
+                  :key="`tool-result-${step.id}`"
+                  :content="formatToolResultAsMarkdown(step)"
+                  :is-streaming="false"
+                  :show-cursor="false"
+                  mode="static"
+                />
+              </div>
+            </div>
           </div>
         </div>
       </div>
     </div>
 
     <!-- Only show thinking indicator inside reasoning stepper -->
-    <div v-if="isStreaming && showStreamingIndicator" class="thinking-indicator">
+    <div v-if="_props.isStreaming && _props.showStreamingIndicator" class="thinking-indicator">
       <div class="thinking-dots">
         <span /><span /><span />
       </div>
@@ -64,6 +84,7 @@
 </template>
 
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import type { ReasoningStep } from '~/types'
 
 interface Props {
@@ -83,8 +104,57 @@ const _props = withDefaults(defineProps<Props>(), {
 
 const expandedSteps = ref(new Set<number>())
 
+// Find the currently running step (last active step)
+const currentlyRunningStepIndex = computed(() => {
+  if (!_props.steps) return -1
+  for (let i = _props.steps.length - 1; i >= 0; i--) {
+    if (_props.steps[i]?.status === 'active') {
+      return i
+    }
+  }
+  return -1
+})
+
 const getStepPreview = (step: ReasoningStep) => {
-  // Strip markdown formatting for preview
+  if (step.type === 'thinking') {
+    return 'Thinking'
+  }
+  
+  if (step.type === 'tool_call') {
+    // For web search, show the query from the inputJson or content
+    if (step.tool_name === 'web_search') {
+      // Try to extract query from inputJson first
+      try {
+        const inputJson = (step as ReasoningStep & { inputJson?: string }).inputJson
+        if (inputJson) {
+          const parsed = JSON.parse(inputJson)
+          if (parsed.query) {
+            return `Searching: ${parsed.query}`
+          }
+        }
+      } catch {
+        // Fall back to content parsing
+      }
+      
+      // Fallback: extract from content
+      const queryMatch = step.content.match(/Searching:\s*(.+)/)
+      if (queryMatch) {
+        return step.content
+      }
+      return 'Web Search'
+    }
+    
+    // For other tools, show tool name
+    const toolNames: Record<string, string> = {
+      'web_search': 'Web Search',
+      'code_execution': 'Code Execution',
+      'file_read': 'File Read',
+      'chart_tools': 'Chart Generation'
+    }
+    return toolNames[step.tool_name || ''] || 'Tool Call'
+  }
+  
+  // Fallback to content preview
   const preview = step.content
     .replace(/^##?\s*/, '') // Remove ## or # headers
     .replace(/\*\*(.*?)\*\*/g, '$1') // Remove bold **text**
@@ -111,20 +181,59 @@ const toggleStep = (index: number) => {
 
 const getToolIcon = (toolName?: string) => {
   const iconMap: Record<string, string> = {
-    'codebase_search': 'lucide:book-open',
-    'read_file': 'lucide:file-text', 
-    'search_replace': 'lucide:edit-3',
-    'write': 'lucide:plus',
-    'run_terminal_cmd': 'lucide:terminal',
-    'grep': 'lucide:search',
-    'list_dir': 'lucide:folder',
-    'web_search': 'lucide:globe',
-    'delete_file': 'lucide:trash-2',
-    'multi_edit': 'lucide:edit-3',
-    'create_diagram': 'lucide:sparkles',
-    'chart_tools': 'lucide:bar-chart-3'
+    'codebase_search': 'book-open',
+    'read_file': 'book-open', 
+    'search_replace': 'edit-3',
+    'write': 'plus',
+    'run_terminal_cmd': 'settings',
+    'grep': 'settings',
+    'list_dir': 'settings',
+    'web_search': 'book-open',
+    'delete_file': 'settings',
+    'multi_edit': 'edit-3',
+    'create_diagram': 'sparkles',
+    'chart_tools': 'settings'
   }
-  return iconMap[toolName || ''] || 'lucide:settings'
+  return iconMap[toolName || ''] || 'settings'
+}
+
+const formatToolResultAsMarkdown = (step: ReasoningStep) => {
+  if (!step.result) return ''
+  
+  if (step.tool_name === 'web_search' && Array.isArray(step.result)) {
+    // Format web search results as rich cards
+    let markdown = ''
+    
+    step.result.forEach((result: { title: string; url: string }, idx: number) => {
+      let domain = 'unknown'
+      try {
+        domain = new URL(result.url).hostname.replace('www.', '')
+      } catch {
+        // Fallback for invalid URLs
+        domain = result.url.split('/')[2] || 'unknown'
+      }
+      
+      markdown += `<div class="search-result-card">\n`
+      markdown += `  <div class="search-result-header">\n`
+      markdown += `    <span class="search-result-domain">${domain}</span>\n`
+      markdown += `  </div>\n`
+      markdown += `  <h4 class="search-result-title">\n`
+      markdown += `    <a href="${result.url}" target="_blank" rel="noopener noreferrer">${result.title}</a>\n`
+      markdown += `  </h4>\n`
+      markdown += `  <p class="search-result-url">${result.url}</p>\n`
+      markdown += `</div>\n\n`
+    })
+    
+    return markdown
+  }
+  
+  // For other tools, format as code block
+  if (typeof step.result === 'string') {
+    return `\`\`\`\n${step.result}\n\`\`\``
+  }
+  
+  // For objects, format as JSON
+  return `\`\`\`json\n${JSON.stringify(step.result, null, 2)}\n\`\`\``
 }
 </script>
 
@@ -143,9 +252,9 @@ const getToolIcon = (toolName?: string) => {
 
 .stepper-line {
   position: absolute;
-  left: 25px;
-  top: 22px;
-  bottom: 22px;
+  left: 29px;
+  top: 24px;
+  bottom: 24px;
   width: 2px;
   background: var(--border-primary);
   border-radius: 1px;
@@ -159,8 +268,8 @@ const getToolIcon = (toolName?: string) => {
 
 .step-indicator {
   flex-shrink: 0;
-  width: 20px;
-  height: 20px;
+  width: 24px;
+  height: 24px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -170,24 +279,30 @@ const getToolIcon = (toolName?: string) => {
 
 .step-icon {
   color: var(--text-secondary);
-}
-
-.thinking-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: var(--text-tertiary);
   transition: all 0.3s ease;
-  border: 2px solid var(--bg-primary);
 }
 
-.thinking-dot--active {
-  background: var(--primary);
-  animation: pulse 2s infinite;
+.step-icon--active {
+  color: #ff8c00 !important; /* Orange for currently running tools */
+  animation: pulse-icon 2s infinite;
 }
 
-.thinking-dot--completed {
-  background: var(--success);
+.step-icon--completed {
+  color: var(--text-secondary); /* Normal color for completed */
+}
+
+.thinking-icon {
+  color: var(--text-secondary);
+  transition: all 0.3s ease;
+}
+
+.thinking-icon--active {
+  color: #ff8c00 !important; /* Orange for currently running thinking */
+  animation: pulse-icon 2s infinite;
+}
+
+.thinking-icon--completed {
+  color: var(--text-secondary); /* Normal color for completed */
 }
 
 .step-content {
@@ -226,11 +341,19 @@ const getToolIcon = (toolName?: string) => {
   gap: 12px;
   padding: 12px 16px;
   cursor: pointer;
-  transition: background 0.2s ease;
+  transition: all 0.2s ease;
+  border-radius: 6px;
 }
 
 .step-header--clickable:hover {
   background: var(--bg-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.step-header--clickable:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
 }
 
 .step-expanded-content {
@@ -294,10 +417,198 @@ const getToolIcon = (toolName?: string) => {
   }
 }
 
+@keyframes pulse-orange {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+    box-shadow: 0 0 8px rgba(255, 140, 0, 0.4);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.2);
+    box-shadow: 0 0 12px rgba(255, 140, 0, 0.6);
+  }
+}
+
+@keyframes pulse-icon {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.7;
+    transform: scale(1.1);
+  }
+}
+
 @keyframes blink {
   0%, 50% { opacity: 1; }
   51%, 100% { opacity: 0; }
 }
+
+/* Tool Results Styling */
+.tool-result-section {
+  margin-top: 12px;
+  border-top: 1px solid var(--border-primary);
+  padding-top: 12px;
+}
+
+.tool-result-header {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin-bottom: 8px;
+}
+
+.tool-result-content {
+  font-size: 13px;
+  color: var(--text-primary);
+  max-height: 400px;
+  overflow-y: auto;
+  border-radius: 8px;
+  border: 1px solid var(--border-primary);
+  padding: 8px;
+  margin-top: 8px;
+  background: var(--bg-primary);
+}
+
+.tool-result-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.tool-result-content::-webkit-scrollbar-track {
+  background: var(--bg-tertiary);
+  border-radius: 3px;
+}
+
+.tool-result-content::-webkit-scrollbar-thumb {
+  background: var(--border-primary);
+  border-radius: 3px;
+}
+
+.tool-result-content::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+/* Enhanced link styling for tool results */
+.tool-result-content :deep(a) {
+  color: var(--accent-primary) !important;
+  text-decoration: none !important;
+  font-weight: 500 !important;
+  border-bottom: 1px solid transparent !important;
+  transition: all 0.2s ease !important;
+  padding: 2px 0 !important;
+}
+
+.tool-result-content :deep(a:hover) {
+  color: var(--accent-primary) !important;
+  border-bottom-color: var(--accent-primary) !important;
+  background: rgba(59, 130, 246, 0.1) !important;
+  border-radius: 3px !important;
+  padding: 2px 4px !important;
+  margin: 0 -4px !important;
+}
+
+.tool-result-content :deep(strong) {
+  color: var(--text-primary) !important;
+  font-weight: 600 !important;
+  margin-bottom: 4px !important;
+  display: block !important;
+}
+
+.tool-result-content :deep(p) {
+  margin: 8px 0 !important;
+  line-height: 1.5 !important;
+}
+
+/* 🔍 SEARCH RESULT CARDS */
+.tool-result-content :deep(.search-result-card) {
+  background: var(--bg-secondary) !important;
+  border: 1px solid var(--border-primary) !important;
+  border-radius: 8px !important;
+  padding: 16px !important;
+  margin: 12px 0 !important;
+  transition: all 0.2s ease !important;
+  position: relative !important;
+  animation: slideInUp 0.3s ease-out !important;
+  animation-fill-mode: both !important;
+}
+
+@keyframes slideInUp {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.tool-result-content :deep(.search-result-card:hover) {
+  border-color: var(--accent-primary) !important;
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.1) !important;
+  transform: translateY(-1px) !important;
+}
+
+.tool-result-content :deep(.search-result-header) {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: flex-end !important;
+  margin-bottom: 8px !important;
+}
+
+
+
+.tool-result-content :deep(.search-result-domain) {
+  background: var(--bg-tertiary) !important;
+  color: var(--text-tertiary) !important;
+  padding: 4px 8px !important;
+  border-radius: 12px !important;
+  font-size: 11px !important;
+  font-weight: 500 !important;
+  text-transform: uppercase !important;
+  letter-spacing: 0.5px !important;
+}
+
+.tool-result-content :deep(.search-result-title) {
+  margin: 8px 0 6px 0 !important;
+  font-size: 14px !important;
+  font-weight: 600 !important;
+  line-height: 1.4 !important;
+}
+
+.tool-result-content :deep(.search-result-title a) {
+  color: var(--text-primary) !important;
+  text-decoration: none !important;
+  border-bottom: none !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  background: none !important;
+  border-radius: 0 !important;
+}
+
+.tool-result-content :deep(.search-result-title a:hover) {
+  color: var(--accent-primary) !important;
+  background: none !important;
+  border-bottom: 1px solid var(--accent-primary) !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border-radius: 0 !important;
+}
+
+.tool-result-content :deep(.search-result-url) {
+  color: var(--text-tertiary) !important;
+  font-size: 12px !important;
+  margin: 0 !important;
+  word-break: break-all !important;
+  opacity: 0.8 !important;
+}
+
+/* Tool result content is now handled by StreamingMarkdown component */
 
 /* 🎨 MARKDOWN STYLING FOR REASONING STEPPER */
 .step-expanded-content :deep(h1),
