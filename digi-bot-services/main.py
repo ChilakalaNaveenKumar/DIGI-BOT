@@ -42,7 +42,10 @@ from app.routers.component_matcher import router as component_matcher_router
 from app.routers.audio_processing import router as audio_processing_router
 from app.routers.file_processing import router as file_processing_router
 from app.routers.vision_processing import router as vision_processing_router
+from app.routers.vector_search import router as vector_search_router
 from app.services.auth.router.enhanced_auth_router import router as enhanced_auth_router
+from app.services.message.router.anthropic_stream_router import router as stream_router
+from app.services.conversation import conversations_router
 
 # Configure clean logging (no spam)
 logging.basicConfig(
@@ -283,10 +286,9 @@ async def verify_google_credential(
         logger.error("Database error in OAuth verification", error=str(db_error))
         raise HTTPException(status_code=500, detail="Database error during authentication")
     
-    # Create JWT token
+    # Create JWT token (without google_id for security)
     token_data = {
         "sub": str(user.id),
-        "google_id": user.google_id,
         "email": user.email,
         "name": user.name
     }
@@ -297,8 +299,8 @@ async def verify_google_credential(
         expires_delta=access_token_expires
     )
     
-    # Serialize user data while session is active
-    user_dict = user.to_dict()
+    # Serialize user data while session is active (public data only)
+    user_dict = user.to_public_dict()
     
     return AuthResponse(
         access_token=access_token,
@@ -364,7 +366,6 @@ async def google_callback(
             
             user_data = {
                 "id": user.id,
-                "google_id": user.google_id,
                 "email": user.email,
                 "name": user.name,
                 "verified_email": user.verified_email
@@ -388,7 +389,7 @@ async def google_callback(
             auth_code_data = {
                 "access_token": access_token,
                 "refresh_token": refresh_token,
-                "user_data": user.to_dict(),
+                "user_data": user.to_public_dict(),  # Use public data only
                 "expires": datetime.now() + timedelta(minutes=5)
             }
             
@@ -407,9 +408,9 @@ async def google_callback(
                 user_id=str(user.id)
             )
             
-            # Serialize user data for response
+            # Serialize user data for response (public data only)
             import json
-            user_info_json = json.dumps(user.to_dict())
+            user_info_json = json.dumps(user.to_public_dict())
             
             html_content = f"""
             <!DOCTYPE html>
@@ -454,10 +455,13 @@ async def google_callback(
 
 # Include routers
 app.include_router(enhanced_auth_router)  # Enhanced secure authentication
+app.include_router(stream_router)  # AI streaming chat with conversation management
+app.include_router(conversations_router)  # Conversation management and history
 app.include_router(component_matcher_router)  # Component matcher with thinking blocks
 app.include_router(audio_processing_router)  # Audio transcription and synthesis
 app.include_router(file_processing_router)  # File analysis and vector stores
 app.include_router(vision_processing_router)  # Image analysis and generation
+app.include_router(vector_search_router)  # Vector search for semantic message search
 
 
 if __name__ == "__main__":

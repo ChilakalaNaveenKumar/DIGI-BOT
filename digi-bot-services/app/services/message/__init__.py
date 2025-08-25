@@ -18,7 +18,7 @@ Components:
 # Import from subdirectories
 from .service.message_service import MessageService
 from .service.message_part_service import MessagePartService
-from .router.stream_router import router as stream_router
+from .router.anthropic_stream_router import router as stream_router
 
 __all__ = [
     "MessageService",

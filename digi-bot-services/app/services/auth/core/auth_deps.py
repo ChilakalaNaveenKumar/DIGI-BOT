@@ -46,9 +46,9 @@ async def get_current_user_from_cookie(
             user_id=str(user.id)
         )
         
+        # Return user data without google_id for security
         return {
             "id": user.id,
-            "google_id": user.google_id,
             "email": user.email,
             "name": user.name,
             "verified_email": user.verified_email,

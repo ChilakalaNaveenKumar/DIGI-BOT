@@ -67,9 +67,11 @@
           />
           
           <!-- Analysis Status Indicator -->
-          <div v-if="isAnalyzing" class="analysis-status">
+          <div v-if="isAnalyzing || isProcessingComponents" class="analysis-status">
             <Icon name="lucide:bar-chart-3" :size="12" class="analysis-icon" />
-            <span class="analysis-text">Analyzing for components...</span>
+            <span class="analysis-text">
+              {{ isProcessingComponents ? 'Processing components...' : 'Analyzing for components...' }}
+            </span>
           </div>
         </div>
       </div>
@@ -97,6 +99,8 @@ const {
   startNewConversation,
   regenerateMessage 
 } = useStreamingChat()
+
+const isProcessingComponents = ref(false)
 
 const isAnalyzing = ref(false)
 

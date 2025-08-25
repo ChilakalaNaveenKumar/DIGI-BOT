@@ -272,6 +272,43 @@ class MessageService:
                 message="Failed to save message"
             )
     
+    async def count_messages_by_role(
+        self,
+        conversation_id: int,
+        role: MessageRole
+    ) -> int:
+        """Count messages by role in a conversation."""
+        
+        try:
+            result = await self.db.execute(
+                select(func.count(Message.id))
+                .where(
+                    and_(
+                        Message.conversation_id == conversation_id,
+                        Message.role == role
+                    )
+                )
+            )
+            
+            count = result.scalar() or 0
+            logger.debug(
+                "Counted messages by role",
+                conversation_id=conversation_id,
+                role=role.value,
+                count=count
+            )
+            
+            return count
+            
+        except Exception as e:
+            logger.error(
+                "Failed to count messages by role",
+                conversation_id=conversation_id,
+                role=role.value,
+                error=str(e)
+            )
+            return 0
+    
     async def _update_conversation_stats(self, conversation_id: int):
         """Update conversation statistics after message changes."""
         

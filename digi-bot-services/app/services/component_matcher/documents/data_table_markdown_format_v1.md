@@ -11,6 +11,8 @@ Use data tables when **multi-attribute precision** is required, or when comparis
 * **Multi-Attribute First**: Use when there are multiple metrics, KPIs, or attributes for each entity.
 * **Exactness Over Visualization**: Favor tables when numbers and details matter more than trends or proportions.
 * **Direct Format**: Always output in `:::data-table ... :::` blocks for automatic rendering.
+* **Postiion**: Exact position to insert the charts after which character without disturbing the text and flow of concept
+* **action**: insert / update -> for this document its only insert
 
 ---
 
@@ -19,6 +21,8 @@ Use data tables when **multi-attribute precision** is required, or when comparis
 ```
 :::data-table
 title: <Descriptive Title>
+position: <Exact position to insert the charts after which character  without disturbing the text and flow of concept>
+action: insert
 data: [
   {
     "Column A": "Value A1",
@@ -70,6 +74,8 @@ data: [
 ```
 :::data-table
 title: Product Performance Statistics
+position: 20
+action: insert
 data: [
   {"Product": "Widget A", "Revenue": "$125,000", "Units": "1,250", "Growth": "+15%", "Rating": "4.8/5"},
   {"Product": "Widget B", "Revenue": "$98,000", "Units": "980", "Growth": "+8%", "Rating": "4.6/5"},
@@ -83,6 +89,8 @@ data: [
 ```
 :::data-table
 title: Department Financial Performance 2024
+position: 10
+action: insert
 data: [
   {"Department": "Sales", "Budget": "$2.5M", "Actual Spend": "$2.3M", "Revenue": "$12.8M", "ROI": "456%", "Headcount": "45"},
   {"Department": "Marketing", "Budget": "$1.8M", "Actual Spend": "$1.7M", "Revenue": "$8.2M", "ROI": "382%", "Headcount": "28"}
@@ -95,6 +103,8 @@ data: [
 ```
 :::data-table
 title: Homepage Redesign - A/B Test
+position: 10
+action: insert
 data: [
   {"Variant": "Control", "Visitors": "10,250", "Conversions": "1,435", "Rate": "14.0%", "Bounce": "42.3%"},
   {"Variant": "New Design", "Visitors": "10,180", "Conversions": "1,672", "Rate": "16.4%", "Bounce": "38.1%"}
@@ -107,6 +117,8 @@ data: [
 ```
 :::data-table
 title: Employee Salary Overview
+position: 100
+action: insert
 data: [
   {"Name": "John", "Role": "Manager", "Salary": "$80,000"},
   {"Name": "Sarah", "Role": "Developer", "Salary": "$70,000"},
@@ -120,6 +132,8 @@ data: [
 ```
 :::data-table
 title: Customer Satisfaction Survey
+position: 10
+action: insert
 data: [
   {"Question": "Overall Satisfaction", "Very Satisfied": "45%", "Satisfied": "32%", "Neutral": "15%", "Dissatisfied": "8%"},
   {"Question": "Product Quality", "Very Satisfied": "52%", "Satisfied": "28%", "Neutral": "12%", "Dissatisfied": "8%"}

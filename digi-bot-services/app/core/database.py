@@ -43,22 +43,32 @@ async def init_db() -> None:
     global async_engine, async_session_factory
     
     try:
-        # Create async engine for PostgreSQL
-        async_engine = create_async_engine(
-            settings.DATABASE_URL,
-            echo=settings.DATABASE_ECHO,
-            future=True,
-            pool_size=10,
-            max_overflow=20,
-            pool_pre_ping=True,
-            pool_recycle=3600,  # 1 hour
-            connect_args={
-                "server_settings": {
-                    "application_name": "digi_setu_ai_backend",
-                },
-                "command_timeout": 60,
-            }
-        )
+        # Create async engine (supports both PostgreSQL and SQLite)
+        if "sqlite" in settings.DATABASE_URL:
+            # SQLite configuration
+            async_engine = create_async_engine(
+                settings.DATABASE_URL,
+                echo=settings.DATABASE_ECHO,
+                future=True,
+                connect_args={"check_same_thread": False}
+            )
+        else:
+            # PostgreSQL configuration
+            async_engine = create_async_engine(
+                settings.DATABASE_URL,
+                echo=settings.DATABASE_ECHO,
+                future=True,
+                pool_size=10,
+                max_overflow=20,
+                pool_pre_ping=True,
+                pool_recycle=3600,  # 1 hour
+                connect_args={
+                    "server_settings": {
+                        "application_name": "digi_setu_ai_backend",
+                    },
+                    "command_timeout": 60,
+                }
+            )
         
         # Create session factory with proper async configuration
         async_session_factory = async_sessionmaker(

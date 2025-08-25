@@ -189,27 +189,33 @@ DOCUMENTATION:
         placeholders = "ALLOWED" if self.allow_placeholders else "DISALLOWED"
 
         system_instruction = f"""
-You are a FORMAT ANSWERER.
+You are a generic FORMAT MATCHER.
 
-Goal:
-- Read the QUERY and the DOCUMENTATION.
-- Silently analyze the QUERY (do your reasoning in your head).
-- Figure out the best possible answer.
-- Express that answer ONLY in the documented output formats (blocks) defined in the DOCUMENTATION.
-- If values are missing, use placeholders like <value1>, <label_B>, <param>.
-- Provide multiple formats if needed.
-Mode: {mode}
-  • LIBERAL → match by intent/pattern; allow placeholders and substitutions.
-  • CONSERVATIVE → require close fit before outputting a block.
+Your job:
+- Read DOCUMENTATION that contains one or more canonical "blocks" or "formats" (could be code blocks, config blocks, UI components, templates, etc.).
+- Decide which documented block(s) best answer the QUERY by PATTERN/INTENT, not by exact wording or entity names.
+- If the QUERY clearly maps to a documented pattern but lacks some values, and placeholders are {placeholders}, output a valid skeleton using obvious placeholders (e.g. <value1>, <column_B>, <param>).
+- In {mode} mode:
+  • LIBERAL → prefer mapping by pattern/intent and allow reasonable substitutions.
+  • CONSERVATIVE → require a closer fit to one of the documented blocks.
 
 Hard constraints:
-- Output ONLY ONE of the following:
-  (a) One or more documented block(s), verbatim in structure (same keys/order/shape as in docs), with adapted labels/values/placeholders if needed
-  (b) The single string "NO_MATCH" (if nothing applies)
+- Output ONLY:
+  (a) in one or more block(s) VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,
+  example: 
+  ```json
+    matches: [
+        {
+            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
+        },
+        {
+            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
+        }
+    ]
+  OR
+  (b) the single string NO_MATCH if nothing applies.
 
-Do NOT output plain text answers, explanations, or reasoning.
-Do NOT include notes or extra commentary.
-Do NOT show your thought process.
+- DO NOT add commentary, prose, or explanations.
 """.strip()
 
         # Add few-shots if available
@@ -246,7 +252,18 @@ Mode: {mode}
 Hard constraints (very important):
 - Output ONLY ONE of the following:
   (a) one or more block(s) VERBATIM IN STRUCTURE (same keys/order/shape as in the docs), with adapted labels/values/placeholders if needed
-  (b) the single string: NO_MATCH
+  example: 
+  ```json
+    matches: [
+        {
+            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
+        },
+        {
+            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
+        }
+    ]
+  (b) if not match ```json
+  []```
 
 - Do NOT include explanations, notes, or thoughts in your output.
 - Do NOT print your plan. Think through all candidate formats, but output only the final block(s) or NO_MATCH.

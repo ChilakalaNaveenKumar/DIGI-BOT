@@ -11,6 +11,8 @@ Charts should only be generated when they **clarify, explain, or enhance** under
 * **Pattern Recognition**: Match queries to chart types by data shape, not keywords.
 * **Educational Focus**: Prioritize visuals that make comparisons, proportions, or trends easier to grasp.
 * **Direct Format**: Always output using `:::chart-type ... :::` blocks for automatic rendering.
+* **Postiion**: Exact position to insert the charts after which character  without disturbing the text and flow of concept
+* **action**: insert / update -> for this document its only insert
 
 ---
 
@@ -23,6 +25,8 @@ Charts should only be generated when they **clarify, explain, or enhance** under
 ```
 :::pie-chart
 title: Market Share 2024
+position: <Exact position to insert the charts after which character without disturbing the text and flow of concept>
+action: insert
 data: [
   {"label": "Instagram", "value": 45},
   {"label": "TikTok", "value": 30},
@@ -39,6 +43,8 @@ data: [
 ```
 :::bar-chart
 title: Regional Sales Q4
+position: 20
+action: insert
 data: [
   {"label": "North America", "value": 125000},
   {"label": "Europe", "value": 98000},
@@ -55,6 +61,8 @@ data: [
 ```
 :::line-chart
 title: AI Adoption 2020-2024
+position: 40
+action: insert
 data: [
   {"label": "2020", "value": 15},
   {"label": "2021", "value": 28},
@@ -72,6 +80,8 @@ data: [
 ```
 :::doughnut-chart
 title: Budget Allocation 2024
+position: 50
+action: insert
 data: [
   {"label": "Marketing", "value": 35},
   {"label": "Development", "value": 40},
@@ -88,6 +98,8 @@ data: [
 ```
 :::scatter-chart
 title: Price vs Performance
+position: 100
+action: insert
 data: [
   {"x": 100, "y": 85},
   {"x": 150, "y": 92},
@@ -130,6 +142,8 @@ data: [
 ```
 :::bar-chart
 title: Team Productivity
+position: 1120
+action: insert
 data: [
   {"label": "Frontend", "value": 45},
   {"label": "Backend", "value": 38},
@@ -143,6 +157,8 @@ data: [
 ```
 :::line-chart
 title: Revenue Growth 2024
+position: 25
+action: insert
 data: [
   {"label": "Jan", "value": 12000},
   {"label": "Feb", "value": 15000},
@@ -159,6 +175,8 @@ data: [
 ```
 :::doughnut-chart
 title: Salary Distribution
+position: 200
+action: insert
 data: [
   {"label": "Managers", "value": 40},
   {"label": "Developers", "value": 35},

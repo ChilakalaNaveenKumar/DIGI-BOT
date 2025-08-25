@@ -111,20 +111,20 @@ const toggleStep = (index: number) => {
 
 const getToolIcon = (toolName?: string) => {
   const iconMap: Record<string, string> = {
-    'codebase_search': 'heroicons:book-open',
-    'read_file': 'heroicons:document-text', 
-    'search_replace': 'heroicons:pencil-square',
-    'write': 'heroicons:plus',
-    'run_terminal_cmd': 'heroicons:command-line',
-    'grep': 'heroicons:magnifying-glass',
-    'list_dir': 'heroicons:folder',
-    'web_search': 'heroicons:globe-alt',
-    'delete_file': 'heroicons:trash',
-    'multi_edit': 'heroicons:pencil-square',
-    'create_diagram': 'heroicons:sparkles',
-    'chart_tools': 'heroicons:chart-bar'
+    'codebase_search': 'lucide:book-open',
+    'read_file': 'lucide:file-text', 
+    'search_replace': 'lucide:edit-3',
+    'write': 'lucide:plus',
+    'run_terminal_cmd': 'lucide:terminal',
+    'grep': 'lucide:search',
+    'list_dir': 'lucide:folder',
+    'web_search': 'lucide:globe',
+    'delete_file': 'lucide:trash-2',
+    'multi_edit': 'lucide:edit-3',
+    'create_diagram': 'lucide:sparkles',
+    'chart_tools': 'lucide:bar-chart-3'
   }
-  return iconMap[toolName || ''] || 'heroicons:cog-6-tooth'
+  return iconMap[toolName || ''] || 'lucide:settings'
 }
 </script>
 

@@ -77,33 +77,23 @@ export const useStreamingChat = () => {
       // Create new AbortController for this request
       currentAbortController.value = new AbortController()
 
-      // Prepare conversation history for the API (excluding the message we just added)
-      const conversationMessages = messages.value
-        .slice(0, -2) // Exclude the last user message and assistant placeholder we just added
-        .filter(msg => msg.content.trim()) // Only include messages with content
-        .map(msg => ({
-          role: msg.role,
-          content: msg.content
-        }))
-      
-      // Add the current user message
-      conversationMessages.push({
-        role: 'user',
-        content: content
-      })
+      console.log('Sending message to stream API:', content) // Debug log
 
-      console.log('Conversation history being sent:', conversationMessages) // Debug log
-
-      // Call the backend's direct_chat API endpoint
-      const response = await fetch('http://localhost:8000/api/direct-chat', {
+      // Call the backend's stream API endpoint (cookies will be sent automatically)
+      const response = await fetch('http://localhost:8000/api/stream', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include', // Include cookies for authentication
         body: JSON.stringify({
-          messages: conversationMessages,
+          messages: [{ role: 'user', content: content }], // Send just the current message
           conversation_id: conversationId.value,
-          user_id: 1  // TODO: Get from auth store
+          model: "claude-sonnet-4-20250514",
+          enable_thinking: true,
+          thinking_budget: 5000,
+          enable_web_search: true,
+          temperature: 0.7
         }),
         signal: currentAbortController.value.signal
       })
@@ -155,11 +145,107 @@ export const useStreamingChat = () => {
               try {
                 const data = JSON.parse(line.slice(6))
                 
-                // Handle different message types from backend
-                if (data.type === 'content' && data.content) {
-                  accumulatedContent += data.content
+                // Handle different message types from Anthropic stream API
+                if (data.type === 'thinking_start') {
+                  // Start thinking mode
+                  isReasoning.value = true
+                  const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                  if (messageIndex !== -1) {
+                    const currentMessage = messages.value[messageIndex]
+                    if (currentMessage) {
+                      messages.value[messageIndex] = {
+                        ...currentMessage,
+                        content: '*Thinking...*',
+                        isLoading: false,
+                        isStreaming: true
+                      }
+                    }
+                  }
+                } else if (data.type === 'thinking_delta') {
+                  // Handle thinking content - add to reasoning steps
+                  if (data.text) {
+                    // Check if this is a continuation of existing reasoning or new step
+                    const lastStep = currentReasoningSteps.value[currentReasoningSteps.value.length - 1]
+                    
+                    if (lastStep && lastStep.status === 'active') {
+                      // Continue existing reasoning step
+                      lastStep.content += data.text
+                      lastStep.timestamp = new Date()
+                    } else {
+                      // Create new reasoning step
+                      const stepId = `thinking-${Date.now()}-${Math.random()}`
+                      const reasoningStep: ReasoningStep = {
+                        id: stepId,
+                        type: 'thinking',
+                        content: data.text,
+                        status: 'active',
+                        timestamp: new Date()
+                      }
+                      currentReasoningSteps.value.push(reasoningStep)
+                    }
+                    
+                    // Update the assistant message with reasoning steps
+                    const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                    if (messageIndex !== -1) {
+                      const currentMessage = messages.value[messageIndex]
+                      if (currentMessage) {
+                        messages.value[messageIndex] = {
+                          ...currentMessage,
+                          reasoningSteps: [...currentReasoningSteps.value],
+                          isLoading: false,
+                          isStreaming: true
+                        }
+                      }
+                    }
+                  }
+                } else if (data.type === 'thinking_stop') {
+                  // Stop thinking mode and mark reasoning steps as completed
+                  isReasoning.value = false
                   
-                  // Update message content in real-time
+                  // Mark all active reasoning steps as completed
+                  currentReasoningSteps.value.forEach(step => {
+                    if (step.status === 'active') {
+                      step.status = 'completed'
+                    }
+                  })
+                  
+                  const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                  if (messageIndex !== -1) {
+                    const currentMessage = messages.value[messageIndex]
+                    if (currentMessage) {
+                      messages.value[messageIndex] = {
+                        ...currentMessage,
+                        content: '',
+                        reasoningSteps: [...currentReasoningSteps.value],
+                        isLoading: false,
+                        isStreaming: true
+                      }
+                    }
+                  }
+                } else if (data.type === 'content_block_start') {
+                  // Content block started
+                  console.log('Content block started')
+                } else if (data.type === 'content_block_delta') {
+                  // Handle actual content streaming
+                  if (data.delta && data.delta.type === 'text_delta' && data.delta.text) {
+                    accumulatedContent += data.delta.text
+                    
+                    // Update message content in real-time
+                    const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                    if (messageIndex !== -1) {
+                      const currentMessage = messages.value[messageIndex]
+                      if (currentMessage) {
+                        messages.value[messageIndex] = {
+                          ...currentMessage,
+                          content: accumulatedContent,
+                          isLoading: false,
+                          isStreaming: true
+                        }
+                      }
+                    }
+                  }
+                } else if (data.type === 'message_stop') {
+                  // Message completed
                   const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
                   if (messageIndex !== -1) {
                     const currentMessage = messages.value[messageIndex]
@@ -168,9 +254,19 @@ export const useStreamingChat = () => {
                         ...currentMessage,
                         content: accumulatedContent,
                         isLoading: false,
-                        isStreaming: true
+                        isStreaming: false
                       }
                     }
+                  }
+                  isStreaming.value = false
+                  break
+                } else if (data.type === 'metadata') {
+                  // Handle conversation metadata
+                  if (data.conversation_id) {
+                    conversationId.value = data.conversation_id
+                  }
+                  if (data.title) {
+                    conversationTitle.value = data.title
                   }
                 } else if (data.type === 'activity') {
                   // Handle activity messages (like "Creating visualizations...")

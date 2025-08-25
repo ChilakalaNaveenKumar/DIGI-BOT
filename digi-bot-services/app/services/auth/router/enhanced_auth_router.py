@@ -158,21 +158,20 @@ async def verify_google_credential_secure(
         # Get or create user in database
         user = await get_or_create_user(google_user, db)
         
-        # Generate secure tokens
+        # Generate secure tokens (without google_id for security)
         access_token, refresh_token = security_manager.generate_tokens({
             "id": user.id,
-            "google_id": user.google_id,
             "email": user.email,
             "name": user.name,
             "verified_email": user.verified_email
         })
         
-        # Set secure cookies
+        # Set secure cookies (using public data only)
         security_manager.set_secure_cookies(
             response,
             access_token,
             refresh_token,
-            user.to_dict()
+            user.to_public_dict()
         )
         
         # Log successful authentication
@@ -252,7 +251,7 @@ async def refresh_access_token(
             response,
             new_access_token,
             new_refresh_token,
-            user.to_dict()
+            user.to_public_dict()  # Use public data only
         )
         
         # Log token refresh
@@ -439,10 +438,9 @@ async def verify_token_and_set_cookies(
             logger.error("Database error in verify-token", error=str(db_error))
             raise HTTPException(status_code=500, detail="Database error during token verification")
         
-        # Generate new secure tokens for the parent window
+        # Generate new secure tokens for the parent window (without google_id)
         user_data = {
             "id": user.id,
-            "google_id": user.google_id,
             "email": user.email,
             "name": user.name,
             "verified_email": user.verified_email
@@ -450,12 +448,12 @@ async def verify_token_and_set_cookies(
         
         new_access_token, new_refresh_token = security_manager.generate_tokens(user_data)
         
-        # Set secure cookies in parent window context
+        # Set secure cookies in parent window context (using public data only)
         security_manager.set_secure_cookies(
             response,
             new_access_token,
             new_refresh_token,
-            user.to_dict()
+            user.to_public_dict()
         )
         
         # Log successful token verification

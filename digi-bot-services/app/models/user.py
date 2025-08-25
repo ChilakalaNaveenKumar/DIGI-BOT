@@ -70,10 +70,10 @@ class User(Base):
         return self.name
     
     def to_dict(self) -> dict:
-        """Convert user to dictionary (excluding sensitive data)."""
+        """Convert user to dictionary (including internal data for backend use)."""
         return {
             "id": self.id,
-            "google_id": self.google_id,
+            "google_id": self.google_id,  # Keep for backend use
             "email": self.email,
             "name": self.name,
             "display_name": self.name,  # display_name is same as name
@@ -83,4 +83,17 @@ class User(Base):
             "created_at": self.created_at.isoformat() if self.created_at else None,
             "updated_at": self.updated_at.isoformat() if self.updated_at else None,
             "last_login_at": self.last_login_at.isoformat() if self.last_login_at else None,
+        }
+    
+    def to_public_dict(self) -> dict:
+        """Convert user to dictionary for frontend (excluding sensitive internal data)."""
+        return {
+            "id": self.id,
+            "email": self.email,
+            "name": self.name,
+            "display_name": self.name,
+            "picture": self.picture,
+            "is_active": self.is_active,
+            "verified_email": self.verified_email,
+            # Timestamps removed for privacy - not needed by frontend
         }

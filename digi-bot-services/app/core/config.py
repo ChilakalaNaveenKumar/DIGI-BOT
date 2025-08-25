@@ -17,9 +17,10 @@ class Settings(BaseSettings):
     
     # Security (minimal)
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
+    COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
     
     # Database  
-    DATABASE_URL: str = os.getenv("DATABASE_URL", "postgresql+asyncpg://user:pass@localhost/digi_bot")
+    DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./digi_bot.db")
     DATABASE_ECHO: bool = os.getenv("DATABASE_ECHO", "false").lower() == "true"
     
     # Google OAuth (only what's needed)
@@ -29,6 +30,7 @@ class Settings(BaseSettings):
     # AI APIs (simple)
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
+    DEFAULT_AI_MODEL: str = os.getenv("DEFAULT_AI_MODEL", "gpt-5")
     
     # CORS (one setting)
     CORS_ORIGINS: str = os.getenv("CORS_ORIGINS", "http://localhost:3000,http://localhost:8000")

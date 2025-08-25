@@ -3,15 +3,18 @@ Efficient Conversation Manager
 
 Handles conversation context, token management, and summarization.
 Implements best practices for Claude API conversation management.
+Includes vector database integration for semantic search and memory.
 """
 
 import json
+import asyncio
 from typing import List, Dict, Any, Optional, Tuple
 import structlog
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.services.ai_providers.anthropic_provider import AnthropicProvider
 from app.services.message import MessageService
+from app.services.vector import get_vector_service
 from ..service.conversation_service import ConversationService
 from app.models.conversation import MessageRole
 
@@ -191,13 +194,14 @@ class ConversationManager:
         conversation_id: int,
         user_message: str,
         assistant_response: str,
+        user_id: int = 1,  # TODO: Get from auth context
         tool_calls_used: int = 0,
         summary: Optional[str] = None
     ):
-        """Save a complete conversation turn to database."""
+        """Save a complete conversation turn to database and create vector embedding."""
         try:
             # Save user message
-            await self.msg_service.create_message(
+            user_msg = await self.msg_service.create_message(
                 conversation_id=conversation_id,
                 role=MessageRole.USER,
                 content=user_message
@@ -215,12 +219,82 @@ class ConversationManager:
             # Commit both messages
             await self.msg_service.commit_message(assistant_msg)
             
+            # Get turn index (count of message pairs in conversation)
+            turn_index = await self._get_conversation_turn_count(conversation_id)
+            
+            # Create vector embedding asynchronously (don't block the response)
+            asyncio.create_task(self._create_message_vector(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                user_message=user_message,
+                assistant_response=assistant_response,
+                turn_index=turn_index,
+                user_message_id=user_msg.id,
+                assistant_message_id=assistant_msg.id
+            ))
+            
             logger.info(
                 "Conversation turn saved",
                 conversation_id=conversation_id,
-                tool_calls_used=tool_calls_used
+                turn_index=turn_index,
+                tool_calls_used=tool_calls_used,
+                vector_creation="scheduled"
             )
             
         except Exception as e:
             logger.error("Error saving conversation turn", error=str(e))
             raise
+    
+    async def _get_conversation_turn_count(self, conversation_id: int) -> int:
+        """Get the current turn count for a conversation."""
+        try:
+            # Count user messages (each represents a turn)
+            user_message_count = await self.msg_service.count_messages_by_role(
+                conversation_id=conversation_id,
+                role=MessageRole.USER
+            )
+            return user_message_count
+        except Exception as e:
+            logger.error("Error getting turn count", error=str(e))
+            return 1  # Default to 1 if we can't count
+    
+    async def _create_message_vector(
+        self,
+        user_id: int,
+        conversation_id: int,
+        user_message: str,
+        assistant_response: str,
+        turn_index: int,
+        user_message_id: Optional[int] = None,
+        assistant_message_id: Optional[int] = None
+    ):
+        """Create vector embedding for message pair (async background task)."""
+        try:
+            vector_service = await get_vector_service(self.db)
+            
+            vector_id = await vector_service.save_message_vector(
+                user_id=user_id,
+                conversation_id=conversation_id,
+                user_message=user_message,
+                assistant_response=assistant_response,
+                turn_index=turn_index,
+                user_message_id=user_message_id,
+                assistant_message_id=assistant_message_id,
+                expires_in_days=7  # 7-day expiry as planned
+            )
+            
+            logger.info(
+                "Message vector created",
+                vector_id=vector_id,
+                conversation_id=conversation_id,
+                turn_index=turn_index
+            )
+            
+        except Exception as e:
+            # Don't fail the main conversation save if vector creation fails
+            logger.error(
+                "Failed to create message vector (non-blocking)",
+                error=str(e),
+                conversation_id=conversation_id,
+                turn_index=turn_index
+            )
