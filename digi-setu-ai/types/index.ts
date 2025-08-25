@@ -15,6 +15,7 @@ export interface Message {
   timestamp: Date
   isLoading?: boolean
   isStreaming?: boolean
+  isProcessingComponents?: boolean
   error?: string
   reasoningSteps?: ReasoningStep[]
   reasoning?: string

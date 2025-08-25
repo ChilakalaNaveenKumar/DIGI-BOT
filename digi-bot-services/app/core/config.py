@@ -18,6 +18,7 @@ class Settings(BaseSettings):
     # Security (minimal)
     SECRET_KEY: str = os.getenv("SECRET_KEY", "your-secret-key-here")
     COOKIE_SECURE: bool = os.getenv("COOKIE_SECURE", "false").lower() == "true"
+    COOKIE_DOMAIN: str = os.getenv("COOKIE_DOMAIN", "localhost")
     
     # Database  
     DATABASE_URL: str = os.getenv("DATABASE_URL", "sqlite+aiosqlite:///./digi_bot.db")

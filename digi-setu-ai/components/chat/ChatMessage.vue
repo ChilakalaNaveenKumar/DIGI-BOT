@@ -47,6 +47,14 @@
             <span class="streaming-text">Generating response...</span>
           </div>
           
+          <!-- Component processing indicator -->
+          <div v-if="message.role === 'assistant' && message.isProcessingComponents" class="component-processing-indicator">
+            <div class="processing-dots">
+              <span /><span /><span />
+            </div>
+            <span class="processing-text">Analyzing for interactive components...</span>
+          </div>
+          
           <!-- Main Content -->
           <div v-if="message.content || (message.isStreaming && message.content)" class="message-text">
             <UiStreamingMarkdown
@@ -200,6 +208,46 @@ const regenerateMessage = () => {
 }
 
 .streaming-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+.component-processing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 16px;
+  color: var(--text-secondary);
+  font-size: 14px;
+  font-style: italic;
+  margin-bottom: 8px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+}
+
+.processing-text {
+  color: var(--text-secondary);
+  font-size: 13px;
+}
+
+.processing-dots {
+  display: flex;
+  gap: 3px;
+}
+
+.processing-dots span {
+  width: 6px;
+  height: 6px;
+  background: var(--primary);
+  border-radius: 50%;
+  animation: pulse 1.4s infinite ease-in-out;
+}
+
+.processing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.processing-dots span:nth-child(3) {
   animation-delay: 0.4s;
 }
 

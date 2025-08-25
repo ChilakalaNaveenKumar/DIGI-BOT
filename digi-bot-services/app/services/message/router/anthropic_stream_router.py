@@ -2,7 +2,7 @@
 Anthropic Stream Router
 
 Replaces existing stream routers with Anthropic-based streaming.
-Integrates vector search from both PostgreSQL (conversations) and OpenAI (files).
+Integrates vector search from OpenAI (files).
 Supports thinking mode toggle and web search.
 """
 
@@ -15,9 +15,9 @@ from pydantic import BaseModel
 import structlog
 
 from app.services.ai_providers.anthropic_provider import AnthropicProvider
-from app.services.vector.vector_service import VectorService
+
 from app.services.component_matcher import VectorStoreManager
-from app.services.conversation import ConversationService, ConversationManager
+
 from app.models.user import User
 from app.core.database import get_db_session
 from app.core.config import get_settings
@@ -32,12 +32,10 @@ router = APIRouter(prefix="/api/stream", tags=["Stream"])
 class StreamRequest(BaseModel):
     """Request model for streaming with vector context."""
     messages: List[dict]
-    conversation_id: Optional[int] = None
     files: Optional[List[dict]] = None
     user_id: Optional[int] = None
     # Vector context
     file_ids: Optional[List[int]] = None
-    message_vector_ids: Optional[List[str]] = None
     # AI settings
     model: Optional[str] = "claude-sonnet-4-20250514"
     enable_thinking: bool = False
@@ -51,11 +49,10 @@ class StreamRequest(BaseModel):
 
 
 class ContextProcessor:
-    """Processes vector context from both conversation and file vectors."""
+    """Processes vector context from file vectors."""
     
     def __init__(self, db: AsyncSession):
         self.db = db
-        self.vector_service = VectorService(db)
         self.vector_store_manager = VectorStoreManager()
         self._initialized = False
     
@@ -64,40 +61,11 @@ class ContextProcessor:
         if self._initialized:
             return
         
-        await self.vector_service.initialize()
         await self.vector_store_manager.initialize()
         self._initialized = True
         logger.info("Context processor initialized")
     
-    async def get_conversation_context(
-        self,
-        query: str,
-        user_id: int,
-        conversation_id: Optional[int] = None,
-        message_vector_ids: Optional[List[str]] = None,
-        limit: int = 10
-    ) -> List[Dict[str, Any]]:
-        """Get relevant conversation context from PostgreSQL vectors."""
-        try:
-            if not self._initialized:
-                await self.initialize()
-            
-            # Search conversation vectors by query
-            conversation_results = await self.vector_service.search_similar_messages(
-                query=query,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                limit=limit
-            )
-            
-            # Note: message_vector_ids functionality would need additional method in VectorService
-            # For now, we'll just use the search results
-            
-            return conversation_results
-            
-        except Exception as e:
-            logger.error("Failed to get conversation context", error=str(e))
-            return []
+
     
     async def get_file_context(
         self,
@@ -131,20 +99,9 @@ class ContextProcessor:
     async def build_context_message(
         self,
         query: str,
-        user_id: int,
-        conversation_id: Optional[int] = None,
-        file_ids: Optional[List[int]] = None,
-        message_vector_ids: Optional[List[str]] = None
+        file_ids: Optional[List[int]] = None
     ) -> str:
-        """Build comprehensive context message from both vector sources."""
-        
-        # Get conversation context
-        conversation_context = await self.get_conversation_context(
-            query=query,
-            user_id=user_id,
-            conversation_id=conversation_id,
-            message_vector_ids=message_vector_ids
-        )
+        """Build context message from file vectors."""
         
         # Get file context
         file_context = await self.get_file_context(
@@ -154,18 +111,6 @@ class ContextProcessor:
         
         # Build context message
         context_parts = []
-        
-        if conversation_context:
-            context_parts.append("## Previous Conversation Context:")
-            for i, ctx in enumerate(conversation_context[:5], 1):  # Limit to 5 most relevant
-                snippet = ctx.get("snippet", "")
-                content_summary = ctx.get("content_summary", "")
-                context_parts.append(f"**Context {i}:**")
-                if snippet:
-                    context_parts.append(f"Snippet: {snippet[:200]}...")
-                if content_summary:
-                    context_parts.append(f"Summary: {content_summary[:200]}...")
-                context_parts.append("")
         
         if file_context:
             context_parts.append("## Relevant File Content:")
@@ -187,40 +132,7 @@ class ContextProcessor:
         return "\n".join(context_parts)
 
 
-async def generate_conversation_title(user_message: str, provider: AnthropicProvider) -> str:
-    """Generate a conversation title using Anthropic."""
-    try:
-        title_prompt = f"""Generate a short, descriptive title (4-6 words) for a conversation that starts with this message:
 
-"{user_message}"
-
-Return only the title, nothing else."""
-
-        response = await provider.generate_completion(
-            messages=[{"role": "user", "content": title_prompt}],
-            max_tokens=20
-        )
-        
-        # Extract title from response
-        title = ""
-        for block in response.get("content", []):
-            if block.get("type") == "text":
-                title += block.get("text", "")
-        
-        # Clean title
-        title = title.strip().replace('"', '').replace('\n', ' ')
-        words = title.split()
-        
-        if len(words) > 6:
-            title = ' '.join(words[:6])
-        elif len(words) < 2:
-            title = "New Conversation"
-        
-        return title or "New Conversation"
-        
-    except Exception as e:
-        logger.error("Failed to generate conversation title", error=str(e))
-        return "New Conversation"
 
 
 @router.post("", response_class=StreamingResponse)
@@ -234,7 +146,7 @@ async def stream_endpoint(
     Anthropic streaming endpoint with vector context integration.
     
     Features:
-    - Vector search from PostgreSQL (conversations) and OpenAI (files)
+    - Vector search from OpenAI (files)
     - Thinking mode toggle
     - Web search with max 5 tries
     - Thinking block format output
@@ -269,56 +181,20 @@ async def stream_endpoint(
             provider = AnthropicProvider()
             await provider.initialize()
             
-            context_processor = ContextProcessor(db)
-            await context_processor.initialize()
-            
-            # Check if this is the first message
-            is_first_message = not request.conversation_id
-            conversation_id = request.conversation_id
-            conversation_title = None
-            
-            # Generate title for first message
-            if is_first_message:
-                conversation_title = await generate_conversation_title(user_message, provider)
-                logger.info("Generated conversation title", title=conversation_title)
-            
-            
-            context_message = await context_processor.build_context_message(
-                query=user_message,
-                user_id=user_id,
-                conversation_id=conversation_id,
-                file_ids=request.file_ids,
-                message_vector_ids=request.message_vector_ids
-            )
-            
-            # Prepare conversation context
-            conv_manager = ConversationManager(db)
-            prepared_messages, conversation_summary = await conv_manager.prepare_conversation_context(
-                conversation_id=conversation_id,
-                new_user_message=user_message,
-                existing_summary=None
-            )
-            
-            # Build system message with context
+            # Build system message (NO vector context)
             system_content = """You are Digi Setu AI, an advanced AI assistant with comprehensive capabilities.
 
 **Important Guidelines:**
 - Provide well-formatted, helpful responses using markdown when it improves readability
-- Use the provided context information to give more accurate and relevant responses
-- If context is provided, reference it naturally in your response
-- Be conversational and helpful while maintaining accuracy"""
-            
-            if context_message:
-                system_content += f"\n\n{context_message}"
+- Be conversational and helpful while maintaining accuracy
+- Focus on providing clear, informative responses to user questions"""
             
             system_message = {"role": "system", "content": system_content}
-            final_messages = [system_message] + prepared_messages
+            final_messages = [system_message] + request.messages
             
             # Start streaming with thinking blocks
             if request.enable_thinking:
                 yield f"data: {json.dumps({'type': 'thinking_start'})}\n\n"
-            
-            assistant_content = ""
             
             async for chunk in provider.stream_completion(
                 messages=final_messages,
@@ -331,48 +207,8 @@ async def stream_endpoint(
                 # Just pass through raw Anthropic data
                 yield f"data: {json.dumps(chunk)}\n\n"
                 
-                # Extract text content for saving conversation
-                if chunk.get("type") == "content_block_delta":
-                    delta = chunk.get("delta", {})
-                    if delta.get("type") == "text_delta":
-                        assistant_content += delta.get("text", "")
-                elif chunk.get("type") == "message_stop":
+                if chunk.get("type") == "message_stop":
                     break
-            
-            # TODO: Re-enable conversation saving after fixing database issues
-            # if is_first_message and conversation_title:
-            #     # Create new conversation
-            #     conv_service = ConversationService(db)
-            #     conversation = await conv_service.create_conversation(
-            #         user_id=user_id,
-            #         title=conversation_title
-            #     )
-            #     conversation_id = conversation.id
-            #     
-            #     # Save conversation turn
-            #     await conv_manager.save_conversation_turn(
-            #         conversation_id=conversation_id,
-            #         user_message=user_message,
-            #         assistant_response=assistant_content,
-            #         user_id=user_id,
-            #         tool_calls_used=1 if request.enable_web_search else 0,
-            #         summary=conversation_summary
-            #     )
-            #     
-            #     yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id, 'title': conversation_title})}\n\n"
-            #     
-            # elif conversation_id:
-            #     # Update existing conversation
-            #     await conv_manager.save_conversation_turn(
-            #         conversation_id=conversation_id,
-            #         user_message=user_message,
-            #         assistant_response=assistant_content,
-            #         user_id=user_id,
-            #         tool_calls_used=1 if request.enable_web_search else 0,
-            #         summary=conversation_summary
-            #     )
-            #     
-            #     yield f"data: {json.dumps({'type': 'metadata', 'conversation_id': conversation_id})}\n\n"
             
             # Send completion
             yield f"data: {json.dumps({'type': 'completion', 'finish_reason': 'stop'})}\n\n"

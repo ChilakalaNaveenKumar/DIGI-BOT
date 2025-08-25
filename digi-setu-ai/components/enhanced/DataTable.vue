@@ -60,15 +60,34 @@ const currentPage = ref(1)
 // Auto-detect headers
 const headers = computed(() => {
   if (props.headers.length) return props.headers
-  if (props.data.length) return Object.keys(props.data[0])
+  if (safeData.value.length > 0) return Object.keys(safeData.value[0])
   return []
 })
 
-const totalPages = computed(() => Math.ceil(props.data.length / props.pageSize))
+// Ensure data is always an array
+const safeData = computed(() => {
+  if (!props.data) return []
+  if (Array.isArray(props.data)) return props.data
+  if (typeof props.data === 'string') {
+    try {
+      const parsed = JSON.parse(props.data)
+      return Array.isArray(parsed) ? parsed : []
+    } catch {
+      return []
+    }
+  }
+  // If it's an object, try to convert to array format
+  if (typeof props.data === 'object') {
+    return Object.entries(props.data).map(([key, value]) => ({ [key]: value }))
+  }
+  return []
+})
+
+const totalPages = computed(() => Math.ceil(safeData.value.length / props.pageSize))
 
 const paginatedData = computed(() => {
   const start = (currentPage.value - 1) * props.pageSize
-  return props.data.slice(start, start + props.pageSize)
+  return safeData.value.slice(start, start + props.pageSize)
 })
 
 function formatValue(value: any): string {

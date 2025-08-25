@@ -1,4 +1,5 @@
 import type { Message, ReasoningStep } from '~/types'
+import { nextTick } from 'vue'
 
 export const useStreamingChat = () => {
   const messages = ref<Message[]>([])
@@ -13,10 +14,169 @@ export const useStreamingChat = () => {
   const currentReasoningSteps = ref<ReasoningStep[]>([])
   const isReasoning = ref(false)
   
+  // Component processing state
+  const isProcessingComponents = ref(false)
+  
   // Add request deduplication and cancellation
   const lastRequestContent = ref<string>('')
   const lastRequestTime = ref<number>(0)
   const currentAbortController = ref<AbortController | null>(null)
+
+  // Component placement processing function
+  const processComponentPlacements = (originalContent: string, matches: any[]) => {
+    let processedContent = originalContent
+    
+    // Sort matches by their original position in the content (process from end to start)
+    const sortedMatches = [...matches].sort((a, b) => {
+      const aPos = originalContent.indexOf(a.placement.anchor_sentence)
+      const bPos = originalContent.indexOf(b.placement.anchor_sentence)
+      return bPos - aPos // Process from end to beginning to avoid position shifts
+    })
+    
+    console.log('Processing components in order:', sortedMatches.map(m => ({
+      anchor: m.placement.anchor_sentence.substring(0, 30) + '...',
+      position: m.placement.position,
+      originalPos: originalContent.indexOf(m.placement.anchor_sentence)
+    })))
+    
+    for (const match of sortedMatches) {
+      const { block_content, placement } = match
+      const { anchor_sentence, position } = placement
+      
+      // Find the anchor sentence in the CURRENT processed content
+      let anchorIndex = processedContent.indexOf(anchor_sentence)
+      let actualAnchor = anchor_sentence
+      
+      if (anchorIndex === -1) {
+        console.warn('Exact anchor not found:', anchor_sentence.substring(0, 50) + '...')
+        
+        // Try variations for markdown formatting issues
+        const variations = [
+          anchor_sentence.replace(/^\*\*/, '').replace(/\*\*$/, ''), // Remove bold
+          anchor_sentence + '**', // Add closing bold
+          anchor_sentence.replace(/\*\*/g, ''), // Remove all bold
+          anchor_sentence.toLowerCase(),
+          anchor_sentence.replace(/^\*\*/, '').replace(/\*\*$/, '').toLowerCase()
+        ]
+        
+        for (const variation of variations) {
+          const varIndex = processedContent.toLowerCase().indexOf(variation.toLowerCase())
+          if (varIndex !== -1) {
+            // Find the actual text in the content (preserve case)
+            anchorIndex = varIndex
+            // Get the actual text from the content
+            actualAnchor = processedContent.substring(varIndex, varIndex + variation.length)
+            console.log('Found anchor using variation:', variation, 'at index:', anchorIndex)
+            break
+          }
+        }
+        
+        if (anchorIndex === -1) {
+          console.warn('Skipping component - no anchor variation found for:', anchor_sentence.substring(0, 50) + '...')
+          continue
+        }
+      }
+      
+      let insertIndex: number
+      let componentWithNewlines: string
+      
+      if (position === 'after_sentence') {
+        // For after_sentence, find the end of the complete line
+        let endOfSentence = anchorIndex + actualAnchor.length
+        const restOfContent = processedContent.substring(endOfSentence)
+        
+        // If the sentence continues with ** (bold formatting), include it
+        if (restOfContent.startsWith('**')) {
+          endOfSentence += 2
+        }
+        
+        // Find the end of the line
+        const nextNewline = processedContent.indexOf('\n', endOfSentence)
+        if (nextNewline !== -1) {
+          insertIndex = nextNewline
+        } else {
+          insertIndex = endOfSentence
+        }
+        
+        componentWithNewlines = '\n\n' + block_content + '\n\n'
+      } else if (position === 'before_sentence') {
+        // Insert before the anchor sentence  
+        insertIndex = anchorIndex
+        componentWithNewlines = block_content + '\n\n'
+      } else {
+        console.warn('Unknown placement position:', position)
+        continue
+      }
+      
+      // Insert the component at the calculated position
+      processedContent = processedContent.slice(0, insertIndex) + 
+                       componentWithNewlines + 
+                       processedContent.slice(insertIndex)
+      
+      console.log('✅ Inserted component:', {
+        position,
+        anchor: anchor_sentence.substring(0, 30) + '...',
+        componentType: block_content.split('\n')[0],
+        insertedAt: insertIndex
+      })
+      
+      // Debug: Show a snippet of the content around the insertion
+      const start = Math.max(0, insertIndex - 50)
+      const end = Math.min(processedContent.length, insertIndex + 100)
+      console.log('Content around insertion:', processedContent.substring(start, end))
+    }
+    
+    return processedContent
+  }
+
+  // Track if we've already processed components for this response
+  const processedResponses = new Set<string>()
+
+  // Component matcher function
+  const callComponentMatcher = async (aiResponse: string) => {
+    // Create a hash of the response to avoid duplicate processing
+    const responseHash = aiResponse.substring(0, 100) + aiResponse.length
+    if (processedResponses.has(responseHash)) {
+      console.log('Skipping duplicate component matcher call')
+      return aiResponse
+    }
+    processedResponses.add(responseHash)
+    
+    try {
+      console.log('Calling component matcher API with AI response:', aiResponse.substring(0, 100) + '...')
+      
+      const response = await fetch('http://localhost:8000/api/component-matcher/analyze-simple', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include', // Include cookies for authentication
+        body: JSON.stringify({
+          query: aiResponse
+        })
+      })
+
+      if (!response.ok) {
+        throw new Error(`Component matcher API error! status: ${response.status}`)
+      }
+
+      const result = await response.json()
+      console.log('Component matcher response:', result)
+
+      if (result.has_matches && result.data?.matches?.length > 0) {
+        console.log('Found component matches:', result.data.matches)
+        // Process component placements and return modified content
+        return processComponentPlacements(aiResponse, result.data.matches)
+      } else {
+        console.log('No components found for AI response:', result.message || 'No matches')
+        return aiResponse // Return original content if no matches
+      }
+
+    } catch (error) {
+      console.error('Component matcher API error:', error)
+      return aiResponse // Return original content on error
+    }
+  }
 
   const sendStreamingMessage = async (content: string) => {
     if (!content.trim() || isLoading.value || isStreaming.value) return
@@ -31,6 +191,10 @@ export const useStreamingChat = () => {
     lastRequestContent.value = content
     lastRequestTime.value = now
     console.log('Sending message:', content) // Debug log
+
+    // Clear reasoning steps for new message to prevent mixing with previous questions
+    currentReasoningSteps.value = []
+    isReasoning.value = false
 
     // Add user message
     const userMessage: Message = {
@@ -361,6 +525,61 @@ export const useStreamingChat = () => {
                     }
                   }
                   isStreaming.value = false
+                  
+                  // Call component matcher API after streaming completes and update content
+                  try {
+                    isProcessingComponents.value = true
+                    
+                    // Show component processing indicator
+                    const messageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                    if (messageIndex !== -1) {
+                      messages.value[messageIndex] = {
+                        ...messages.value[messageIndex],
+                        content: accumulatedContent,
+                        isStreaming: false,
+                        isProcessingComponents: true
+                      }
+                    }
+                    
+                    const processedContent = await callComponentMatcher(accumulatedContent)
+                    if (processedContent && processedContent !== accumulatedContent) {
+                      // Use nextTick to ensure Vue has finished current updates
+                      await nextTick()
+                      // Update the assistant message with processed content that includes components
+                      const updatedMessageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                      if (updatedMessageIndex !== -1) {
+                        // Create a new message object to trigger reactivity properly
+                        messages.value[updatedMessageIndex] = {
+                          ...messages.value[updatedMessageIndex],
+                          content: processedContent,
+                          isStreaming: false,
+                          isProcessingComponents: false
+                        }
+                      }
+                    } else {
+                      // No components found, just remove processing indicator
+                      const updatedMessageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                      if (updatedMessageIndex !== -1) {
+                        messages.value[updatedMessageIndex] = {
+                          ...messages.value[updatedMessageIndex],
+                          isProcessingComponents: false
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error processing components:', error)
+                    // Remove processing indicator on error
+                    const errorMessageIndex = messages.value.findIndex(m => m.id === assistantMessage.id)
+                    if (errorMessageIndex !== -1) {
+                      messages.value[errorMessageIndex] = {
+                        ...messages.value[errorMessageIndex],
+                        isProcessingComponents: false
+                      }
+                    }
+                  } finally {
+                    isProcessingComponents.value = false
+                  }
+                  
                   break
                 } else if (data.type === 'metadata') {
                   // Handle conversation metadata
@@ -492,6 +711,8 @@ export const useStreamingChat = () => {
         }
       }
 
+
+
     } catch (error) {
       // Handle aborted requests silently
       if (error instanceof Error && error.name === 'AbortError') {
@@ -563,6 +784,7 @@ export const useStreamingChat = () => {
     conversationTitle: readonly(conversationTitle),
     currentReasoningSteps: readonly(currentReasoningSteps),
     isReasoning: readonly(isReasoning),
+    isProcessingComponents: readonly(isProcessingComponents),
     sendMessage: sendStreamingMessage,
     clearMessages,
     startNewConversation,

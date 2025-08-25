@@ -118,7 +118,10 @@ export const useMarkdown = () => {
     if (!content) return ''
     
     try {
-      return md.render(content)
+      // Remove any remaining component blocks that might have slipped through
+      // This prevents the markdown renderer from trying to process them
+      const cleanContent = content.replace(/:::[^:]+\n[\s\S]*?\n:::/g, '')
+      return md.render(cleanContent)
     } catch (error) {
       console.error('Markdown rendering error:', error)
       return `<p>Error rendering markdown: ${error}</p>`

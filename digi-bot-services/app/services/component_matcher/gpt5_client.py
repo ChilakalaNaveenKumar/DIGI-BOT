@@ -29,7 +29,7 @@ class GPT5ComponentMatcherClient:
         model: str = "gpt-5",
         fallback_model: str = "gpt-4o",
         keep_top_k: int = 5,
-        max_tokens: int = 16000,
+        max_tokens: int = 32000,
         liberal_match: bool = True,      # prefer semantic/pattern matches
         allow_placeholders: bool = True, # emit skeletons when data missing
         reasoning_effort: Optional[str] = None, # "low" | "medium" | "high"
@@ -192,30 +192,23 @@ DOCUMENTATION:
 You are a generic FORMAT MATCHER.
 
 Your job:
-- Read DOCUMENTATION that contains one or more canonical "blocks" or "formats" (could be code blocks, config blocks, UI components, templates, etc.).
-- Decide which documented block(s) best answer the QUERY by PATTERN/INTENT, not by exact wording or entity names.
-- If the QUERY clearly maps to a documented pattern but lacks some values, and placeholders are {placeholders}, output a valid skeleton using obvious placeholders (e.g. <value1>, <column_B>, <param>).
-- In {mode} mode:
+- Read DOCUMENTATION that contains one or more canonical "blocks" or "formats" (code blocks, config blocks, UI components, templates, etc.).
+- Decide which documented block(s) best answer the QUERY by PATTERN/INTENT, not by keyword overlap.
+- If the QUERY maps to a documented pattern but lacks some values, and placeholders are {placeholders}, output a valid skeleton using obvious placeholders (e.g., <value>, <label>, <position>).
+
+Mode: {mode}
   • LIBERAL → prefer mapping by pattern/intent and allow reasonable substitutions.
-  • CONSERVATIVE → require a closer fit to one of the documented blocks.
+  • CONSERVATIVE → require a closer fit to a documented block.
 
 Hard constraints:
-- Output ONLY:
-  (a) in one or more block(s) VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,
-  example: 
-  ```json
-    matches: [
-        {
-            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
-        },
-        {
-            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
-        }
-    ]
-  OR
-  (b) the single string NO_MATCH if nothing applies.
-
-- DO NOT add commentary, prose, or explanations.
+- Data integrity: Use only values explicitly present in DOCUMENTATION or in the QUERY. If a required value is missing, use a placeholder. Never invent numbers, bins, labels, counts, or statistics.
+- Output format (mandatory):
+  • If there is at least one match, return a single JSON object exactly like:
+    {{"matches":[{{"block_content":"<block 1>"}},{{"block_content":"<block 2>"}}]}}
+    where each "block_content" is one documented block verbatim in structure (keys/order/shape) as defined by DOCUMENTATION, adapted with real values or placeholders.
+  • If there is no match, return the single string: NO_MATCH
+- Do not add commentary, prose, code fences, or any extra keys beyond "matches".
+- insert_character_index rule: Analyze the QUERY content and determine the optimal character position where the component should be inserted. Count characters from the start of the content to calculate the exact insertion point. Only use <insert_character_index> placeholder if the content is too short or contains no suitable insertion points.
 """.strip()
 
         # Add few-shots if available
@@ -237,36 +230,47 @@ Hard constraints:
         system = f"""
 You are a FORMAT MATCHER.
 
-Goal:
-- Read DOCUMENTATION that defines canonical output "blocks" or "formats".
-- Silently analyze the QUERY and the DOCUMENTATION. Make a brief plan in your head.
-- Choose the best-fitting documented block(s) by PATTERN/INTENT (not only exact words).
+Inputs
+- QUERY: end-user content to analyze.
+- DOCUMENTATION: retrieved vector chunks that define canonical block types, required fields, and exact block syntax.
+- Generate as many blocks as you can to increase the visual aspect
+Objective.
+- Read DOCUMENTATION and select the block format(s) that best fit QUERY by intent.
+- For each selected block, output:
+  1) "block_content": one block EXACTLY as defined by DOCUMENTATION (verbatim keys/order).
+     • You MAY generate a concise, human-readable title.
+     • All data (labels, values, x/y pairs, categories, bins) MUST be copied verbatim from QUERY (or DOCUMENTATION). ]
+  2) "placement": an anchor plan describing where to insert the block in QUERY.
 
-If the QUERY maps to a documented pattern but some values are missing and placeholders are {placeholders},
-emit a valid skeleton with obvious placeholders (e.g., <value1>, <column_B>, <param>).
+Selection policy (high-level, doc-agnostic)
+- Only use blocks explicitly defined in DOCUMENTATION chunks retrieved.
+- Use each document’s own “scope / when to use” guidance at a high level.
+- If multiple documents apply, you may return multiple blocks (each must conform to its source doc).
+- If no document supports the needed block type, return NO_MATCH.
 
-Mode: {mode}
-  • LIBERAL → match by pattern/intent; allow reasonable substitutions.
-  • CONSERVATIVE → require a close fit to a documented block.
+Placement (anchor; no numeric offsets)
+- Do NOT output numeric character offsets.
+- Prefer a sentence anchor:
+  "placement": {
+    "strategy": "sentence",
+    "anchor_sentence": "<EXACT sentence copied verbatim from QUERY>",
+    "occurrence": 1,
+    "position": "before_sentence" | "after_sentence"
+  }
+- If the best anchor lives inside a code block or fenced data where “sentences” are unclear, you MAY use a line anchor:
+  "placement": {
+    "strategy": "line",
+    "anchor_line": "<EXACT line copied verbatim from QUERY>",
+    "occurrence": 1,
+    "position": "before_line" | "after_line"
+  }
+- The anchor text MUST be copied verbatim from QUERY. If it appears multiple times, set "occurrence" to the 1-based instance that makes the insertion most readable.
 
-Hard constraints (very important):
-- Output ONLY ONE of the following:
-  (a) one or more block(s) VERBATIM IN STRUCTURE (same keys/order/shape as in the docs), with adapted labels/values/placeholders if needed
-  example: 
-  ```json
-    matches: [
-        {
-            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
-        },
-        {
-            "block_content": "block VERBATIM IN STRUCTURE (keys/order/shape) as they appear in the documentation, with adapted labels/values/placeholders if needed,"
-        }
-    ]
-  (b) if not match ```json
-  []```
-
-- Do NOT include explanations, notes, or thoughts in your output.
-- Do NOT print your plan. Think through all candidate formats, but output only the final block(s) or NO_MATCH.
+Output format (mandatory)
+- If at least one match is found, return EXACTLY:
+  {"matches":[{"block_content":"<block 1>","placement":{...}}, {"block_content":"<block 2>","placement":{...}}]}
+- If there is no match (unsupported block or insufficient data), return ONLY:
+  NO_MATCH
 """.strip()
 
         msgs: List[Dict[str, str]] = [{"role": "system", "content": system}]

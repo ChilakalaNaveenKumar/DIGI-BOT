@@ -71,9 +71,19 @@ export const useAuthStore = defineStore('auth', {
           }
         })
 
+        const wasAuthenticated = this.isAuthenticated
         this.isAuthenticated = response.authenticated
         this.user = response.user
         this.error = null
+
+        // Debug logging for auth state changes
+        if (wasAuthenticated !== response.authenticated) {
+          console.log('🔐 Auth state changed:', {
+            from: wasAuthenticated,
+            to: response.authenticated,
+            user: response.user?.name || 'none'
+          })
+        }
 
         return response.authenticated
       } catch (error: any) {

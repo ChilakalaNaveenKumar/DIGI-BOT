@@ -4,7 +4,7 @@
     <EnhancedChartRenderer
       v-if="isChart"
       :type="chartType"
-      :data="componentData"
+      :data="componentData.data || []"
       :title="componentTitle"
       :options="chartOptions"
     />
@@ -12,7 +12,7 @@
     <!-- Data Table -->
     <EnhancedDataTable
       v-else-if="isTable"
-      :data="componentData"
+      :data="componentData.data || []"
       :title="componentTitle"
       :headers="tableHeaders"
       :page-size="tablePageSize"
@@ -120,38 +120,84 @@ const componentData = computed(() => {
   if (!props.markdown) return {}
   
   try {
-    // Extract data from markdown content
-    const lines = props.markdown.split('\n')
+    // Extract content between ::: markers
+    const content = props.markdown.replace(/^:::[^:\n]*\n/, '').replace(/\n:::$/, '').trim()
+    const lines = content.split('\n')
     const data: Record<string, any> = {}
     
+    let currentKey = ''
+    let currentValue = ''
+    let inJsonArray = false
+    let jsonArrayContent = ''
+    
     for (const line of lines) {
-      if (line.includes(':')) {
-        const [key, ...valueParts] = line.split(':')
-        const value = valueParts.join(':').trim()
+      const trimmedLine = line.trim()
+      
+      if (trimmedLine.includes(':') && !inJsonArray) {
+        // Save previous key-value pair if exists
+        if (currentKey && currentValue) {
+          data[currentKey] = parseValue(currentValue)
+        }
         
-        if (key && value) {
-          const cleanKey = key.trim().toLowerCase().replace(/[^a-z0-9]/g, '_')
-          
-          // Try to parse as JSON, number, or keep as string
-          try {
-            data[cleanKey] = JSON.parse(value)
-          } catch {
-            if (!isNaN(Number(value))) {
-              data[cleanKey] = Number(value)
-            } else {
-              data[cleanKey] = value
-            }
+        const colonIndex = trimmedLine.indexOf(':')
+        currentKey = trimmedLine.substring(0, colonIndex).trim().toLowerCase().replace(/[^a-z0-9]/g, '_')
+        currentValue = trimmedLine.substring(colonIndex + 1).trim()
+        
+        // Check if value starts a JSON array
+        if (currentValue === '[' || currentValue.startsWith('[')) {
+          inJsonArray = true
+          jsonArrayContent = currentValue
+          if (currentValue.endsWith(']')) {
+            inJsonArray = false
+            data[currentKey] = parseValue(jsonArrayContent)
+            currentKey = ''
+            currentValue = ''
+            jsonArrayContent = ''
           }
         }
+      } else if (inJsonArray) {
+        jsonArrayContent += '\n' + line
+        if (trimmedLine.endsWith(']')) {
+          inJsonArray = false
+          data[currentKey] = parseValue(jsonArrayContent)
+          currentKey = ''
+          currentValue = ''
+          jsonArrayContent = ''
+        }
+      } else if (currentKey) {
+        // Continuation of previous value
+        currentValue += '\n' + line
       }
     }
     
+    // Save last key-value pair
+    if (currentKey && currentValue) {
+      data[currentKey] = parseValue(currentValue)
+    }
+    
+    console.log('Parsed component data:', data)
     return data
   } catch (error) {
-    console.error('Error parsing component data:', error)
+    console.error('Error parsing component data:', error, 'Original markdown:', props.markdown)
     return {}
   }
 })
+
+const parseValue = (value: string): any => {
+  const trimmedValue = value.trim()
+  
+  // Try to parse as JSON first
+  try {
+    return JSON.parse(trimmedValue)
+  } catch {
+    // If not JSON, try as number
+    if (!isNaN(Number(trimmedValue))) {
+      return Number(trimmedValue)
+    }
+    // Keep as string
+    return trimmedValue
+  }
+}
 
 // Component type checks
 const isChart = computed(() => {

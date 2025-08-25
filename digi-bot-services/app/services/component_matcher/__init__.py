@@ -12,5 +12,6 @@ Components:
 
 from .client import ComponentMatcherClient
 from .vector_manager import VectorStoreManager
+from .openai_vector_manager import OpenAIVectorStoreManager
 
-__all__ = ['ComponentMatcherClient', 'VectorStoreManager']
+__all__ = ['ComponentMatcherClient', 'VectorStoreManager', 'OpenAIVectorStoreManager']

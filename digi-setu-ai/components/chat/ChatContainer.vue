@@ -15,7 +15,7 @@
         <!-- Main Input (Digi Setu Style) -->
         <div class="main-input">
           <UiDigiSetuInput
-            :loading="isLoading"
+            :loading="isLoading || isStreaming || isProcessingComponents"
             placeholder="Ask me anything or describe what you want to create..."
             @send="handleSend"
           />
@@ -61,7 +61,7 @@
       <div class="chat-input-area-fixed">
         <div class="input-with-status">
           <UiDigiSetuInput
-            :loading="isLoading || isStreaming"
+            :loading="isLoading || isStreaming || isProcessingComponents"
             placeholder="Reply to Digi Setu..."
             @send="handleSend"
           />
@@ -95,12 +95,11 @@ const {
   isStreaming, 
   conversationId,
   conversationTitle,
+  isProcessingComponents,
   sendMessage, 
   startNewConversation,
   regenerateMessage 
 } = useStreamingChat()
-
-const isProcessingComponents = ref(false)
 
 const isAnalyzing = ref(false)
 

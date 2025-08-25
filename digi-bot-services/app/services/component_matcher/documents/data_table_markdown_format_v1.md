@@ -1,18 +1,17 @@
-# Data Table Markdown Format Documentation v2
+# Data Table Markdown Format Documentation v3 (Generic)
 
 ## Overview
 
 This documentation defines how to create **structured data tables** in markdown for interactive rendering.
-Use data tables when **multi-attribute precision** is required, or when comparisons are too detailed for charts alone.
+Use data tables when **multi-attribute precision** is required, or when comparisons are too detailed for charts.
 
 ## Core Principles
 
-* **Purposeful Tabulation**: Create tables only when they improve comprehension.
-* **Multi-Attribute First**: Use when there are multiple metrics, KPIs, or attributes for each entity.
-* **Exactness Over Visualization**: Favor tables when numbers and details matter more than trends or proportions.
-* **Direct Format**: Always output in `:::data-table ... :::` blocks for automatic rendering.
-* **Postiion**: Exact position to insert the charts after which character without disturbing the text and flow of concept
-* **action**: insert / update -> for this document its only insert
+* **Purposeful Tabulation**: Only use tables when they improve comprehension.
+* **Multi-Attribute First**: Choose tables when multiple metrics, KPIs, or attributes need side-by-side comparison.
+* **Exactness Over Visualization**: Prefer tables when raw numbers/details matter more than trends.
+* **Generic Placeholders**: Always use `<column_X>`, `<value_X>`, `<position>` if real data is missing.
+* **No Fabrication**: Never invent rows, metrics, or numbers. Use placeholders when actual values are absent.
 
 ---
 
@@ -21,19 +20,9 @@ Use data tables when **multi-attribute precision** is required, or when comparis
 ```
 :::data-table
 title: <Descriptive Title>
-position: <Exact position to insert the charts after which character  without disturbing the text and flow of concept>
-action: insert
 data: [
-  {
-    "Column A": "Value A1",
-    "Column B": "Value B1",
-    "Column C": "Value C1"
-  },
-  {
-    "Column A": "Value A2",
-    "Column B": "Value B2",
-    "Column C": "Value C2"
-  }
+  {"<column_1>": "<value_1>", "<column_2>": "<value_2>"},
+  {"<column_1>": "<value_3>", "<column_2>": "<value_4>"}
 ]
 :::
 ```
@@ -42,151 +31,80 @@ data: [
 
 ## Decision Rules
 
-| Data Type / Pattern                                             | Use Table?                | Reasoning                                          |
-| --------------------------------------------------------------- | ------------------------- | -------------------------------------------------- |
-| **Multi-metric entities** (products, teams, departments)        | ✅ Yes                     | Multiple attributes need structured comparison     |
-| **Financial / budget data**                                     | ✅ Yes                     | Requires precision and multiple numbers            |
-| **Performance KPIs** (load time, conversion, bounce rate, etc.) | ✅ Yes                     | Several metrics side-by-side                       |
-| **Survey / poll results**                                       | ✅ Yes                     | Rows for questions, columns for answer percentages |
-| **A/B test results**                                            | ✅ Yes                     | Side-by-side statistical outcomes                  |
-| **Simple proportions** (just percentages)                       | ❌ No → Pie/Doughnut chart | Visual proportions easier                          |
-| **Trends over time**                                            | ❌ No → Line chart         | Trend visualization better                         |
-| **Category comparison (single metric)**                         | ❌ No → Bar chart          | Easier to compare with bars                        |
+| Data Type / Pattern                               | Use Table? | Reason                                      |
+| ------------------------------------------------- | ---------- | ------------------------------------------- |
+| Multi-metric entities (products, teams, depts.)   | ✅ Yes      | Multiple attributes → structured comparison |
+| Financial / budget data                           | ✅ Yes      | Precision across multiple numbers           |
+| Performance KPIs (load, conversion, bounce, etc.) | ✅ Yes      | Several metrics side-by-side                |
+| Survey / poll results                             | ✅ Yes      | Rows = questions, columns = answer %        |
+| A/B test results                                  | ✅ Yes      | Side-by-side statistical outcomes           |
+| Simple proportions only                           | ❌ No       | Use Pie/Doughnut chart                      |
+| Trends over time                                  | ❌ No       | Use Line chart                              |
+| Single-metric categorical comparison              | ❌ No       | Use Bar chart                               |
 
 ---
 
 ## Best Practices
 
-1. **Clear Headers**: Column names should be explicit (Revenue, ROI, Conversions).
-2. **Consistent Values**: Format currency, percentages, units consistently.
-3. **Readable Size**: Keep 2–8 columns, avoid overly wide tables.
-4. **Match Context**: Only include metrics relevant to the user’s query.
-5. **Fallback**: If attributes are missing, but a tabular structure is obvious, use placeholders like `<value_X>`.
+1. **Clear Headers**: Column names should be explicit (`<column_1>`, `<column_2>`).
+2. **Consistent Values**: Keep units consistent (%, \$, counts).
+3. **Readable Size**: 2–8 columns max.
+4. **Use Placeholders**: If missing, output `<column_X>`, `<value_X>`.
+5. **Fallback**: If no table pattern fits, return `NO_MATCH`.
 
 ---
 
-## Example Scenarios
+## Example Blocks (Generic)
 
-### ✅ Good Use Cases
-
-**1. Product Performance**
+**Query**: "Compare product performance"
 
 ```
 :::data-table
-title: Product Performance Statistics
-position: 20
-action: insert
+title: Product Performance
 data: [
-  {"Product": "Widget A", "Revenue": "$125,000", "Units": "1,250", "Growth": "+15%", "Rating": "4.8/5"},
-  {"Product": "Widget B", "Revenue": "$98,000", "Units": "980", "Growth": "+8%", "Rating": "4.6/5"},
-  {"Product": "Widget C", "Revenue": "$156,000", "Units": "1,560", "Growth": "+22%", "Rating": "4.9/5"}
+  {"<column_1>": "<value_1>", "<column_2>": "<value_2>", "<column_3>": "<value_3>"},
+  {"<column_1>": "<value_4>", "<column_2>": "<value_5>", "<column_3>": "<value_6>"}
 ]
 :::
 ```
 
-**2. Department Financials**
+**Query**: "Show A/B test results"
 
 ```
 :::data-table
-title: Department Financial Performance 2024
-position: 10
-action: insert
+title: A/B Test Results
 data: [
-  {"Department": "Sales", "Budget": "$2.5M", "Actual Spend": "$2.3M", "Revenue": "$12.8M", "ROI": "456%", "Headcount": "45"},
-  {"Department": "Marketing", "Budget": "$1.8M", "Actual Spend": "$1.7M", "Revenue": "$8.2M", "ROI": "382%", "Headcount": "28"}
+  {"<variant>": "<value_1>", "<metric_1>": "<value_2>", "<metric_2>": "<value_3>"},
+  {"<variant>": "<value_4>", "<metric_1>": "<value_5>", "<metric_2>": "<value_6>"}
 ]
 :::
 ```
 
-**3. A/B Test Results**
+**Query**: "Provide survey breakdown"
 
 ```
 :::data-table
-title: Homepage Redesign - A/B Test
-position: 10
-action: insert
+title: Survey Results
 data: [
-  {"Variant": "Control", "Visitors": "10,250", "Conversions": "1,435", "Rate": "14.0%", "Bounce": "42.3%"},
-  {"Variant": "New Design", "Visitors": "10,180", "Conversions": "1,672", "Rate": "16.4%", "Bounce": "38.1%"}
+  {"<question>": "<value_1>", "<answer_1>": "<value_2>", "<answer_2>": "<value_3>"},
+  {"<question>": "<value_4>", "<answer_1>": "<value_5>", "<answer_2>": "<value_6>"}
 ]
 :::
 ```
-
-**4. HR / Salary Comparison**
-
-```
-:::data-table
-title: Employee Salary Overview
-position: 100
-action: insert
-data: [
-  {"Name": "John", "Role": "Manager", "Salary": "$80,000"},
-  {"Name": "Sarah", "Role": "Developer", "Salary": "$70,000"},
-  {"Name": "Mike", "Role": "Designer", "Salary": "$65,000"}
-]
-:::
-```
-
-**5. Survey Results**
-
-```
-:::data-table
-title: Customer Satisfaction Survey
-position: 10
-action: insert
-data: [
-  {"Question": "Overall Satisfaction", "Very Satisfied": "45%", "Satisfied": "32%", "Neutral": "15%", "Dissatisfied": "8%"},
-  {"Question": "Product Quality", "Very Satisfied": "52%", "Satisfied": "28%", "Neutral": "12%", "Dissatisfied": "8%"}
-]
-:::
-```
-
----
-
-### ❌ Poor Use Cases
-
-* **Query**: “What’s the market share of platforms?”
-  → Use **Pie Chart**
-* **Query**: “Show sales over 6 months.”
-  → Use **Line Chart**
-* **Query**: “List the benefits of exercise.”
-  → Use **Bulleted text**
-
----
-
-## Technical Workflow
-
-1. **Analyze Query**: Look for multiple attributes per entity.
-2. **Extract Entities**: Products, teams, departments, variants.
-3. **Identify Metrics**: Revenue, Growth, ROI, KPIs, survey percentages.
-4. **Build Table**: Map entities → rows, metrics → columns.
-5. **Format Output**: Use `:::data-table ... :::`.
 
 ---
 
 ## Quick Reference
 
-**Available Table Type**:
-
-* `:::data-table` — For structured, multi-attribute data
-
-**Best Fits**:
-
-* Financial data
-* Multi-metric performance
-* Survey or poll breakdowns
-* A/B tests
-* HR / salaries / inventory
-
-**Avoid**:
-
-* Pure proportions (Pie/Doughnut)
-* Time series trends (Line)
-* Single-metric comparisons (Bar)
+* **Use**: Multi-attribute structured data (finance, KPIs, surveys, A/B tests).
+* **Avoid**: Pure proportions (Pie/Doughnut), time series (Line), single-metric comparisons (Bar).
+* **Always**: Placeholders if missing data, never fabricate.
+* **Output**: Exact block or `NO_MATCH`.
 
 ---
 
 ## Key Principle
 
-👉 **Only use a data table when precision, structure, and multi-attribute detail matter.**
-Charts are for trends and visuals. Tables are for structured comparisons.
+👉 Use **data tables** when detail, structure, and multiple attributes matter.
+👉 Use **charts** for visual clarity (trends, comparisons, proportions).
+👉 Use **text** for explanations and concepts.
