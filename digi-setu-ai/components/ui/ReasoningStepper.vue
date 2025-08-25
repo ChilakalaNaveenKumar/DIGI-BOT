@@ -252,7 +252,7 @@ const formatToolResultAsMarkdown = (step: ReasoningStep) => {
 
 .stepper-line {
   position: absolute;
-  left: 29px;
+  left: 27px;
   top: 24px;
   bottom: 24px;
   width: 2px;
