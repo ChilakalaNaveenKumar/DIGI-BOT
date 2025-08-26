@@ -63,35 +63,11 @@
               :is-streaming="message.isStreaming || false"
               :show-cursor="message.isStreaming || false"
               :mode="message.isStreaming ? 'streaming' : 'static'"
+              :enable-component-matching="true"
             />
           </div>
           
-          <!-- Generated Components -->
-          <div v-if="message.components && message.components.length > 0" class="components-section">
-            <div class="components-header">
-              <Icon name="lucide:bar-chart-3" :size="14" />
-              <span>Generated Components ({{ message.components.length }})</span>
-            </div>
-            <div class="components-list">
-              <div
-                v-for="(component, index) in message.components"
-                :key="`component-${index}`"
-                class="generated-component"
-              >
-                <div class="component-info">
-                  <div class="component-meta">
-                    <span class="component-badge">{{ component.type }}</span>
-                    <span v-if="component.confidence" class="component-confidence">
-                      {{ (component.confidence * 100).toFixed(1) }}% confidence
-                    </span>
-                  </div>
-                </div>
-                <div class="component-preview">
-                  <pre class="component-markdown">{{ component.markdown }}</pre>
-                </div>
-              </div>
-            </div>
-          </div>
+
           
           <!-- Error Display -->
           <div v-if="message.error" class="error-message">

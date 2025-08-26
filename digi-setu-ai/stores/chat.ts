@@ -332,17 +332,32 @@ export const useChatStore = defineStore('chat', {
                     timestamp: new Date()
                   }
                   this.addReasoningStep(currentStep)
+                  
+                  // Immediately update the assistant message with the new reasoning step
+                  this.updateMessage(assistantMessageId, { 
+                    reasoningSteps: [...this.currentReasoningSteps]
+                  })
                 } else if (data.type === 'content_block_delta' && data.delta?.type === 'thinking_delta') {
                   // Update thinking step
                   if (currentStep && data.delta.thinking) {
                     currentStep.content += data.delta.thinking
                     this.updateReasoningStep(currentStep.id, { content: currentStep.content })
+                    
+                    // Also update the assistant message with current reasoning steps
+                    this.updateMessage(assistantMessageId, { 
+                      reasoningSteps: [...this.currentReasoningSteps]
+                    })
                   }
                 } else if (data.type === 'content_block_stop') {
                   // Complete thinking step
                   if (currentStep) {
                     this.updateReasoningStep(currentStep.id, { status: 'completed' })
                     currentStep = null
+                    
+                    // Update the assistant message with completed reasoning steps
+                    this.updateMessage(assistantMessageId, { 
+                      reasoningSteps: [...this.currentReasoningSteps]
+                    })
                   }
                 } else if (data.type === 'content_block_delta' && data.delta?.type === 'text_delta') {
                   // Regular content
@@ -361,12 +376,13 @@ export const useChatStore = defineStore('chat', {
                     isStreaming: true 
                   })
                 } else if (data.type === 'message_stop') {
-                  // Stream complete
+                  // Stream complete - attach reasoning steps to the message
 
                   this.updateMessage(assistantMessageId, { 
                     content: accumulatedContent,
                     isStreaming: false,
-                    isLoading: false 
+                    isLoading: false,
+                    reasoningSteps: [...this.currentReasoningSteps]
                   })
                   break
                 }
@@ -378,7 +394,7 @@ export const useChatStore = defineStore('chat', {
         }
 
         // Process components and save
-        await this.processComponentsAndSave(content, accumulatedContent)
+        await this.processComponentsAndSave(content, accumulatedContent, assistantMessageId)
 
       } catch (error) {
         console.error('Streaming error:', error)
@@ -412,7 +428,7 @@ export const useChatStore = defineStore('chat', {
       return history
     },
 
-    async processComponentsAndSave(userMessage: string, assistantMessage: string) {
+    async processComponentsAndSave(userMessage: string, assistantMessage: string, assistantMessageId: string | number) {
       try {
         console.log('Starting component processing for message:', assistantMessage.substring(0, 100) + '...')
         this.setProcessingComponents(true)
@@ -430,6 +446,8 @@ export const useChatStore = defineStore('chat', {
           console.log('Component matcher result:', result)
           if (result.success && result.has_matches) {
             console.log('Found', result.data.matches.length, 'component matches')
+            console.log('Original content length:', assistantMessage.length)
+            console.log('Processing content for component insertion...')
             // Process components and insert them into the content
             let processedContent = assistantMessage
             const components: Array<{
@@ -441,21 +459,38 @@ export const useChatStore = defineStore('chat', {
               markdown: string
             }> = []
             
-            // Sort matches by their position in the text (reverse order to avoid index shifting)
+            // Sort matches by their position in the text (forward order, then process in reverse to avoid index shifting)
             const sortedMatches = result.data.matches.sort((a: { placement: { anchor_sentence: string } }, b: { placement: { anchor_sentence: string } }) => {
               const aIndex = processedContent.indexOf(a.placement.anchor_sentence)
               const bIndex = processedContent.indexOf(b.placement.anchor_sentence)
-              return bIndex - aIndex // Reverse order
+              return aIndex - bIndex // Forward order for sorting
             })
             
-            // Insert each component into the content
-            for (const [index, match] of sortedMatches.entries()) {
+            // Process matches in reverse order to avoid index shifting issues
+            for (let i = sortedMatches.length - 1; i >= 0; i--) {
+              const match = sortedMatches[i]
               const anchorSentence = match.placement.anchor_sentence
-              const anchorIndex = processedContent.indexOf(anchorSentence)
+              let anchorIndex = processedContent.indexOf(anchorSentence)
+              
+              // If exact match fails, try to find a partial match
+              if (anchorIndex === -1) {
+                // Try finding the first few words of the sentence
+                const firstWords = anchorSentence.split(' ').slice(0, 5).join(' ')
+                anchorIndex = processedContent.indexOf(firstWords)
+                console.log('Exact match failed, trying partial match:', firstWords, 'found at:', anchorIndex)
+              }
               
               if (anchorIndex !== -1) {
-                const componentId = `component-${Date.now()}-${index}`
-                const componentPlaceholder = `\n\n[COMPONENT:${componentId}]\n\n`
+                const componentId = `component-${Date.now()}-${i}`
+                
+                // Insert the actual markdown component that will be rendered by UiStreamingMarkdown
+                const componentMarkdown = `\n\n${match.block_content}\n\n`
+                
+                console.log(`Processing component ${i + 1}:`, {
+                  type: match.block_content.split('\n')[0].replace(':::', ''),
+                  anchorFound: anchorIndex,
+                  anchorSentence: anchorSentence.substring(0, 50) + '...'
+                })
                 
                 let insertPosition: number
                 
@@ -463,18 +498,27 @@ export const useChatStore = defineStore('chat', {
                 if (match.placement.position === 'before_sentence') {
                   // Insert before the anchor sentence
                   insertPosition = anchorIndex
-                  processedContent = processedContent.slice(0, insertPosition) + 
-                                  componentPlaceholder + 
-                                  processedContent.slice(insertPosition)
                 } else {
                   // Insert after the anchor sentence (default)
-                  insertPosition = anchorIndex + anchorSentence.length
-                  processedContent = processedContent.slice(0, insertPosition) + 
-                                  componentPlaceholder + 
-                                  processedContent.slice(insertPosition)
+                  // Find the end of the sentence by looking for the next period, newline, or end of text
+                  const sentenceEnd = processedContent.indexOf('.', anchorIndex)
+                  const nextNewline = processedContent.indexOf('\n', anchorIndex)
+                  
+                  if (sentenceEnd !== -1 && (nextNewline === -1 || sentenceEnd < nextNewline)) {
+                    insertPosition = sentenceEnd + 1
+                  } else if (nextNewline !== -1) {
+                    insertPosition = nextNewline
+                  } else {
+                    insertPosition = anchorIndex + anchorSentence.length
+                  }
                 }
                 
-                // Store component data
+                // Insert the component markdown directly into content
+                processedContent = processedContent.slice(0, insertPosition) + 
+                                componentMarkdown + 
+                                processedContent.slice(insertPosition)
+                
+                // Store component data for reference
                 components.push({
                   id: componentId,
                   type: match.block_content.split('\n')[0].replace(':::', ''),
@@ -483,30 +527,22 @@ export const useChatStore = defineStore('chat', {
                   title: match.block_content.split('\n')[1]?.replace('title: ', '') || '',
                   markdown: match.block_content
                 })
+              } else {
+                console.warn('Could not find anchor sentence in content:', anchorSentence.substring(0, 100) + '...')
               }
             }
             
-            // Update the assistant message with processed content and components
-            const assistantMessageIndex = this.messages.findIndex(m => 
-              m.role === 'assistant' && m.content === assistantMessage
-            )
+            // Update the assistant message with processed content and components using message ID
+            console.log('Updating message with ID:', assistantMessageId, 'with processed content')
+            console.log('Original content length:', assistantMessage.length)
+            console.log('Processed content length:', processedContent.length)
+            console.log('Components:', components.length)
             
-            if (assistantMessageIndex !== -1 && this.messages[assistantMessageIndex]) {
-              const currentMessage = this.messages[assistantMessageIndex]
-              console.log('Updating message at index', assistantMessageIndex, 'with processed content')
-              console.log('Original content length:', assistantMessage.length)
-              console.log('Processed content length:', processedContent.length)
-              console.log('Components:', components.length)
-              
-              this.messages[assistantMessageIndex] = {
-                ...currentMessage,
-                content: processedContent,
-                components: components
-              }
-            } else {
-              console.error('Could not find assistant message to update. Index:', assistantMessageIndex)
-              console.log('Available messages:', this.messages.map(m => ({ role: m.role, contentLength: m.content.length })))
-            }
+            // Use updateMessage method which finds by ID
+            this.updateMessage(assistantMessageId, {
+              content: processedContent,
+              components: components
+            })
           }
         }
 
