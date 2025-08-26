@@ -16,6 +16,11 @@ export default defineNuxtConfig({
     '@pinia/nuxt'
   ],
 
+  // Pinia configuration
+  pinia: {
+    storesDirs: ['./stores/**']
+  },
+
   css: [
     '~/assets/css/main.css',
     'katex/dist/katex.min.css',

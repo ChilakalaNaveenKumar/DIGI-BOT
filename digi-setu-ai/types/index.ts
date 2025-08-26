@@ -16,6 +16,7 @@ export interface Message {
   isLoading?: boolean
   isStreaming?: boolean
   isProcessingComponents?: boolean
+  isAnalyzing?: boolean
   error?: string
   reasoningSteps?: ReasoningStep[]
   reasoning?: string
@@ -47,6 +48,8 @@ export interface GeneratedComponent {
   type: string
   data: unknown
   confidence?: number
+  title?: string
+  markdown?: string
 }
 
 // Enhanced content types

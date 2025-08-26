@@ -133,6 +133,9 @@ class Message(Base):
     token_count: Mapped[Optional[int]] = mapped_column(Integer)
     processing_time: Mapped[Optional[float]] = mapped_column(Float)
     
+    # Reasoning steps (for thinking mode)
+    reasoning_steps: Mapped[Optional[dict]] = mapped_column(JSON)
+    
     # Timestamps
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
@@ -174,6 +177,7 @@ class Message(Base):
             "ai_model": self.ai_model,
             "token_count": self.token_count,
             "processing_time": self.processing_time,
+            "reasoning_steps": self.reasoning_steps,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
             "conversation_id": self.conversation_id,

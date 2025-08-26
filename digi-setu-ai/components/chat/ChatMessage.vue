@@ -40,7 +40,7 @@
           </div>
           
           <!-- Streaming indicator for response generation (below reasoning) -->
-          <div v-if="message.role === 'assistant' && message.isStreaming && !message.content" class="response-streaming-indicator">
+          <div v-if="message.role === 'assistant' && message.isStreaming && !message.content.trim()" class="response-streaming-indicator">
             <div class="streaming-dots">
               <span /><span /><span />
             </div>
@@ -56,7 +56,7 @@
           </div>
           
           <!-- Main Content -->
-          <div v-if="message.content || (message.isStreaming && message.content)" class="message-text">
+          <div v-if="message.content.trim()" class="message-text">
             <UiStreamingMarkdown
               :key="`content-${message.id}`"
               :content="message.content"
@@ -64,6 +64,33 @@
               :show-cursor="message.isStreaming || false"
               :mode="message.isStreaming ? 'streaming' : 'static'"
             />
+          </div>
+          
+          <!-- Generated Components -->
+          <div v-if="message.components && message.components.length > 0" class="components-section">
+            <div class="components-header">
+              <Icon name="lucide:bar-chart-3" :size="14" />
+              <span>Generated Components ({{ message.components.length }})</span>
+            </div>
+            <div class="components-list">
+              <div
+                v-for="(component, index) in message.components"
+                :key="`component-${index}`"
+                class="generated-component"
+              >
+                <div class="component-info">
+                  <div class="component-meta">
+                    <span class="component-badge">{{ component.type }}</span>
+                    <span v-if="component.confidence" class="component-confidence">
+                      {{ (component.confidence * 100).toFixed(1) }}% confidence
+                    </span>
+                  </div>
+                </div>
+                <div class="component-preview">
+                  <pre class="component-markdown">{{ component.markdown }}</pre>
+                </div>
+              </div>
+            </div>
           </div>
           
           <!-- Error Display -->
@@ -90,6 +117,7 @@
 </template>
 
 <script setup lang="ts">
+
 import type { Message } from '~/types'
 
 interface Props {
@@ -107,9 +135,21 @@ const props = withDefaults(defineProps<Props>(), {
 
 const emit = defineEmits<Emits>()
 
-const formatTime = (timestamp?: Date) => {
+
+
+const formatTime = (timestamp?: Date | string | number) => {
   if (!timestamp) return ''
-  return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  
+  // Convert to Date object if it's not already
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid timestamp:', timestamp)
+    return ''
+  }
+  
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 const copyMessage = async () => {
@@ -150,7 +190,7 @@ const regenerateMessage = () => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 15px;
 }
 
 .message-author {
@@ -314,6 +354,88 @@ const regenerateMessage = () => {
 
 .message--user .message-actions {
   justify-content: flex-end;
+}
+
+/* Generated Components */
+.components-section {
+  margin: 12px 0;
+  border: 1px solid var(--border-primary);
+  border-radius: 8px;
+  background: var(--bg-secondary);
+}
+
+.components-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-primary);
+  background: var(--bg-tertiary);
+}
+
+.components-list {
+  padding: 8px;
+}
+
+.generated-component {
+  background: var(--bg-primary);
+  border: 1px solid var(--border-secondary);
+  border-radius: 6px;
+  margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.generated-component:last-child {
+  margin-bottom: 0;
+}
+
+.component-info {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border-secondary);
+}
+
+.component-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.component-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2px 6px;
+  font-size: 10px;
+  font-weight: 500;
+  border-radius: 12px;
+  background: var(--primary);
+  color: white;
+  text-transform: uppercase;
+  letter-spacing: 0.025em;
+}
+
+.component-confidence {
+  font-size: 11px;
+  color: var(--text-tertiary);
+  font-family: monospace;
+}
+
+.component-preview {
+  background: var(--bg-code);
+  padding: 12px;
+}
+
+.component-markdown {
+  margin: 0;
+  font-size: 11px;
+  line-height: 1.4;
+  color: var(--text-secondary);
+  background: none;
+  white-space: pre-wrap;
+  word-break: break-word;
 }
 
 /* Animations */

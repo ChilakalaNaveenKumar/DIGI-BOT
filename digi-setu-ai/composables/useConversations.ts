@@ -1,24 +1,26 @@
 import { ref, computed } from 'vue'
-
-export interface Conversation {
-  id: number
-  title: string
-  status: string
-  message_count: number
-  created_at: string
-  updated_at: string
-  last_message_at?: string
-  storage_type?: string  // 'active' | 'archived'
-}
+import type { Conversation, ConversationMessage } from '~/types/conversation'
 
 export const useConversations = () => {
   const conversations = ref<Conversation[]>([])
   const currentConversation = ref<Conversation | null>(null)
+  const conversationMessages = ref<ConversationMessage[]>([])
   const isLoading = ref(false)
+  const isLoadingMessages = ref(false)
   const error = ref<string | null>(null)
 
-  // Use Pinia auth store
+  // Use Pinia auth store and smart fetch
   const authStore = useAuthStore()
+  const { get, post, put, delete: del } = useAuthenticatedFetch()
+
+  // Persistent current conversation ID using Nuxt's useCookie
+  const currentConversationId = useCookie<number | null>('digi-setu-current-conversation', {
+    default: () => null,
+    maxAge: 60 * 60 * 24 * 30, // 30 days
+    sameSite: 'lax',
+    secure: true,
+    watch: true
+  })
 
   // Fetch all conversations
   const fetchConversations = async () => {
@@ -31,13 +33,7 @@ export const useConversations = () => {
       isLoading.value = true
       error.value = null
 
-      const data = await $fetch<Conversation[]>('http://localhost:8000/api/conversations/', {
-        method: 'GET',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        }
-      })
+      const data = await get<Conversation[]>('http://localhost:8000/api/conversations/')
 
       conversations.value = data
       
@@ -60,15 +56,8 @@ export const useConversations = () => {
       isLoading.value = true
       error.value = null
 
-      const newConversation = await $fetch<Conversation>('http://localhost:8000/api/conversations/', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          title
-        })
+      const newConversation = await post<Conversation>('http://localhost:8000/api/conversations/', {
+        title
       })
 
       conversations.value.unshift(newConversation)
@@ -189,15 +178,101 @@ export const useConversations = () => {
     })
   })
 
+  // Load conversation history (messages)
+  const loadConversationHistory = async (conversationId: number) => {
+    if (!authStore.isAuthenticated) {
+      error.value = 'Not authenticated'
+      return []
+    }
+
+    try {
+      isLoadingMessages.value = true
+      error.value = null
+
+      const messages = await get<ConversationMessage[]>(`http://localhost:8000/api/conversations/${conversationId}/messages`)
+
+      conversationMessages.value = messages
+      
+      // Set current conversation
+      const conversation = conversations.value.find(c => c.id === conversationId)
+      if (conversation) {
+        currentConversation.value = conversation
+      }
+      
+      console.log('Conversation history loaded:', conversationId, messages.length, 'messages')
+      return messages
+    } catch (err) {
+      error.value = err instanceof Error ? err.message : 'Unknown error'
+      console.error('Error loading conversation history:', err)
+      return []
+    } finally {
+      isLoadingMessages.value = false
+    }
+  }
+
+  // Switch to a conversation and load its history
+  const switchToConversation = async (conversationId: number) => {
+    const messages = await loadConversationHistory(conversationId)
+    // Persist the current conversation ID using reactive cookie
+    currentConversationId.value = conversationId
+    
+    // Also update the streaming chat state to sync conversation ID and title
+    const conversation = conversations.value.find(c => c.id === conversationId)
+    if (conversation) {
+      // We need to import and use the streaming chat composable here
+      // This will be handled by the caller (Sidebar.vue) instead
+    }
+    
+    return messages
+  }
+
+  // Auto-restore conversation on app start
+  const restoreCurrentConversation = async () => {
+    const savedId = currentConversationId.value
+    if (savedId && authStore.isAuthenticated) {
+      console.log('Restoring conversation:', savedId)
+      try {
+        // Check if conversation exists in our list
+        await fetchConversations()
+        const conversation = conversations.value.find(c => c.id === savedId)
+        if (conversation) {
+          const messages = await loadConversationHistory(savedId)
+          return { conversation, messages }
+        } else {
+          // Conversation doesn't exist anymore, clear saved ID
+          currentConversationId.value = null
+        }
+      } catch (error) {
+        console.error('Failed to restore conversation:', error)
+        currentConversationId.value = null
+      }
+    }
+    return null
+  }
+
+  // Clear current conversation (for new chat)
+  const clearCurrentConversation = () => {
+    currentConversation.value = null
+    conversationMessages.value = []
+    currentConversationId.value = null
+  }
+
   return {
     conversations: sortedConversations,
     currentConversation: readonly(currentConversation),
+    conversationMessages: readonly(conversationMessages),
+    currentConversationId: readonly(currentConversationId),
     isLoading: readonly(isLoading),
+    isLoadingMessages: readonly(isLoadingMessages),
     error: readonly(error),
     fetchConversations,
     createConversation,
     updateConversation,
     deleteConversation,
+    loadConversationHistory,
+    switchToConversation,
+    restoreCurrentConversation,
+    clearCurrentConversation,
     setCurrentConversation,
     generateTitle
   }

@@ -125,7 +125,7 @@ const handleKeydown = (e: KeyboardEvent) => {
 const handleSend = () => {
   const content = inputValue.value.trim()
   if (content && !props.disabled && !props.loading) {
-    console.log('DigiSetuInput: Emitting send event:', content) // Debug log
+
     emit('send', content)
     inputValue.value = ''
     nextTick(() => {

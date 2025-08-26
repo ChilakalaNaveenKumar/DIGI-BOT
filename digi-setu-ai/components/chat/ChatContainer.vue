@@ -36,14 +36,7 @@
       
     <!-- Chat Messages (When messages exist) -->
     <div v-else class="chat-mode">
-      <!-- Conversation Header -->
-      <div v-if="conversationTitle" class="conversation-header">
-        <h2 class="conversation-title">{{ conversationTitle }}</h2>
-        <button @click="startNewConversation" class="new-chat-btn">
-          <Icon name="lucide:plus" :size="16" />
-          New Chat
-        </button>
-      </div>
+
       
       <div class="chat-messages">
         <div class="messages-list">
@@ -80,6 +73,7 @@
 </template>
 
 <script setup lang="ts">
+
 // Message type imported by useStreamingChat composable
 
 interface ExamplePrompt {
@@ -88,18 +82,23 @@ interface ExamplePrompt {
   icon: string
 }
 
-// Use streaming chat composable
-const { 
-  messages, 
-  isLoading, 
-  isStreaming, 
-  conversationId,
-  conversationTitle,
-  isProcessingComponents,
-  sendMessage, 
-  startNewConversation,
-  regenerateMessage 
-} = useStreamingChat()
+// Use Pinia chat store
+const chatStore = useChatStore()
+
+// Reactive references to store state
+const messages = computed(() => chatStore.messages)
+const isLoading = computed(() => chatStore.isLoading)
+const isStreaming = computed(() => chatStore.isStreaming)
+const isProcessingComponents = computed(() => chatStore.isProcessingComponents)
+// conversationTitle available via chatStore.conversationTitle if needed
+
+// Store actions
+const sendMessage = (content: string) => chatStore.sendMessage(content)
+const regenerateMessage = (messageId: string | number) => chatStore.regenerateMessage(messageId)
+
+
+
+// Messages are now properly managed by singleton composable
 
 const isAnalyzing = ref(false)
 
@@ -131,7 +130,7 @@ const examplePrompts: ExamplePrompt[] = [
 const handleSend = async (content: string) => {
   if (!content.trim()) return
   
-  console.log('ChatContainer: handleSend called with:', content) // Debug log
+
   
   // Use the streaming composable
   await sendMessage(content.trim())

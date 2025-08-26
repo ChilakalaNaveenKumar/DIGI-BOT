@@ -1,21 +1,137 @@
 import type { Message, ReasoningStep } from '~/types'
 import { nextTick } from 'vue'
 
+// Singleton state - shared across all instances
+const messages = ref<Message[]>([])
+const isLoading = ref(false)
+const isStreaming = ref(false)
+const conversationId = ref<number | null>(null)
+const conversationTitle = ref<string>('')
+const currentReasoningSteps = ref<ReasoningStep[]>([])
+const isReasoning = ref(false)
+const isProcessingComponents = ref(false)
+
 export const useStreamingChat = () => {
-  const messages = ref<Message[]>([])
-  const isLoading = ref(false)
-  const isStreaming = ref(false)
+
+  // Build conversation history for API call
+  const buildConversationHistory = (newUserMessage: string) => {
+    const history: Array<{ role: 'user' | 'assistant', content: string }> = []
+    
+    // For existing conversations, only send recent context (last 10 messages) + new message
+    // For new conversations, send just the new message
+    if (conversationId.value) {
+      // Existing conversation: Send recent context for better AI responses
+      const recentMessages = messages.value.slice(-10) // Last 10 messages
+      for (const msg of recentMessages) {
+        if (msg.role === 'user' || msg.role === 'assistant') {
+          history.push({
+            role: msg.role,
+            content: msg.content
+          })
+        }
+      }
+    }
+    
+    // Add the new user message
+    history.push({
+      role: 'user',
+      content: newUserMessage
+    })
+    
+    return history
+  }
+
+  // Save messages to conversation (new or existing)
+  const saveMessagesToConversation = async (
+    userMessage: string, 
+    assistantMessage: string, 
+    reasoningSteps: ReasoningStep[]
+  ) => {
+    try {
+      const { post } = useAuthenticatedFetch()
+      
+      if (!conversationId.value) {
+        // NEW CONVERSATION: Create conversation with both messages
+        const title = userMessage.length > 50 
+          ? userMessage.substring(0, 47) + "..." 
+          : userMessage
+
+        const response = await post<{id: number, title: string}>('http://localhost:8000/api/conversations/save-complete', {
+          title: title.trim(),
+          user_message: userMessage,
+          assistant_message: assistantMessage,
+          reasoning_steps: reasoningSteps.map(step => ({
+            id: step.id,
+            type: step.type,
+            content: step.content,
+            status: step.status,
+            timestamp: step.timestamp?.toISOString() || new Date().toISOString(),
+            tool_name: step.tool_name,
+            result: step.result,
+            inputJson: step.inputJson
+          })),
+          ai_provider: "anthropic",
+          ai_model: "claude-sonnet-4-20250514"
+        })
+
+        // Update conversation state
+        conversationId.value = response.id
+        conversationTitle.value = response.title
+        
+        // Update the conversations composable with the new conversation
+        const { setCurrentConversation } = useConversations()
+        setCurrentConversation({
+          id: response.id,
+          title: response.title,
+          status: 'active',
+          message_count: 2,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString(),
+          last_message_at: new Date().toISOString()
+        })
+        
+        console.log('New conversation created and saved:', response.id, response.title)
+        
+      } else {
+        // EXISTING CONVERSATION: Add messages to existing conversation
+        
+        // Save user message
+        await post(`http://localhost:8000/api/conversations/${conversationId.value}/messages`, {
+          role: 'user',
+          content: userMessage,
+          token_count: Math.ceil(userMessage.length / 4) // Rough estimate
+        })
+        
+        // Save assistant message with reasoning steps
+        await post(`http://localhost:8000/api/conversations/${conversationId.value}/messages`, {
+          role: 'assistant',
+          content: assistantMessage,
+          ai_provider: "anthropic",
+          ai_model: "claude-sonnet-4-20250514",
+          reasoning_steps: {
+            steps: reasoningSteps.map(step => ({
+              id: step.id,
+              type: step.type,
+              content: step.content,
+              status: step.status,
+              timestamp: step.timestamp?.toISOString() || new Date().toISOString(),
+              tool_name: step.tool_name,
+              result: step.result,
+              inputJson: step.inputJson
+            }))
+          },
+          token_count: Math.ceil(assistantMessage.length / 4) // Rough estimate
+        })
+        
+        console.log('Messages added to existing conversation:', conversationId.value)
+      }
+      
+    } catch (error) {
+      console.error('Failed to save messages to conversation:', error)
+    }
+  }
   
-  // Conversation state
-  const conversationId = ref<number | null>(null)
-  const conversationTitle = ref<string>('')
-  
-  // Reasoning state
-  const currentReasoningSteps = ref<ReasoningStep[]>([])
-  const isReasoning = ref(false)
-  
-  // Component processing state
-  const isProcessingComponents = ref(false)
+  // Note: All state variables are now defined as singletons above
   
   // Add request deduplication and cancellation
   const lastRequestContent = ref<string>('')
@@ -226,7 +342,7 @@ export const useStreamingChat = () => {
         if (currentMessage) {
           messages.value[messageIndex] = {
             ...currentMessage,
-            content: '*Thinking...*',
+            content: '', // Don't show placeholder, we have reasoning steps
             isLoading: true,
             isStreaming: false
           }
@@ -251,7 +367,7 @@ export const useStreamingChat = () => {
         },
         credentials: 'include', // Include cookies for authentication
         body: JSON.stringify({
-          messages: [{ role: 'user', content: content }], // Send just the current message
+          messages: buildConversationHistory(content), // Send full conversation history
           conversation_id: conversationId.value,
           model: "claude-sonnet-4-20250514",
           enable_thinking: true,
@@ -319,7 +435,7 @@ export const useStreamingChat = () => {
                     if (currentMessage) {
                       messages.value[messageIndex] = {
                         ...currentMessage,
-                        content: '*Thinking...*',
+                        content: '', // Don't show placeholder, we have reasoning steps
                         isLoading: false,
                         isStreaming: true
                       }
@@ -527,6 +643,7 @@ export const useStreamingChat = () => {
                   isStreaming.value = false
                   
                   // Call component matcher API after streaming completes and update content
+                  let processedContent = accumulatedContent // Initialize with original content
                   try {
                     isProcessingComponents.value = true
                     
@@ -541,7 +658,7 @@ export const useStreamingChat = () => {
                       }
                     }
                     
-                    const processedContent = await callComponentMatcher(accumulatedContent)
+                    processedContent = await callComponentMatcher(accumulatedContent)
                     if (processedContent && processedContent !== accumulatedContent) {
                       // Use nextTick to ensure Vue has finished current updates
                       await nextTick()
@@ -578,6 +695,13 @@ export const useStreamingChat = () => {
                     }
                   } finally {
                     isProcessingComponents.value = false
+                    
+                    // NEW: Save conversation after component processing is complete
+                    try {
+                      await saveMessagesToConversation(content, processedContent, currentReasoningSteps.value)
+                    } catch (error) {
+                      console.error('Failed to save conversation:', error)
+                    }
                   }
                   
                   break
@@ -748,13 +872,67 @@ export const useStreamingChat = () => {
     conversationId.value = null
     conversationTitle.value = ''
   }
+
+  // Load conversation history from API
+  const loadConversationMessages = (conversationMessages: Array<{
+    id: number
+    role: 'user' | 'assistant'
+    content: string
+    reasoning_steps?: {
+      steps: Array<{
+        id: string
+        type: 'thinking' | 'tool_call'
+        content: string
+        status: string
+        timestamp: string
+        tool_name?: string
+        result?: unknown
+        inputJson?: string
+      }>
+    }
+    created_at: string
+  }>) => {
+    // Convert API messages to frontend Message format
+    const convertedMessages: Message[] = conversationMessages.map(msg => ({
+      id: msg.id,
+      content: msg.content,
+      role: msg.role,
+      timestamp: new Date(msg.created_at),
+      isLoading: false,
+      isStreaming: false,
+      reasoningSteps: msg.reasoning_steps?.steps?.map(step => ({
+        id: step.id,
+        type: step.type,
+        content: step.content,
+        status: step.status as 'pending' | 'active' | 'completed' | 'error',
+        timestamp: new Date(step.timestamp),
+        tool_name: step.tool_name,
+        result: step.result,
+        inputJson: step.inputJson
+      })) || []
+    }))
+    
+    messages.value = convertedMessages
+    console.log('Loaded conversation messages:', convertedMessages.length)
+    console.log('Converted messages:', convertedMessages)
+  }
   
   const startNewConversation = () => {
     clearMessages()
     conversationId.value = null
-    conversationTitle.value = ''
+    conversationTitle.value = 'New Conversation'
     currentReasoningSteps.value = []
     isReasoning.value = false
+    
+    // Clear current conversation in the conversations composable
+    const { clearCurrentConversation } = useConversations()
+    clearCurrentConversation()
+  }
+
+  // Set conversation state (for switching conversations)
+  const setConversationState = (id: number | null, title: string) => {
+    conversationId.value = id
+    conversationTitle.value = title
   }
 
   const regenerateMessage = async (messageId: string | number) => {
@@ -787,7 +965,9 @@ export const useStreamingChat = () => {
     isProcessingComponents: readonly(isProcessingComponents),
     sendMessage: sendStreamingMessage,
     clearMessages,
+    loadConversationMessages,
     startNewConversation,
+    setConversationState,
     regenerateMessage
   }
 }

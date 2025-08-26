@@ -63,29 +63,24 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from 'vue'
-import { useConversations } from '~/composables/useConversations'
+import { onMounted, computed, watch } from 'vue'
 
-// Use Pinia auth store
+// Use Pinia stores
 const authStore = useAuthStore()
+const chatStore = useChatStore()
+const conversationStore = useConversationStore()
 
-// Use conversations composable
-const {
-  conversations,
-  currentConversation,
-  isLoading,
-  fetchConversations,
-  deleteConversation,
-  setCurrentConversation
-} = useConversations()
+// Reactive references to store state
+const conversations = computed(() => conversationStore.conversations)
+const currentConversation = computed(() => conversationStore.currentConversation)
+const isLoading = computed(() => conversationStore.isLoading)
 
 // Event handlers
 const handleNewChat = async () => {
   try {
-    // Don't create conversation immediately - let the first message create it with proper title
-    // Just clear the current chat and navigate
-    const { startNewConversation } = useStreamingChat()
-    startNewConversation()
+    // Clear current conversation and chat state
+    conversationStore.clearCurrentConversation()
+    chatStore.startNewConversation()
     
     console.log('Started new conversation (will be created on first message)')
     
@@ -96,18 +91,36 @@ const handleNewChat = async () => {
   }
 }
 
-const handleSelectConversation = (conversation: any) => {
-  setCurrentConversation(conversation)
-  console.log('Selected conversation:', conversation.id)
-  
-  // Navigate to chat page
-  navigateTo('/chat')
+const handleSelectConversation = async (conversation: any) => {
+  try {
+    console.log('Switching to conversation:', conversation.id)
+    
+    // Load conversation history from API
+    const messages = await conversationStore.switchToConversation(conversation.id)
+    
+    // Update chat store state
+    chatStore.setConversationState(conversation.id, conversation.title)
+    
+    // Load messages into chat interface
+    if (messages.length > 0) {
+      chatStore.loadConversationMessages(messages)
+      console.log('Loaded', messages.length, 'messages into chat')
+    } else {
+      // Clear chat if no messages
+      chatStore.startNewConversation()
+    }
+    
+    // Navigate to chat page
+    await navigateTo('/chat')
+  } catch (error) {
+    console.error('Failed to switch conversation:', error)
+  }
 }
 
 const handleDeleteConversation = async (conversationId: number) => {
   if (confirm('Are you sure you want to delete this conversation?')) {
     try {
-      await deleteConversation(conversationId)
+      await conversationStore.deleteConversation(conversationId)
       console.log('Conversation deleted:', conversationId)
     } catch (error) {
       console.error('Failed to delete conversation:', error)
@@ -124,14 +137,14 @@ onMounted(async () => {
   
   // Now fetch conversations if authenticated
   if (authStore.isAuthenticated) {
-    fetchConversations()
+    conversationStore.fetchConversations()
   }
 })
 
 // Also watch for auth state changes (e.g., after login)
 watch(() => authStore.isAuthenticated, (isAuthenticated) => {
   if (isAuthenticated) {
-    fetchConversations()
+    conversationStore.fetchConversations()
   }
 }, { immediate: false })
 </script>

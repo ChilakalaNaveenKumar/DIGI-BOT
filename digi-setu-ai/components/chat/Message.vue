@@ -118,7 +118,7 @@
                       <UiBadge variant="secondary" size="sm">
                         {{ component.type }}
                       </UiBadge>
-                      <span class="component-confidence">
+                      <span v-if="component.confidence" class="component-confidence">
                         {{ (component.confidence * 100).toFixed(1) }}% confidence
                       </span>
                     </div>
@@ -213,9 +213,19 @@ const handleBlockCompleted = (block: unknown) => {
   console.log('Block completed:', block)
 }
 
-const formatTime = (timestamp?: Date) => {
+const formatTime = (timestamp?: Date | string | number) => {
   if (!timestamp) return ''
-  return timestamp.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+  
+  // Convert to Date object if it's not already
+  const date = timestamp instanceof Date ? timestamp : new Date(timestamp)
+  
+  // Check if the date is valid
+  if (isNaN(date.getTime())) {
+    console.warn('Invalid timestamp:', timestamp)
+    return ''
+  }
+  
+  return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 }
 
 const toggleReasoning = () => {
@@ -269,7 +279,7 @@ const getToolStatus = (status?: string) => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-bottom: 6px;
+  margin-bottom: 15px;
 }
 
 .message-author {

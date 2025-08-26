@@ -165,7 +165,7 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Refresh access token
+     * Refresh access token (only when needed)
      */
     async refreshToken(): Promise<boolean> {
       try {
@@ -193,6 +193,45 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
+     * Smart API call wrapper that handles token refresh automatically
+     */
+    async makeAuthenticatedRequest<T>(
+      url: string, 
+      options: RequestInit = {}
+    ): Promise<T> {
+      // Ensure credentials are included
+      const requestOptions = {
+        ...options,
+        credentials: 'include' as RequestCredentials,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers
+        }
+      }
+
+      try {
+        // First attempt
+        const response = await $fetch<T>(url, requestOptions)
+        return response
+      } catch (error: any) {
+        // If 401 (token expired), try to refresh and retry once
+        if (error.status === 401 && this.isAuthenticated) {
+          console.log('Token expired, attempting refresh...')
+          
+          const refreshSuccess = await this.refreshToken()
+          if (refreshSuccess) {
+            // Retry the original request
+            console.log('Retrying request after token refresh')
+            return await $fetch<T>(url, requestOptions)
+          }
+        }
+        
+        // Re-throw the error if refresh failed or wasn't needed
+        throw error
+      }
+    },
+
+    /**
      * Set authentication state (for external auth flows)
      */
     setAuthenticated(user: User) {
@@ -210,20 +249,14 @@ export const useAuthStore = defineStore('auth', {
     },
 
     /**
-     * Setup automatic token refresh
+     * Setup activity-based token refresh (no automatic timer)
      */
     setupTokenRefresh() {
       // Clear any existing timer
       this.clearTokenRefresh()
       
-      // Set up refresh every 10 minutes
-      if (import.meta.client) {
-        refreshTimer = setInterval(async () => {
-          if (this.isAuthenticated) {
-            await this.refreshToken()
-          }
-        }, 10 * 60 * 1000) // 10 minutes
-      }
+      // No automatic refresh - we'll refresh on API calls when needed
+      console.log('Token refresh setup complete (activity-based)')
     },
 
     /**

@@ -7,7 +7,7 @@
         <div class="page-content">
           <slot />
         </div>
-        <LayoutFooter />
+        <!-- Footer removed for logged-in users -->
       </main>
     </div>
   </div>

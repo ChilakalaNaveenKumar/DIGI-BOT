@@ -2,7 +2,7 @@
   <footer class="app-footer">
     <div class="footer-content">
       <p class="footer-text">
-        © 2024 Digi Setu AI. All rights reserved.
+        © 2025 Digi Setu AI. All rights reserved.
       </p>
       <div class="footer-links">
         <NuxtLink to="/legal/terms" class="footer-link">Terms</NuxtLink>

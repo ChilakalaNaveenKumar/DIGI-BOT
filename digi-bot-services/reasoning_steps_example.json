@@ -1,0 +1,65 @@
+{
+  "message_example": {
+    "id": 123,
+    "role": "assistant",
+    "content": "Based on my research, here's what I found about the latest AI developments...",
+    "ai_provider": "anthropic",
+    "ai_model": "claude-sonnet-4-20250514",
+    "token_count": 2450,
+    "processing_time": 8.3,
+    "reasoning_steps": {
+      "steps": [
+        {
+          "id": "thinking-0",
+          "type": "thinking",
+          "content": "The user is asking about AI developments. I should search for recent information to provide accurate, up-to-date details.",
+          "status": "completed",
+          "timestamp": "2025-01-27T10:30:45Z"
+        },
+        {
+          "id": "tool-abc123",
+          "type": "tool_call",
+          "content": "Searching: latest AI developments 2025",
+          "tool_name": "web_search",
+          "status": "completed",
+          "timestamp": "2025-01-27T10:30:47Z",
+          "inputJson": "{\"query\": \"latest AI developments 2025\"}",
+          "result": [
+            {
+              "title": "Major AI Breakthroughs in 2025",
+              "url": "https://example.com/ai-news",
+              "snippet": "Recent developments in AI..."
+            }
+          ]
+        },
+        {
+          "id": "thinking-1", 
+          "type": "thinking",
+          "content": "Now I have current information. Let me analyze the key points and structure a comprehensive response.",
+          "status": "completed",
+          "timestamp": "2025-01-27T10:30:52Z"
+        }
+      ]
+    },
+    "created_at": "2025-01-27T10:30:55Z",
+    "updated_at": "2025-01-27T10:30:55Z"
+  },
+  
+  "step_types_supported": {
+    "thinking": {
+      "description": "General reasoning and analysis steps",
+      "fields": ["id", "type", "content", "status", "timestamp"]
+    },
+    "tool_call": {
+      "description": "Tool usage like web search, code execution, file operations",
+      "fields": ["id", "type", "content", "tool_name", "status", "timestamp", "inputJson", "result"],
+      "supported_tools": [
+        "web_search",
+        "code_execution", 
+        "file_read",
+        "chart_tools",
+        "create_diagram"
+      ]
+    }
+  }
+}

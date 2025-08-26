@@ -17,17 +17,21 @@
 
 <script setup lang="ts">
 import { computed } from 'vue'
-import { useConversations } from '~/composables/useConversations'
 
-// Get current conversation
-const { currentConversation } = useConversations()
+// Use Pinia stores
+const chatStore = useChatStore()
+const conversationStore = useConversationStore()
 
 // Compute display title
 const displayTitle = computed(() => {
-  if (currentConversation.value) {
-    return currentConversation.value.title
+  // Priority: current conversation > chat store title > default
+  if (conversationStore.currentConversation) {
+    return conversationStore.currentConversation.title
   }
-  return 'Untitled'
+  if (chatStore.conversationTitle && chatStore.conversationTitle !== '') {
+    return chatStore.conversationTitle
+  }
+  return 'Digi Setu AI'
 })
 </script>
 

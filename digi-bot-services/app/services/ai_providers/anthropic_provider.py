@@ -246,6 +246,12 @@ class AnthropicProvider:
                 web_search_enabled=enable_web_search
             )
             
+            # Debug: Log the full request payload (excluding sensitive data)
+            debug_request = request_data.copy()
+            if "messages" in debug_request:
+                debug_request["messages"] = f"[{len(debug_request['messages'])} messages]"
+            logger.info("Anthropic request payload", request_data=debug_request)
+            
             # Start streaming - just pass through raw Anthropic response
             async with self.client.stream("POST", "/messages", json=request_data) as response:
                 response.raise_for_status()
@@ -265,10 +271,26 @@ class AnthropicProvider:
             )
             
         except Exception as e:
-            logger.error("Anthropic streaming failed", model=model, error=str(e))
+            # Get detailed error information for HTTP errors
+            error_details = str(e)
+            if hasattr(e, 'response') and e.response is not None:
+                try:
+                    # Try to get the response body for more details
+                    error_body = await e.response.aread() if hasattr(e.response, 'aread') else e.response.text
+                    if isinstance(error_body, bytes):
+                        error_body = error_body.decode('utf-8')
+                    error_details = f"{str(e)} - Response: {error_body}"
+                except:
+                    # If we can't read the response, just use the original error
+                    pass
+            
+            logger.error("Anthropic streaming failed", 
+                        model=model, 
+                        error=error_details,
+                        error_type=type(e).__name__)
             yield {
                 "type": "error",
-                "error": str(e),
+                "error": error_details,
                 "provider": self.name,
                 "model": model
             }
