@@ -256,14 +256,19 @@ class AnthropicProvider:
             async with self.client.stream("POST", "/messages", json=request_data) as response:
                 response.raise_for_status()
                 
-                async for line in response.aiter_lines():
-                    if line.startswith("data: "):
-                        try:
-                            data = json.loads(line[6:])
-                            # Just yield the raw Anthropic data
-                            yield data
-                        except json.JSONDecodeError:
-                            continue
+                try:
+                    async for line in response.aiter_lines():
+                        if line.startswith("data: "):
+                            try:
+                                data = json.loads(line[6:])
+                                # Just yield the raw Anthropic data as dict
+                                yield data
+                            except json.JSONDecodeError:
+                                continue
+                except GeneratorExit:
+                    # Handle generator cleanup properly
+                    logger.info("Anthropic streaming generator closed")
+                    return
             
             logger.info(
                 "Anthropic streaming completed",
@@ -288,12 +293,12 @@ class AnthropicProvider:
                         model=model, 
                         error=error_details,
                         error_type=type(e).__name__)
-            yield {
+            yield json.dumps({
                 "type": "error",
                 "error": error_details,
                 "provider": self.name,
                 "model": model
-            }
+            })
     
     async def generate_completion(
         self,

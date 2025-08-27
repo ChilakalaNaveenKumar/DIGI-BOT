@@ -7,6 +7,7 @@ and cost.
 """
 
 import os
+import json
 from typing import Dict, List, Optional, Any, AsyncGenerator
 from openai import AsyncOpenAI
 from .model_config import (
@@ -92,7 +93,7 @@ class SmartModelClient:
         # Get model config
         config = get_model_config(model)
         if not config:
-            yield {"type": "error", "error": f"Unknown model: {model}"}
+            yield json.dumps({"type": "error", "error": f"Unknown model: {model}"})
             return
         
         # Estimate input tokens (rough)
@@ -106,7 +107,7 @@ class SmartModelClient:
         
         # Validate tool support
         if tools and not config.supports_tools:
-            yield {"type": "error", "error": f"Model {model} does not support tools"}
+            yield json.dumps({"type": "error", "error": f"Model {model} does not support tools"})
             return
         
         # Build content

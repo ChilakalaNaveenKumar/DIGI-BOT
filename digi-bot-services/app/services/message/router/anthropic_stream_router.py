@@ -17,6 +17,8 @@ import structlog
 from app.services.ai_providers.anthropic_provider import AnthropicProvider
 
 from app.services.component_matcher import VectorStoreManager
+from app.services.file_processing.user_vector_store import UserVectorStoreManager
+from app.services.file_processing.file_aware_chat import FileAwareChatService
 
 from app.models.user import User
 from app.models.conversation import Conversation, Message, MessageRole, ConversationStatus
@@ -159,6 +161,8 @@ class StreamRequest(BaseModel):
     conversation_id: Optional[int] = None  # NEW: For saving messages
     files: Optional[List[dict]] = None
     user_id: Optional[int] = None
+    # File attachments for file-aware chat
+    attachments: Optional[List[dict]] = None
     # Vector context
     file_ids: Optional[List[int]] = None
     # AI settings
@@ -174,11 +178,12 @@ class StreamRequest(BaseModel):
 
 
 class ContextProcessor:
-    """Processes vector context from file vectors."""
+    """Processes vector context from file vectors and user files."""
     
     def __init__(self, db: AsyncSession):
         self.db = db
         self.vector_store_manager = VectorStoreManager()
+        self.user_vector_manager = UserVectorStoreManager()
         self._initialized = False
     
     async def initialize(self):
@@ -255,6 +260,15 @@ class ContextProcessor:
         context_parts.insert(2, "")
         
         return "\n".join(context_parts)
+    
+    async def get_user_vector_store_id(self, user_id: int) -> Optional[str]:
+        """Get the user's vector store ID for file search."""
+        try:
+            vector_store_id = await self.user_vector_manager.get_user_vector_store(user_id)
+            return vector_store_id
+        except Exception as e:
+            logger.error("Failed to get user vector store", user_id=user_id, error=str(e))
+            return None
 
 
 
@@ -263,7 +277,6 @@ class ContextProcessor:
 @router.post("", response_class=StreamingResponse)
 async def stream_endpoint(
     request: StreamRequest,
-    db: AsyncSession = Depends(get_db_session),
     current_user: Dict[str, Any] = Depends(get_current_user_required),
     settings = Depends(get_settings)
 ):
@@ -320,18 +333,79 @@ async def stream_endpoint(
             provider = AnthropicProvider()
             await provider.initialize()
             
-            # Build system message (NO vector context)
+            # Check for user's vector store (for file-aware chat)
+            vector_store_id = None
+            try:
+                # Create database session manually for streaming context
+                async for db in get_db_session():
+                    # Initialize context processor
+                    context_processor = ContextProcessor(db)
+                    await context_processor.initialize()
+                    
+                    # Always get user's vector store ID (they might have uploaded files before)
+                    vector_store_id = await context_processor.get_user_vector_store_id(user_id)
+                    break  # Exit after getting the vector store ID
+                
+                if vector_store_id:
+                    if request.attachments and len(request.attachments) > 0:
+                        logger.info("File attachments detected, using hybrid file-aware chat", 
+                                  user_id=user_id, 
+                                  file_count=len(request.attachments),
+                                  vector_store_id=vector_store_id)
+                    else:
+                        logger.info("User has vector store, file-aware chat available", 
+                                  user_id=user_id, 
+                                  vector_store_id=vector_store_id)
+            except Exception as e:
+                logger.error("Failed to get user vector store", user_id=user_id, error=str(e))
+            
+            # Build system message
             system_content = """You are Digi Setu AI, an advanced AI assistant with comprehensive capabilities.
 
 **Important Guidelines:**
 - Provide well-formatted, helpful responses using markdown when it improves readability
 - Be conversational and helpful while maintaining accuracy
-- Focus on providing clear, informative responses to user questions"""
+- Focus on providing clear, informative responses to user questions
+- When files are attached, reference their content to provide detailed, accurate answers"""
             
             system_message = {"role": "system", "content": system_content}
             final_messages = [system_message] + request.messages
             
-            # Start streaming with thinking blocks
+            # Use smart Claude chat if files are attached
+            if vector_store_id:
+                # Determine if this is the first message with files
+                is_first_message_with_files = False
+                if request.attachments and len(request.attachments) > 0:
+                    # Check if this is the first user message in the conversation
+                    user_messages = [msg for msg in request.messages if msg.get('role') == 'user']
+                    is_first_message_with_files = len(user_messages) <= 1
+                
+                # Extract file names for smart detection
+                attached_file_names = []
+                if request.attachments:
+                    attached_file_names = [att.get('name', '') for att in request.attachments]
+                
+                # Use smart Claude approach: Always Claude, smart file context inclusion
+                file_chat_service = FileAwareChatService()
+                
+                async for chunk in file_chat_service.smart_claude_chat_stream(
+                    messages=final_messages,
+                    vector_store_id=vector_store_id,
+                    anthropic_provider=provider,
+                    model=request.model,
+                    temperature=request.temperature,
+                    attached_file_names=attached_file_names,
+                    is_first_message_with_files=is_first_message_with_files
+                ):
+                    # Format as SSE event
+                    if isinstance(chunk, dict):
+                        yield f"data: {json.dumps(chunk)}\n\n"
+                    else:
+                        yield chunk
+                
+                return  # Exit early, smart chat handles the response
+            
+            # No files attached, use regular Anthropic streaming
             if request.enable_thinking:
                 yield f"data: {json.dumps({'type': 'thinking_start'})}\n\n"
             

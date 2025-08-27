@@ -17,5 +17,8 @@ Supported file types:
 from .file_analyzer import FileAnalyzer, AnalyzeLimits, AnalyzeResult
 from .vector_store_saver import VectorStoreSaver
 from .text_vector_saver import TextVectorSaver
+from .user_vector_store import UserVectorStoreManager
+from .file_aware_chat import FileAwareChatService
+from .smart_file_context import SmartFileContextDetector
 
-__all__ = ["FileAnalyzer", "AnalyzeLimits", "AnalyzeResult", "VectorStoreSaver", "TextVectorSaver"]
+__all__ = ["FileAnalyzer", "AnalyzeLimits", "AnalyzeResult", "VectorStoreSaver", "TextVectorSaver", "UserVectorStoreManager", "FileAwareChatService", "SmartFileContextDetector"]

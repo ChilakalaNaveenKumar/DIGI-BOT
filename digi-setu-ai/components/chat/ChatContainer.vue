@@ -15,9 +15,13 @@
         <!-- Main Input (Digi Setu Style) -->
         <div class="main-input">
           <UiDigiSetuInput
+            ref="inputRef"
             :loading="isLoading || isStreaming || isProcessingComponents"
             placeholder="Ask me anything or describe what you want to create..."
             @send="handleSend"
+            @files-uploaded="handleFilesUploaded"
+            @files-changed="handleFilesChanged"
+            @thinking-mode-changed="handleThinkingModeChanged"
           />
         </div>
         
@@ -50,14 +54,18 @@
         </div>
       </div>
       
-      <!-- Fixed Input at bottom when in chat mode -->
-      <div class="chat-input-area-fixed">
-        <div class="input-with-status">
-          <UiDigiSetuInput
-            :loading="isLoading || isStreaming || isProcessingComponents"
-            placeholder="Reply to Digi Setu..."
-            @send="handleSend"
-          />
+              <!-- Fixed Input at bottom when in chat mode -->
+        <div class="chat-input-area-fixed">
+          <div class="input-with-status">
+            <UiDigiSetuInput
+              ref="chatInputRef"
+              :loading="isLoading || isStreaming || isProcessingComponents"
+              placeholder="Reply to Digi Setu..."
+              @send="handleSend"
+              @files-uploaded="handleFilesUploaded"
+              @files-changed="handleFilesChanged"
+              @thinking-mode-changed="handleThinkingModeChanged"
+            />
           
           <!-- Analysis Status Indicator -->
           <div v-if="isAnalyzing || isProcessingComponents" class="analysis-status">
@@ -75,6 +83,7 @@
 <script setup lang="ts">
 
 // Message type imported by useStreamingChat composable
+const { speak, stop: stopSpeech, isSpeaking } = useTextToSpeech()
 
 interface ExamplePrompt {
   id: string
@@ -93,7 +102,7 @@ const isProcessingComponents = computed(() => chatStore.isProcessingComponents)
 // conversationTitle available via chatStore.conversationTitle if needed
 
 // Store actions
-const sendMessage = (content: string) => chatStore.sendMessage(content)
+const sendMessage = (content: string, attachments: any[] = [], thinkingMode: boolean = false) => chatStore.sendMessage(content, attachments, thinkingMode)
 const regenerateMessage = (messageId: string | number) => chatStore.regenerateMessage(messageId)
 
 
@@ -101,8 +110,11 @@ const regenerateMessage = (messageId: string | number) => chatStore.regenerateMe
 // Messages are now properly managed by singleton composable
 
 const isAnalyzing = ref(false)
-
 const messagesArea = ref()
+const inputRef = ref()
+const chatInputRef = ref()
+const currentFiles = ref<any[]>([])
+const thinkingMode = ref(false)
 
 const examplePrompts: ExamplePrompt[] = [
   {
@@ -130,11 +142,64 @@ const examplePrompts: ExamplePrompt[] = [
 const handleSend = async (content: string) => {
   if (!content.trim()) return
   
+  // Include file attachments in the message
+  const attachments = currentFiles.value.filter(f => f.status === 'uploaded').map(f => ({
+    id: f.id,
+    name: f.name,
+    size: f.size,
+    status: f.status,
+    vectorStoreFileId: f.vectorStoreFileId
+  }))
+  
 
   
   // Use the streaming composable
-  await sendMessage(content.trim())
+  await sendMessage(content.trim(), attachments, thinkingMode.value)
+  
+  // Clear files after sending (moved to after await to ensure attachments are sent)
+  currentFiles.value = []
+  if (inputRef.value?.clearFiles) {
+    inputRef.value.clearFiles()
+  }
+  if (chatInputRef.value?.clearFiles) {
+    chatInputRef.value.clearFiles()
+  }
 }
+
+const handleThinkingModeChanged = (enabled: boolean) => {
+  thinkingMode.value = enabled
+  console.log('Thinking mode:', enabled ? 'enabled' : 'disabled')
+}
+
+const handleFilesUploaded = (files: any[]) => {
+  console.log('Files uploaded:', files)
+  // Files are already in currentFiles via handleFilesChanged
+}
+
+const handleFilesChanged = (files: any[]) => {
+  currentFiles.value = files
+}
+
+// Watch for new AI messages and speak them in voice mode
+watch(messages, (newMessages, oldMessages) => {
+  if (newMessages.length > oldMessages.length) {
+    const latestMessage = newMessages[newMessages.length - 1]
+    
+    // Check if it's an AI message that just finished streaming
+    if (latestMessage.role === 'assistant' && 
+        !latestMessage.isStreaming && 
+        !latestMessage.isLoading &&
+        latestMessage.content.trim()) {
+      
+      // Check if user is in voice mode (check if input component has voice mode active)
+      const inputComponent = inputRef.value || chatInputRef.value
+      if (inputComponent?.isVoiceMode) {
+        // Speak the AI response
+        speak(latestMessage.content)
+      }
+    }
+  }
+}, { deep: true })
 
 // Removed simulateAIResponse - now using real streaming via useStreamingChat()
 
@@ -297,7 +362,7 @@ watch(messages, () => {
   margin: 0 auto;
   width: 100%;
   overflow: visible;
-  padding-bottom: 140px; /* Extra space for message actions visibility */
+  padding-bottom: 300px; /* Extra space for message actions visibility */
 }
 
 .messages-list {
@@ -391,7 +456,7 @@ watch(messages, () => {
   }
   
   .chat-messages {
-    padding-bottom: 160px; /* Extra space for message actions on mobile */
+    padding-bottom: 300px; /* Extra space for message actions on mobile */
   }
   
   .chat-input-area-fixed {

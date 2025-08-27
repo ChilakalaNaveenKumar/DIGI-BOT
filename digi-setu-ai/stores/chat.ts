@@ -234,7 +234,7 @@ export const useChatStore = defineStore('chat', {
     },
 
     // Streaming message functionality
-    async sendMessage(content: string) {
+    async sendMessage(content: string, attachments: any[] = [], thinkingMode: boolean = false) {
       if (!content.trim() || this.isLoading || this.isStreaming) return
 
       this.setLoading(true)
@@ -245,10 +245,18 @@ export const useChatStore = defineStore('chat', {
           id: Date.now(),
           content: content.trim(),
           role: 'user',
+          attachments: attachments.length > 0 ? attachments : undefined,
           timestamp: new Date(),
           isLoading: false,
           isStreaming: false
         }
+        
+        // Debug logging for attachments
+        if (attachments.length > 0) {
+          console.log('Adding user message with attachments:', attachments)
+          console.log('User message object:', userMessage)
+        }
+        
         this.addMessage(userMessage)
 
         // Create assistant message placeholder
@@ -264,7 +272,7 @@ export const useChatStore = defineStore('chat', {
         this.addMessage(assistantMessage)
 
         // Start streaming
-        await this.streamFromAPI(content, assistantMessage.id)
+        await this.streamFromAPI(content, assistantMessage.id, attachments, thinkingMode)
         
       } catch (error) {
         console.error('Failed to send message:', error)
@@ -273,7 +281,7 @@ export const useChatStore = defineStore('chat', {
       }
     },
 
-    async streamFromAPI(content: string, assistantMessageId: string | number) {
+    async streamFromAPI(content: string, assistantMessageId: string | number, attachments: any[] = [], thinkingMode: boolean = false) {
       this.setStreaming(true)
       this.setReasoning(true)
       this.currentReasoningSteps = []
@@ -285,6 +293,11 @@ export const useChatStore = defineStore('chat', {
         // Build conversation history
         const history = this.buildConversationHistory()
 
+        // Debug logging for request
+        if (attachments.length > 0) {
+          console.log('Sending request with attachments:', attachments)
+        }
+
         const response = await fetch('http://localhost:8000/api/stream', {
           method: 'POST',
           headers: {
@@ -294,9 +307,10 @@ export const useChatStore = defineStore('chat', {
           body: JSON.stringify({
             messages: history,
             conversation_id: this.conversationId,
+            attachments: attachments.length > 0 ? attachments : undefined, // Include file attachments
             model: "claude-sonnet-4-20250514",
-            enable_thinking: true,
-            thinking_budget: 5000,
+            enable_thinking: thinkingMode,
+            thinking_budget: thinkingMode ? 5000 : 0,
             enable_web_search: true,
             temperature: 0.7
           })
@@ -444,7 +458,7 @@ export const useChatStore = defineStore('chat', {
         if (response.ok) {
           const result = await response.json()
           console.log('Component matcher result:', result)
-          if (result.success && result.has_matches) {
+          if (result.success && result.has_matches && result.data && result.data.matches) {
             console.log('Found', result.data.matches.length, 'component matches')
             console.log('Original content length:', assistantMessage.length)
             console.log('Processing content for component insertion...')

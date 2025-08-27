@@ -25,6 +25,22 @@
         </span>
       </div>
       
+      <!-- File Attachments -->
+      <div v-if="message.attachments && message.attachments.length > 0" class="message-attachments">
+        <div class="attachments-list">
+          <UiFileAttachment
+            v-for="attachment in message.attachments"
+            :key="attachment.id"
+            :filename="attachment.name"
+            :size="attachment.size"
+            :status="attachment.status"
+            :compact="true"
+          />
+        </div>
+      </div>
+      
+
+      
       <div class="message-body">
         <!-- Loading State -->
         <UiLoadingDots v-if="message.isLoading" size="sm" />
@@ -412,6 +428,17 @@ const regenerateMessage = () => {
   background: none;
   white-space: pre-wrap;
   word-break: break-word;
+}
+
+/* File Attachments */
+.message-attachments {
+  margin-bottom: 12px;
+}
+
+.attachments-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
 }
 
 /* Animations */

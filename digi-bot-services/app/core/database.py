@@ -121,9 +121,7 @@ async def _create_mock_user() -> None:
                 name="Development User",
                 picture="https://via.placeholder.com/150",
                 is_active=True,
-                verified_email=True,
-                preferred_ai_provider="anthropic",
-                theme_preference="light"
+                verified_email=True
             )
             
             db.add(mock_user)

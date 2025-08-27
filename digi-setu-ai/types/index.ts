@@ -7,6 +7,16 @@ export interface User {
   verified_email: boolean
 }
 
+// File attachment types
+export interface FileAttachment {
+  id: string
+  name: string
+  size: number
+  status: 'pending' | 'uploading' | 'uploaded' | 'error'
+  vectorStoreFileId?: string
+  error?: string
+}
+
 // Message types for chat interface
 export interface Message {
   id: string | number
@@ -22,6 +32,7 @@ export interface Message {
   reasoning?: string
   toolCalls?: ToolCall[]
   components?: GeneratedComponent[]
+  attachments?: FileAttachment[]
 }
 
 export interface ReasoningStep {

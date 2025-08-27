@@ -287,7 +287,7 @@ async def get_current_user(token: str = None) -> User:
                         self.email = "dev@digisetu.ai"
                         self.full_name = "Development User"
                         self.is_active = True
-                        self.preferred_ai_provider = "openai"
+
                         self.theme_preference = "light"
                         self.language_preference = "en"
                 
@@ -302,7 +302,7 @@ async def get_current_user(token: str = None) -> User:
                 self.email = "dev@digisetu.ai"
                 self.full_name = "Development User"
                 self.is_active = True
-                self.preferred_ai_provider = "openai"
+
                 self.theme_preference = "light"
                 self.language_preference = "en"
         

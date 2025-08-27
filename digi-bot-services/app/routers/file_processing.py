@@ -16,6 +16,7 @@ import aiofiles
 
 from app.services.auth.core.auth_deps import get_current_user_required
 from app.services.file_processing import FileAnalyzer, AnalyzeLimits, AnalyzeResult, VectorStoreSaver, TextVectorSaver
+from app.services.file_processing.user_vector_store import UserVectorStoreManager
 
 logger = structlog.get_logger(__name__)
 
@@ -49,6 +50,7 @@ class FileProcessingRouter:
         self.file_analyzer = FileAnalyzer()
         self.vector_saver = VectorStoreSaver()
         self.text_vector_saver = TextVectorSaver()
+        self.user_vector_manager = UserVectorStoreManager()
     
     async def initialize(self):
         """Initialize file processing clients"""
@@ -440,6 +442,163 @@ async def upload_to_vector_store(
         raise HTTPException(
             status_code=500,
             detail=f"Vector store file upload failed: {str(e)}"
+        )
+
+
+@router.post("/upload-for-chat")
+async def upload_file_for_chat(
+    file: UploadFile = File(..., description="File to upload for chat"),
+    current_user: Dict[str, Any] = Depends(get_current_user_required)
+):
+    """
+    Upload a file to the user's personal vector store for chat functionality.
+    This creates a user-specific vector store and uploads the file for file-aware chat.
+    """
+    try:
+        user_id = current_user["id"]
+        
+        # Validate file size (25MB limit)
+        max_size = 25 * 1024 * 1024
+        if file.size and file.size > max_size:
+            raise HTTPException(
+                status_code=413,
+                detail=f"File too large. Maximum size is {max_size} bytes."
+            )
+        
+        # Save uploaded file temporarily
+        temp_file = None
+        try:
+            # Create temporary file
+            suffix = os.path.splitext(file.filename or "file.txt")[1]
+            with tempfile.NamedTemporaryFile(delete=False, suffix=suffix) as temp_file:
+                content = await file.read()
+                temp_file.write(content)
+                temp_path = temp_file.name
+            
+            # Upload to user's vector store
+            result = await file_router.user_vector_manager.upload_file_to_user_store(
+                user_id=user_id,
+                file_path=temp_path,
+                filename=file.filename
+            )
+            
+            logger.info(
+                "File uploaded for chat",
+                user_id=user_id,
+                filename=file.filename,
+                file_id=result["file_id"],
+                vector_store_id=result["vector_store_id"]
+            )
+            
+            return {
+                "success": True,
+                "file": {
+                    "id": result["file_id"],
+                    "filename": result["filename"],
+                    "vector_store_id": result["vector_store_id"],
+                    "vector_store_file_id": result["vector_store_file_id"],
+                    "status": result["status"]
+                },
+                "message": "File uploaded successfully and ready for chat"
+            }
+            
+        finally:
+            # Clean up temporary file
+            if temp_file and os.path.exists(temp_path):
+                os.unlink(temp_path)
+        
+    except Exception as e:
+        logger.error(
+            "Chat file upload error",
+            user_id=current_user["id"],
+            filename=file.filename,
+            error=str(e)
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"File upload failed: {str(e)}"
+        )
+
+
+@router.get("/my-files")
+async def get_user_files(
+    current_user: Dict[str, Any] = Depends(get_current_user_required)
+):
+    """
+    Get all files uploaded by the current user for chat functionality.
+    """
+    try:
+        user_id = current_user["id"]
+        files = await file_router.user_vector_manager.list_user_files(user_id)
+        
+        return {
+            "success": True,
+            "files": files,
+            "count": len(files)
+        }
+        
+    except Exception as e:
+        logger.error("Failed to get user files", user_id=current_user["id"], error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to retrieve files: {str(e)}"
+        )
+
+
+@router.delete("/my-files/{file_id}")
+async def delete_user_file(
+    file_id: str,
+    current_user: Dict[str, Any] = Depends(get_current_user_required)
+):
+    """
+    Delete a file from the user's vector store.
+    """
+    try:
+        user_id = current_user["id"]
+        success = await file_router.user_vector_manager.delete_user_file(user_id, file_id)
+        
+        if success:
+            return {
+                "success": True,
+                "message": "File deleted successfully"
+            }
+        else:
+            raise HTTPException(
+                status_code=404,
+                detail="File not found or could not be deleted"
+            )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("Failed to delete user file", user_id=current_user["id"], file_id=file_id, error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to delete file: {str(e)}"
+        )
+
+
+@router.get("/my-vector-store/stats")
+async def get_user_vector_store_stats(
+    current_user: Dict[str, Any] = Depends(get_current_user_required)
+):
+    """
+    Get statistics about the user's vector store.
+    """
+    try:
+        user_id = current_user["id"]
+        stats = await file_router.user_vector_manager.get_store_stats(user_id)
+        
+        return {
+            "success": True,
+            "stats": stats
+        }
+        
+    except Exception as e:
+        logger.error("Failed to get vector store stats", user_id=current_user["id"], error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to get stats: {str(e)}"
         )
 
 
